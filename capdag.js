@@ -3148,7 +3148,7 @@ class CapArgumentValue {
 /**
  * An edge in the capability graph representing a conversion from one media URN to another.
  */
-class CapGraphEdge {
+class CapFabEdge {
   /**
    * @param {string} fromUrn - The input media URN
    * @param {string} toUrn - The output media URN
@@ -3168,7 +3168,7 @@ class CapGraphEdge {
 /**
  * Statistics about a capability graph.
  */
-class CapGraphStats {
+class CapFabStats {
   /**
    * @param {number} nodeCount - Number of unique media URN nodes
    * @param {number} edgeCount - Number of edges (capabilities)
@@ -3187,7 +3187,7 @@ class CapGraphStats {
  * A directed graph where nodes are media URNs and edges are capabilities.
  * This graph enables discovering conversion paths between different media formats.
  */
-class CapGraph {
+class CapFab {
   constructor() {
     this.edges = [];
     this.outgoing = new Map();  // fromUrn -> edge indices
@@ -3211,7 +3211,7 @@ class CapGraph {
 
     // Create edge
     const edgeIndex = this.edges.length;
-    const edge = new CapGraphEdge(fromUrn, toUrn, cap, registryName, specificity);
+    const edge = new CapFabEdge(fromUrn, toUrn, cap, registryName, specificity);
     this.edges.push(edge);
 
     // Update outgoing index
@@ -3237,7 +3237,7 @@ class CapGraph {
 
   /**
    * Get all edges in the graph.
-   * @returns {CapGraphEdge[]}
+   * @returns {CapFabEdge[]}
    */
   getEdges() {
     return [...this.edges];
@@ -3247,7 +3247,7 @@ class CapGraph {
    * Get all edges where the provided URN satisfies the edge's input requirement.
    * Uses conformsTo-based matching instead of exact string matching.
    * @param {string} urn - The media URN
-   * @returns {CapGraphEdge[]}
+   * @returns {CapFabEdge[]}
    */
   getOutgoing(urn) {
     // Use TaggedUrn matching: find all edges where the provided URN (instance)
@@ -3268,7 +3268,7 @@ class CapGraph {
   /**
    * Get all edges targeting a media URN.
    * @param {string} urn - The media URN
-   * @returns {CapGraphEdge[]}
+   * @returns {CapFabEdge[]}
    */
   getIncoming(urn) {
     const indices = this.incoming.get(urn) || [];
@@ -3289,7 +3289,7 @@ class CapGraph {
    * Get all direct edges from one URN to another, sorted by specificity (highest first).
    * @param {string} fromUrn - The source media URN
    * @param {string} toUrn - The target media URN
-   * @returns {CapGraphEdge[]}
+   * @returns {CapFabEdge[]}
    */
   getDirectEdges(fromUrn, toUrn) {
     const edges = this.getOutgoing(fromUrn).filter(edge => edge.toUrn === toUrn);
@@ -3338,7 +3338,7 @@ class CapGraph {
    * Find the shortest conversion path from one URN to another.
    * @param {string} fromUrn - The source media URN
    * @param {string} toUrn - The target media URN
-   * @returns {CapGraphEdge[]|null} Array of edges representing the path, or null if no path exists
+   * @returns {CapFabEdge[]|null} Array of edges representing the path, or null if no path exists
    */
   findPath(fromUrn, toUrn) {
     if (fromUrn === toUrn) {
@@ -3393,7 +3393,7 @@ class CapGraph {
    * @param {string} fromUrn - The source media URN
    * @param {string} toUrn - The target media URN
    * @param {number} maxDepth - Maximum path length to search
-   * @returns {CapGraphEdge[][]} Array of paths (each path is an array of edges)
+   * @returns {CapFabEdge[][]} Array of paths (each path is an array of edges)
    */
   findAllPaths(fromUrn, toUrn, maxDepth) {
     if (!this.nodes.has(fromUrn) || !this.nodes.has(toUrn)) {
@@ -3447,7 +3447,7 @@ class CapGraph {
    * @param {string} fromUrn - The source media URN
    * @param {string} toUrn - The target media URN
    * @param {number} maxDepth - Maximum path length to search
-   * @returns {CapGraphEdge[]|null} Array of edges representing the best path, or null if no path exists
+   * @returns {CapFabEdge[]|null} Array of edges representing the best path, or null if no path exists
    */
   findBestPath(fromUrn, toUrn, maxDepth) {
     const allPaths = this.findAllPaths(fromUrn, toUrn, maxDepth);
@@ -3488,10 +3488,10 @@ class CapGraph {
 
   /**
    * Get statistics about the graph.
-   * @returns {CapGraphStats}
+   * @returns {CapFabStats}
    */
   stats() {
-    return new CapGraphStats(
+    return new CapFabStats(
       this.nodes.size,
       this.edges.length,
       this.outgoing.size,
@@ -5183,16 +5183,16 @@ class MachineBuilder {
   }
 
   /**
-   * Add a linear chain of edges from CapGraphEdge[] (from CapGraph.findAllPaths).
+   * Add a linear chain of edges from CapFabEdge[] (from CapFab.findAllPaths).
    *
-   * Each CapGraphEdge has fromUrn, toUrn, and cap (with cap.urn).
+   * Each CapFabEdge has fromUrn, toUrn, and cap (with cap.urn).
    * This converts the path into a series of MachineEdges.
    *
-   * @param {CapGraphEdge[]} capGraphEdges - Array of CapGraphEdge from pathfinding
+   * @param {CapFabEdge[]} capFabEdges - Array of CapFabEdge from pathfinding
    * @returns {MachineBuilder} this (for chaining)
    */
-  addCapGraphPath(capGraphEdges) {
-    for (const edge of capGraphEdges) {
+  addCapFabPath(capFabEdges) {
+    for (const edge of capFabEdges) {
       const source = MediaUrn.fromString(edge.fromUrn);
       const target = MediaUrn.fromString(edge.toUrn);
       this._edges.push(new MachineEdge([source], edge.cap.urn, target, false));
@@ -5501,9 +5501,9 @@ module.exports = {
   mediaUrnForType,
   modelAvailabilityUrn,
   modelPathUrn,
-  CapGraphEdge,
-  CapGraphStats,
-  CapGraph,
+  CapFabEdge,
+  CapFabStats,
+  CapFab,
   StdinSource,
   StdinSourceKind,
   // Cartridge Repository

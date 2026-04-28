@@ -8,7 +8,7 @@ const {
   Cap, MediaSpec, MediaSpecError, MediaSpecErrorCodes,
   resolveMediaUrn, buildExtensionIndex, mediaUrnsForExtension, getExtensionMappings,
   CartridgeInfo, CartridgeCapSummary, CartridgeSuggestion, CartridgeRepoClient, CartridgeRepoServer,
-  CapGraphEdge, CapGraphStats, CapGraph,
+  CapFabEdge, CapFabStats, CapFab,
   StdinSource, StdinSourceKind,
   validateNoMediaSpecRedefinitionSync,
   CapArgumentValue, CapArg, ArgSource, validateCapArgs, ValidationError,
@@ -1147,9 +1147,9 @@ function test110_multipleExtensions() {
 // cap_graph: browse-mode API used by cap-graph-renderer.js
 //
 // The renderer builds its browse graph by:
-//   const capGraph = new CapGraph();
-//   for each cap in /api/capabilities: capGraph.addCap(cap, 'registry');
-//   ... then reads capGraph.edges / getOutgoing(urn) / etc.
+//   const capFab = new CapFab();
+//   for each cap in /api/capabilities: capFab.addCap(cap, 'registry');
+//   ... then reads capFab.edges / getOutgoing(urn) / etc.
 //
 // These tests lock in that specific contract. They do NOT cover
 // buildFromRegistries / CapMatrix / CapBlock — all deleted with the dead
@@ -1158,8 +1158,8 @@ function test110_multipleExtensions() {
 
 // Add a cap and check it becomes an edge with from/to nodes and carries the
 // registry name we passed. This is exactly the shape the renderer depends on.
-function testCapGraphAddCapPopulatesEdgesAndNodes() {
-  const graph = new CapGraph();
+function testCapFabAddCapPopulatesEdgesAndNodes() {
+  const graph = new CapFab();
   const cap = makeGraphCap('media:pdf', 'media:textable', 'PDF to Text');
   graph.addCap(cap, 'registry');
 
@@ -1176,8 +1176,8 @@ function testCapGraphAddCapPopulatesEdgesAndNodes() {
 
 // getOutgoing takes a concrete source URN and returns edges whose from_spec
 // the source conforms to. It must NOT be a plain string lookup.
-function testCapGraphGetOutgoingConformsToMatching() {
-  const graph = new CapGraph();
+function testCapFabGetOutgoingConformsToMatching() {
+  const graph = new CapFab();
   graph.addCap(makeGraphCap('media:textable', 'media:embedding-vector', 'Embed text'), 'registry');
 
   // 'media:txt;textable' conforms to 'media:textable' — renderer relies on
@@ -1197,8 +1197,8 @@ function testCapGraphGetOutgoingConformsToMatching() {
 
 // Each edge must carry the registry name it was added with. This is how
 // the renderer colours/groups edges by provenance in browse mode.
-function testCapGraphDistinctRegistryNames() {
-  const graph = new CapGraph();
+function testCapFabDistinctRegistryNames() {
+  const graph = new CapFab();
   graph.addCap(makeGraphCap('media:pdf', 'media:textable', 'PDF to Text'), 'providers');
   graph.addCap(makeGraphCap('media:textable', 'media:embedding-vector', 'Embed'), 'cartridges');
 
@@ -3700,7 +3700,7 @@ if (typeof global.TaggedUrn === 'undefined') {
 if (typeof global.MediaUrn === 'undefined') global.MediaUrn = MediaUrn;
 if (typeof global.CapUrn === 'undefined') global.CapUrn = CapUrn;
 if (typeof global.Cap === 'undefined') global.Cap = Cap;
-if (typeof global.CapGraph === 'undefined') global.CapGraph = CapGraph;
+if (typeof global.CapFab === 'undefined') global.CapFab = CapFab;
 // Reference the top-of-file destructured createCap via the module export.
 if (typeof global.createCap === 'undefined') {
   global.createCap = require('./capdag.js').createCap;
@@ -5369,13 +5369,13 @@ async function runTests() {
   runTest('TEST109: extensions_with_metadata_and_validation', test109_extensionsWithMetadataAndValidation);
   runTest('TEST110: multiple_extensions', test110_multipleExtensions);
 
-  // cap-graph-renderer.js uses CapGraph in browse mode (static registry from
+  // cap-graph-renderer.js uses CapFab in browse mode (static registry from
   // /api/capabilities). These tests guard the minimal API the renderer relies
-  // on: new CapGraph(), addCap(cap, registryName), getEdges(), getOutgoing().
+  // on: new CapFab(), addCap(cap, registryName), getEdges(), getOutgoing().
   console.log('\n--- cap_graph (browse-mode API used by cap-graph-renderer) ---');
-  runTest('cap_graph: add_cap_populates_edges_and_nodes', testCapGraphAddCapPopulatesEdgesAndNodes);
-  runTest('cap_graph: get_outgoing_conforms_to_matching', testCapGraphGetOutgoingConformsToMatching);
-  runTest('cap_graph: distinct_registry_names_recorded_per_edge', testCapGraphDistinctRegistryNames);
+  runTest('cap_graph: add_cap_populates_edges_and_nodes', testCapFabAddCapPopulatesEdgesAndNodes);
+  runTest('cap_graph: get_outgoing_conforms_to_matching', testCapFabGetOutgoingConformsToMatching);
+  runTest('cap_graph: distinct_registry_names_recorded_per_edge', testCapFabDistinctRegistryNames);
 
   // caller.rs: TEST156-TEST159
   console.log('\n--- caller.rs (StdinSource) ---');

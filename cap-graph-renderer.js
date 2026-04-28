@@ -1,4 +1,4 @@
-// CapGraphRenderer — unified graph rendering for capdag-js
+// CapFabRenderer — unified graph rendering for capdag-js
 //
 // One class, four modes:
 //
@@ -28,7 +28,7 @@
 //   * cytoscape-elk extension (registers itself on `cytoscape`)
 //   * elkjs (via cytoscape-elk)
 //   * TaggedUrn (from tagged-urn browser build)
-//   * CapUrn, MediaUrn, Cap, createCap, CapGraph (from capdag.js)
+//   * CapUrn, MediaUrn, Cap, createCap, CapFab (from capdag.js)
 //
 // The renderer owns its own theme observer (<html data-theme>) so hosts do
 // nothing to drive theme sync. It owns its own tooltip element and its own
@@ -54,13 +54,13 @@ function requireHostDependency(name) {
            : null;
   if (g === null) {
     throw new Error(
-      `CapGraphRenderer: no global object (window/global) — cannot resolve '${name}'`
+      `CapFabRenderer: no global object (window/global) — cannot resolve '${name}'`
     );
   }
   const value = g[name];
   if (value === undefined) {
     throw new Error(
-      `CapGraphRenderer: required host dependency '${name}' is not loaded. ` +
+      `CapFabRenderer: required host dependency '${name}' is not loaded. ` +
       `Load cytoscape, cytoscape-elk, tagged-urn.js, and capdag.js before this script.`
     );
   }
@@ -86,7 +86,7 @@ function cardinalityLabel(input_is_sequence, output_is_sequence) {
 // `CapOutput.is_sequence` names exactly.
 function cardinalityFromCap(cap) {
   if (!cap || typeof cap !== 'object') {
-    throw new Error('CapGraphRenderer: cardinalityFromCap requires a cap object');
+    throw new Error('CapFabRenderer: cardinalityFromCap requires a cap object');
   }
   const args = cap.args || [];
   const mainArg = args.find(arg =>
@@ -112,7 +112,7 @@ function canonicalMediaUrn(mediaUrnString) {
 // allowed to synthesize user-facing labels from URNs.
 function mediaNodeLabel() {
   throw new Error(
-    'CapGraphRenderer: mediaNodeLabel() is no longer supported. ' +
+    'CapFabRenderer: mediaNodeLabel() is no longer supported. ' +
     'Pass explicit media titles/display names to the renderer.'
   );
 }
@@ -124,7 +124,7 @@ function requireExplicitDisplayName(canonicalUrn, displayEntries, context) {
     if (candidate.isEquivalent(entry.media)) return entry.display;
   }
   throw new Error(
-    `CapGraphRenderer: missing explicit display name for ${context} '${canonicalUrn}'`
+    `CapFabRenderer: missing explicit display name for ${context} '${canonicalUrn}'`
   );
 }
 
@@ -142,7 +142,7 @@ function cssVarNumber(name, fallback) {
   const parsed = parseFloat(raw);
   if (!Number.isFinite(parsed)) {
     throw new Error(
-      `CapGraphRenderer: CSS variable '${name}' value '${raw}' is not a number`
+      `CapFabRenderer: CSS variable '${name}' value '${raw}' is not a number`
     );
   }
   return parsed;
@@ -209,7 +209,7 @@ function layoutForMode(mode) {
       'elk.spacing.nodeNode': 40,
     });
   }
-  throw new Error(`CapGraphRenderer: unknown mode '${mode}'`);
+  throw new Error(`CapFabRenderer: unknown mode '${mode}'`);
 }
 
 // =============================================================================
@@ -441,13 +441,13 @@ function createTooltipElement() {
 
 function assertString(value, path) {
   if (typeof value !== 'string' || value.length === 0) {
-    throw new Error(`CapGraphRenderer: ${path} must be a non-empty string`);
+    throw new Error(`CapFabRenderer: ${path} must be a non-empty string`);
   }
 }
 
 function assertArray(value, path) {
   if (!Array.isArray(value)) {
-    throw new Error(`CapGraphRenderer: ${path} must be an array`);
+    throw new Error(`CapFabRenderer: ${path} must be an array`);
   }
 }
 
@@ -455,7 +455,7 @@ function validateBrowseData(data) {
   assertArray(data, 'browse mode data');
   data.forEach((cap, idx) => {
     if (!cap || typeof cap !== 'object') {
-      throw new Error(`CapGraphRenderer browse mode: data[${idx}] is not an object`);
+      throw new Error(`CapFabRenderer browse mode: data[${idx}] is not an object`);
     }
     assertString(cap.urn, `browse mode data[${idx}].urn`);
     assertString(cap.in_spec, `browse mode data[${idx}].in_spec (cap urn: ${cap.urn})`);
@@ -470,37 +470,37 @@ function validateBrowseData(data) {
 // externally-tagged step_type.
 function validateStrandStep(step, path) {
   if (!step || typeof step !== 'object') {
-    throw new Error(`CapGraphRenderer: ${path} is not an object`);
+    throw new Error(`CapFabRenderer: ${path} is not an object`);
   }
   assertString(step.from_spec, `${path}.from_spec`);
   assertString(step.to_spec, `${path}.to_spec`);
   if (!step.step_type || typeof step.step_type !== 'object') {
-    throw new Error(`CapGraphRenderer: ${path}.step_type must be an object`);
+    throw new Error(`CapFabRenderer: ${path}.step_type must be an object`);
   }
   const keys = Object.keys(step.step_type);
   if (keys.length !== 1) {
     throw new Error(
-      `CapGraphRenderer: ${path}.step_type must have exactly one variant key (got: ${keys.join(',')})`
+      `CapFabRenderer: ${path}.step_type must have exactly one variant key (got: ${keys.join(',')})`
     );
   }
   const variant = keys[0];
   if (variant !== 'Cap' && variant !== 'ForEach' && variant !== 'Collect') {
     throw new Error(
-      `CapGraphRenderer: ${path}.step_type variant must be Cap | ForEach | Collect (got: ${variant})`
+      `CapFabRenderer: ${path}.step_type variant must be Cap | ForEach | Collect (got: ${variant})`
     );
   }
   const body = step.step_type[variant];
   if (!body || typeof body !== 'object') {
-    throw new Error(`CapGraphRenderer: ${path}.step_type.${variant} must be an object`);
+    throw new Error(`CapFabRenderer: ${path}.step_type.${variant} must be an object`);
   }
   if (variant === 'Cap') {
     assertString(body.cap_urn, `${path}.step_type.Cap.cap_urn`);
     assertString(body.title, `${path}.step_type.Cap.title`);
     if (typeof body.input_is_sequence !== 'boolean') {
-      throw new Error(`CapGraphRenderer: ${path}.step_type.Cap.input_is_sequence must be a boolean`);
+      throw new Error(`CapFabRenderer: ${path}.step_type.Cap.input_is_sequence must be a boolean`);
     }
     if (typeof body.output_is_sequence !== 'boolean') {
-      throw new Error(`CapGraphRenderer: ${path}.step_type.Cap.output_is_sequence must be a boolean`);
+      throw new Error(`CapFabRenderer: ${path}.step_type.Cap.output_is_sequence must be a boolean`);
     }
   } else {
     assertString(body.media_spec, `${path}.step_type.${variant}.media_spec`);
@@ -509,7 +509,7 @@ function validateStrandStep(step, path) {
 
 function validateStrandPayload(data) {
   if (!data || typeof data !== 'object') {
-    throw new Error('CapGraphRenderer strand mode: data must be an object');
+    throw new Error('CapFabRenderer strand mode: data must be an object');
   }
   assertString(data.source_spec, 'strand mode data.source_spec');
   assertString(data.target_spec, 'strand mode data.target_spec');
@@ -519,28 +519,28 @@ function validateStrandPayload(data) {
   });
   if (data.media_display_names !== undefined
       && (data.media_display_names === null || typeof data.media_display_names !== 'object')) {
-    throw new Error('CapGraphRenderer strand mode: data.media_display_names must be an object when present');
+    throw new Error('CapFabRenderer strand mode: data.media_display_names must be an object when present');
   }
   if (data.source_display !== undefined && typeof data.source_display !== 'string') {
-    throw new Error('CapGraphRenderer strand mode: data.source_display must be a string when present');
+    throw new Error('CapFabRenderer strand mode: data.source_display must be a string when present');
   }
 }
 
 function validateBodyOutcome(outcome, path) {
   if (!outcome || typeof outcome !== 'object') {
-    throw new Error(`CapGraphRenderer: ${path} is not an object`);
+    throw new Error(`CapFabRenderer: ${path} is not an object`);
   }
   if (typeof outcome.body_index !== 'number' || !Number.isInteger(outcome.body_index) || outcome.body_index < 0) {
-    throw new Error(`CapGraphRenderer: ${path}.body_index must be a non-negative integer`);
+    throw new Error(`CapFabRenderer: ${path}.body_index must be a non-negative integer`);
   }
   if (typeof outcome.success !== 'boolean') {
-    throw new Error(`CapGraphRenderer: ${path}.success must be a boolean`);
+    throw new Error(`CapFabRenderer: ${path}.success must be a boolean`);
   }
   assertArray(outcome.cap_urns, `${path}.cap_urns`);
   outcome.cap_urns.forEach((u, i) => assertString(u, `${path}.cap_urns[${i}]`));
   if (outcome.failed_cap !== undefined && outcome.failed_cap !== null
       && (typeof outcome.failed_cap !== 'string' || outcome.failed_cap.length === 0)) {
-    throw new Error(`CapGraphRenderer: ${path}.failed_cap must be a non-empty string when present`);
+    throw new Error(`CapFabRenderer: ${path}.failed_cap must be a non-empty string when present`);
   }
   if (!outcome.success && outcome.failed_cap === undefined) {
     // Failure without a failed_cap is allowed (e.g. infrastructure
@@ -552,10 +552,10 @@ function validateBodyOutcome(outcome, path) {
 
 function validateRunPayload(data) {
   if (!data || typeof data !== 'object') {
-    throw new Error('CapGraphRenderer run mode: data must be an object');
+    throw new Error('CapFabRenderer run mode: data must be an object');
   }
   if (!data.resolved_strand || typeof data.resolved_strand !== 'object') {
-    throw new Error('CapGraphRenderer run mode: data.resolved_strand must be an object');
+    throw new Error('CapFabRenderer run mode: data.resolved_strand must be an object');
   }
   validateStrandPayload(Object.assign({}, data.resolved_strand, {
     media_display_names: data.media_display_names,
@@ -565,28 +565,28 @@ function validateRunPayload(data) {
     validateBodyOutcome(o, `run mode data.body_outcomes[${idx}]`);
   });
   if (typeof data.visible_success_count !== 'number' || data.visible_success_count < 0) {
-    throw new Error('CapGraphRenderer run mode: data.visible_success_count must be a non-negative number');
+    throw new Error('CapFabRenderer run mode: data.visible_success_count must be a non-negative number');
   }
   if (typeof data.visible_failure_count !== 'number' || data.visible_failure_count < 0) {
-    throw new Error('CapGraphRenderer run mode: data.visible_failure_count must be a non-negative number');
+    throw new Error('CapFabRenderer run mode: data.visible_failure_count must be a non-negative number');
   }
   if (typeof data.total_body_count !== 'number' || data.total_body_count < 0) {
-    throw new Error('CapGraphRenderer run mode: data.total_body_count must be a non-negative number');
+    throw new Error('CapFabRenderer run mode: data.total_body_count must be a non-negative number');
   }
 }
 
 function validateEditorGraphPayload(data) {
   if (!data || typeof data !== 'object') {
-    throw new Error('CapGraphRenderer editor-graph mode: data must be an object');
+    throw new Error('CapFabRenderer editor-graph mode: data must be an object');
   }
   assertArray(data.elements, 'editor-graph mode data.elements');
   data.elements.forEach((el, idx) => {
     if (!el || typeof el !== 'object') {
-      throw new Error(`CapGraphRenderer editor-graph mode: data.elements[${idx}] is not an object`);
+      throw new Error(`CapFabRenderer editor-graph mode: data.elements[${idx}] is not an object`);
     }
     if (el.kind !== 'node' && el.kind !== 'cap' && el.kind !== 'edge') {
       throw new Error(
-        `CapGraphRenderer editor-graph mode: data.elements[${idx}].kind must be "node" | "cap" | "edge" (got: ${JSON.stringify(el.kind)})`
+        `CapFabRenderer editor-graph mode: data.elements[${idx}].kind must be "node" | "cap" | "edge" (got: ${JSON.stringify(el.kind)})`
       );
     }
     assertString(el.graph_id, `editor-graph mode data.elements[${idx}].graph_id`);
@@ -619,17 +619,17 @@ function validateEditorGraphPayload(data) {
 //   }
 function validateResolvedMachinePayload(data) {
   if (!data || typeof data !== 'object') {
-    throw new Error('CapGraphRenderer machine mode: data must be an object');
+    throw new Error('CapFabRenderer machine mode: data must be an object');
   }
   assertArray(data.strands, 'machine mode data.strands');
   data.strands.forEach((strand, sIdx) => {
     if (!strand || typeof strand !== 'object') {
-      throw new Error(`CapGraphRenderer machine mode: data.strands[${sIdx}] is not an object`);
+      throw new Error(`CapFabRenderer machine mode: data.strands[${sIdx}] is not an object`);
     }
     assertArray(strand.nodes, `machine mode data.strands[${sIdx}].nodes`);
     strand.nodes.forEach((n, nIdx) => {
       if (!n || typeof n !== 'object') {
-        throw new Error(`CapGraphRenderer machine mode: data.strands[${sIdx}].nodes[${nIdx}] is not an object`);
+        throw new Error(`CapFabRenderer machine mode: data.strands[${sIdx}].nodes[${nIdx}] is not an object`);
       }
       assertString(n.id, `machine mode data.strands[${sIdx}].nodes[${nIdx}].id`);
       assertString(n.urn, `machine mode data.strands[${sIdx}].nodes[${nIdx}].urn`);
@@ -638,18 +638,18 @@ function validateResolvedMachinePayload(data) {
     assertArray(strand.edges, `machine mode data.strands[${sIdx}].edges`);
     strand.edges.forEach((e, eIdx) => {
       if (!e || typeof e !== 'object') {
-        throw new Error(`CapGraphRenderer machine mode: data.strands[${sIdx}].edges[${eIdx}] is not an object`);
+        throw new Error(`CapFabRenderer machine mode: data.strands[${sIdx}].edges[${eIdx}] is not an object`);
       }
       assertString(e.alias, `machine mode data.strands[${sIdx}].edges[${eIdx}].alias`);
       assertString(e.cap_urn, `machine mode data.strands[${sIdx}].edges[${eIdx}].cap_urn`);
       assertString(e.title, `machine mode data.strands[${sIdx}].edges[${eIdx}].title`);
       if (typeof e.is_loop !== 'boolean') {
-        throw new Error(`CapGraphRenderer machine mode: data.strands[${sIdx}].edges[${eIdx}].is_loop must be boolean`);
+        throw new Error(`CapFabRenderer machine mode: data.strands[${sIdx}].edges[${eIdx}].is_loop must be boolean`);
       }
       assertArray(e.assignment, `machine mode data.strands[${sIdx}].edges[${eIdx}].assignment`);
       e.assignment.forEach((b, bIdx) => {
         if (!b || typeof b !== 'object') {
-          throw new Error(`CapGraphRenderer machine mode: data.strands[${sIdx}].edges[${eIdx}].assignment[${bIdx}] is not an object`);
+          throw new Error(`CapFabRenderer machine mode: data.strands[${sIdx}].edges[${eIdx}].assignment[${bIdx}] is not an object`);
         }
         assertString(b.cap_arg_media_urn, `machine mode data.strands[${sIdx}].edges[${eIdx}].assignment[${bIdx}].cap_arg_media_urn`);
         assertString(b.source_node, `machine mode data.strands[${sIdx}].edges[${eIdx}].assignment[${bIdx}].source_node`);
@@ -700,11 +700,11 @@ function buildBrowseGraphData(capabilities) {
 
   const CapUrn = requireHostDependency('CapUrn');
   const createCap = requireHostDependency('createCap');
-  const CapGraph = requireHostDependency('CapGraph');
+  const CapFab = requireHostDependency('CapFab');
 
   const nodesMap = new Map();
   const edges = [];
-  const capGraph = new CapGraph();
+  const capFab = new CapFab();
   const mediaTitles = new Map();
   const capabilitiesByEdgeId = new Map();
 
@@ -729,8 +729,8 @@ function buildBrowseGraphData(capabilities) {
     // malformed registry data.
     const parsedUrn = CapUrn.fromString(capData.urn);
     const cap = createCap(parsedUrn, title, capData.command || '');
-    const capGraphEdgeIndex = capGraph.edges.length;
-    capGraph.addCap(cap, 'registry');
+    const capFabEdgeIndex = capFab.edges.length;
+    capFab.addCap(cap, 'registry');
 
     edges.push({
       id: edgeId,
@@ -738,7 +738,7 @@ function buildBrowseGraphData(capabilities) {
       target: outSpec,
       title,
       capability: capData,
-      capGraphEdgeIndex,
+      capFabEdgeIndex,
     });
     capabilitiesByEdgeId.set(edgeId, capData);
   }
@@ -751,7 +751,7 @@ function buildBrowseGraphData(capabilities) {
   for (const node of nodes) {
     if (!mediaTitles.has(node.id)) {
       throw new Error(
-        `CapGraphRenderer browse mode: missing explicit media title for '${node.id}'`
+        `CapFabRenderer browse mode: missing explicit media title for '${node.id}'`
       );
     }
   }
@@ -765,7 +765,7 @@ function buildBrowseGraphData(capabilities) {
     reverseAdj.get(edge.target).add(edge.source);
   }
 
-  return { nodes, edges, adjacency, reverseAdj, capGraph, mediaTitles, capabilitiesByEdgeId };
+  return { nodes, edges, adjacency, reverseAdj, capFab, mediaTitles, capabilitiesByEdgeId };
 }
 
 function browseCytoscapeElements(built) {
@@ -791,7 +791,7 @@ function browseCytoscapeElements(built) {
         title: edge.title,
         cardinality,
         fullUrn: edge.capability.urn,
-        capGraphEdgeIndex: edge.capGraphEdgeIndex,
+        capFabEdgeIndex: edge.capFabEdgeIndex,
         color: edge.color,
       },
     };
@@ -992,7 +992,7 @@ function buildStrandGraphData(data) {
           // Outer ForEach with no body caps is an illegal nesting; the
           // plan builder throws. Mirror that.
           throw new Error(
-            `CapGraphRenderer strand: nested ForEach at step[${i}] but outer ForEach at step[${outer.index}] has no body caps`
+            `CapFabRenderer strand: nested ForEach at step[${i}] but outer ForEach at step[${outer.index}] has no body caps`
           );
         }
         prevNodeId = finalizeOuterForEach(outer, entry, exit);
@@ -1041,7 +1041,7 @@ function buildStrandGraphData(data) {
       return;
     }
 
-    throw new Error(`CapGraphRenderer strand: unknown step_type variant '${variant}' at step[${i}]`);
+    throw new Error(`CapFabRenderer strand: unknown step_type variant '${variant}' at step[${i}]`);
   });
 
   // Handle unclosed ForEach after the walk. Mirrors plan_builder.rs:362-428.
@@ -1936,7 +1936,7 @@ function buildResolvedMachineGraphData(data) {
       // fail hard rather than silently dropping.
       if (seenNodeIds.has(node.id)) {
         throw new Error(
-          `CapGraphRenderer machine mode: duplicate node id "${node.id}" in strand ${strandIdx}`
+          `CapFabRenderer machine mode: duplicate node id "${node.id}" in strand ${strandIdx}`
         );
       }
       seenNodeIds.add(node.id);
@@ -2005,18 +2005,18 @@ function resolvedMachineCytoscapeElements(built) {
 // Renderer class.
 // =============================================================================
 
-class CapGraphRenderer {
+class CapFabRenderer {
   constructor(containerOrId, options) {
     if (options === undefined || options === null) {
-      throw new Error('CapGraphRenderer: options object is required');
+      throw new Error('CapFabRenderer: options object is required');
     }
     if (typeof options !== 'object') {
-      throw new Error('CapGraphRenderer: options must be an object');
+      throw new Error('CapFabRenderer: options must be an object');
     }
     const mode = options.mode;
     if (mode !== 'browse' && mode !== 'strand' && mode !== 'run' && mode !== 'machine' && mode !== 'editor-graph') {
       throw new Error(
-        `CapGraphRenderer: options.mode must be one of "browse", "strand", "run", "machine", "editor-graph" (got ${JSON.stringify(mode)})`
+        `CapFabRenderer: options.mode must be one of "browse", "strand", "run", "machine", "editor-graph" (got ${JSON.stringify(mode)})`
       );
     }
 
@@ -2041,12 +2041,12 @@ class CapGraphRenderer {
     if (typeof containerOrId === 'string') {
       container = document.getElementById(containerOrId);
       if (!container) {
-        throw new Error(`CapGraphRenderer: container element '${containerOrId}' not found`);
+        throw new Error(`CapFabRenderer: container element '${containerOrId}' not found`);
       }
     } else if (containerOrId instanceof Element) {
       container = containerOrId;
     } else {
-      throw new Error('CapGraphRenderer: first argument must be a container id string or an Element');
+      throw new Error('CapFabRenderer: first argument must be a container id string or an Element');
     }
 
     this.container = container;
@@ -2070,7 +2070,7 @@ class CapGraphRenderer {
     this.edges = [];
     this.adjacency = new Map();
     this.reverseAdj = new Map();
-    this.capGraph = null;
+    this.capFab = null;
     this.capabilitiesByEdgeId = new Map();
     this._mediaTitles = new Map();
     this._pendingFocusCap = null;
@@ -2108,7 +2108,7 @@ class CapGraphRenderer {
 
   setNavigator(navigator) {
     if (this.mode !== 'browse') {
-      throw new Error(`CapGraphRenderer: setNavigator is only valid in browse mode (current: ${this.mode})`);
+      throw new Error(`CapFabRenderer: setNavigator is only valid in browse mode (current: ${this.mode})`);
     }
     this.navigator = navigator;
   }
@@ -2124,7 +2124,7 @@ class CapGraphRenderer {
       this.edges = built.edges;
       this.adjacency = built.adjacency;
       this.reverseAdj = built.reverseAdj;
-      this.capGraph = built.capGraph;
+      this.capFab = built.capFab;
       this._mediaTitles = built.mediaTitles;
       this.capabilitiesByEdgeId = built.capabilitiesByEdgeId;
       return this;
@@ -2152,7 +2152,7 @@ class CapGraphRenderer {
       this._machineBuilt = buildResolvedMachineGraphData(data);
       return this;
     }
-    throw new Error(`CapGraphRenderer: unreachable mode '${this.mode}'`);
+    throw new Error(`CapFabRenderer: unreachable mode '${this.mode}'`);
   }
 
   // Compatibility shim for capdag-dot-com browse callers: `buildFromCapabilities`
@@ -2160,7 +2160,7 @@ class CapGraphRenderer {
   buildFromCapabilities(capabilities) {
     if (this.mode !== 'browse') {
       throw new Error(
-        `CapGraphRenderer: buildFromCapabilities is only valid in browse mode (current: ${this.mode})`
+        `CapFabRenderer: buildFromCapabilities is only valid in browse mode (current: ${this.mode})`
       );
     }
     return this.setData(capabilities);
@@ -2172,7 +2172,7 @@ class CapGraphRenderer {
 
   render() {
     if (!this.container) {
-      throw new Error('CapGraphRenderer: container is missing');
+      throw new Error('CapFabRenderer: container is missing');
     }
 
     const elements = this._buildCytoscapeElements();
@@ -2258,7 +2258,7 @@ class CapGraphRenderer {
       if (!this._machineBuilt) return [];
       return resolvedMachineCytoscapeElements(this._machineBuilt);
     }
-    throw new Error(`CapGraphRenderer: unreachable mode '${this.mode}'`);
+    throw new Error(`CapFabRenderer: unreachable mode '${this.mode}'`);
   }
 
   // ===========================================================================
@@ -2409,7 +2409,7 @@ class CapGraphRenderer {
 
   highlightCapability(cap) {
     if (this.mode !== 'browse') {
-      throw new Error(`CapGraphRenderer: highlightCapability is only valid in browse mode (current: ${this.mode})`);
+      throw new Error(`CapFabRenderer: highlightCapability is only valid in browse mode (current: ${this.mode})`);
     }
     if (!this.cy || !this._layoutReady) {
       this._pendingFocusCap = cap;
@@ -2435,10 +2435,10 @@ class CapGraphRenderer {
 
   _capUrnString(cap) {
     if (!cap || typeof cap !== 'object') {
-      throw new Error('CapGraphRenderer: cap must be an object');
+      throw new Error('CapFabRenderer: cap must be an object');
     }
     if (typeof cap.urn !== 'string' || cap.urn.length === 0) {
-      throw new Error('CapGraphRenderer: cap.urn must be a non-empty string');
+      throw new Error('CapFabRenderer: cap.urn must be a non-empty string');
     }
     return cap.urn;
   }
@@ -2472,7 +2472,7 @@ class CapGraphRenderer {
 
   selectEdgeByCapUrn(capUrnString) {
     if (this.mode !== 'browse') {
-      throw new Error(`CapGraphRenderer: selectEdgeByCapUrn is only valid in browse mode (current: ${this.mode})`);
+      throw new Error(`CapFabRenderer: selectEdgeByCapUrn is only valid in browse mode (current: ${this.mode})`);
     }
     if (!this.cy || typeof capUrnString !== 'string' || capUrnString.length === 0) return;
     const CapUrn = requireHostDependency('CapUrn');
@@ -2523,7 +2523,7 @@ class CapGraphRenderer {
 
   applyEditorGraphActiveTokenIds(tokenIds) {
     if (this.mode !== 'editor-graph') {
-      throw new Error(`CapGraphRenderer: applyEditorGraphActiveTokenIds is only valid in editor-graph mode (current: ${this.mode})`);
+      throw new Error(`CapFabRenderer: applyEditorGraphActiveTokenIds is only valid in editor-graph mode (current: ${this.mode})`);
     }
     if (!this.cy) return;
     const wanted = new Set(tokenIds || []);
@@ -2545,16 +2545,16 @@ class CapGraphRenderer {
 
   enterPathMode(sourceId, targetId) {
     if (this.mode !== 'browse') {
-      throw new Error(`CapGraphRenderer: enterPathMode is only valid in browse mode (current: ${this.mode})`);
+      throw new Error(`CapFabRenderer: enterPathMode is only valid in browse mode (current: ${this.mode})`);
     }
-    if (!this.capGraph) return;
+    if (!this.capFab) return;
 
     const MAX_PATHS = 10;
-    let paths = this.capGraph.findAllPaths(sourceId, targetId, MAX_PATHS);
+    let paths = this.capFab.findAllPaths(sourceId, targetId, MAX_PATHS);
     let actualSource = sourceId;
     let actualTarget = targetId;
     if (paths.length === 0) {
-      const reverse = this.capGraph.findAllPaths(targetId, sourceId, MAX_PATHS);
+      const reverse = this.capFab.findAllPaths(targetId, sourceId, MAX_PATHS);
       if (reverse.length === 0) return;
       paths = reverse;
       actualSource = targetId;
@@ -2594,7 +2594,7 @@ class CapGraphRenderer {
     for (const pathEdge of pathEdges) {
       pathNodeIds.add(canonicalMediaUrn(pathEdge.fromUrn));
       pathNodeIds.add(canonicalMediaUrn(pathEdge.toUrn));
-      const idx = this.capGraph.edges.indexOf(pathEdge);
+      const idx = this.capFab.edges.indexOf(pathEdge);
       if (idx !== -1) pathEdgeIndices.add(idx);
     }
 
@@ -2605,7 +2605,7 @@ class CapGraphRenderer {
       if (pathNodeIds.has(node.id())) node.removeClass('faded').addClass('path-highlighted');
     });
     this.cy.edges().forEach(edge => {
-      const cyIdx = edge.data('capGraphEdgeIndex');
+      const cyIdx = edge.data('capFabEdgeIndex');
       if (cyIdx !== undefined && pathEdgeIndices.has(cyIdx)) {
         edge.removeClass('faded').addClass('path-highlighted');
       }
@@ -2827,12 +2827,12 @@ class CapGraphRenderer {
 // =============================================================================
 // Module exports — CJS for Node tests. Browser-side the build-browser.js
 // concatenation wraps these declarations in an IIFE and assigns
-// `window.CapGraphRenderer`.
+// `window.CapFabRenderer`.
 // =============================================================================
 
 if (typeof module !== 'undefined' && module.exports) {
   module.exports = {
-    CapGraphRenderer,
+    CapFabRenderer,
     cardinalityLabel,
     cardinalityFromCap,
     canonicalMediaUrn,

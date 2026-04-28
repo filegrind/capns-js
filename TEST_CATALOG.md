@@ -167,9 +167,9 @@ This catalog lists all tests in the JS codebase.
 | test1314 | `test1314_isVideo` | TEST1314: is_video returns true only when video marker tag is present | capdag.test.js:2245 |
 | test1315 | `test1315_isNumeric` | TEST1315: is_numeric returns true only when numeric marker tag is present | capdag.test.js:2255 |
 | | | | |
-| unnumbered | `testCapGraphAddCapPopulatesEdgesAndNodes` | Add a cap and check it becomes an edge with from/to nodes and carries the registry name we passed. This is exactly the shape the renderer depends on. | capdag.test.js:1161 |
-| unnumbered | `testCapGraphDistinctRegistryNames` | Each edge must carry the registry name it was added with. This is how the renderer colours/groups edges by provenance in browse mode. | capdag.test.js:1200 |
-| unnumbered | `testCapGraphGetOutgoingConformsToMatching` | getOutgoing takes a concrete source URN and returns edges whose from_spec the source conforms to. It must NOT be a plain string lookup. | capdag.test.js:1179 |
+| unnumbered | `testCapFabAddCapPopulatesEdgesAndNodes` | Add a cap and check it becomes an edge with from/to nodes and carries the registry name we passed. This is exactly the shape the renderer depends on. | capdag.test.js:1161 |
+| unnumbered | `testCapFabDistinctRegistryNames` | Each edge must carry the registry name it was added with. This is how the renderer colours/groups edges by provenance in browse mode. | capdag.test.js:1200 |
+| unnumbered | `testCapFabGetOutgoingConformsToMatching` | getOutgoing takes a concrete source URN and returns edges whose from_spec the source conforms to. It must NOT be a plain string lookup. | capdag.test.js:1179 |
 | unnumbered | `testJS_buildExtensionIndex` | These tests cover JS-specific functionality not in the Rust numbering scheme but are important for capdag-js correctness. | capdag.test.js:1442 |
 | unnumbered | `testJS_capDocumentationOmittedWhenNull` | When documentation is null, toJSON must omit the field entirely. This matches the Rust serializer's skip-when-None semantics and the ObjC toDictionary behaviour. A regression where null is emitted as `documentation: null` would break the symmetric round-trip with Rust (which has no null sentinel) and pollute generated JSON. | capdag.test.js:1559 |
 | unnumbered | `testJS_capDocumentationRoundTrip` | JS round-trip for the documentation field on Cap. Mirrors TEST920 in capdag/src/cap/definition.rs — the body is non-trivial (newlines, backticks, embedded quotes, Unicode) so escaping mismatches between JSON.stringify on this side and the Rust serializer on the other side surface as failures here. | capdag.test.js:1537 |
@@ -323,9 +323,9 @@ This catalog lists all tests in the JS codebase.
 
 The following tests are cataloged but do not currently participate in numeric test indexing.
 
-- `testCapGraphAddCapPopulatesEdgesAndNodes` — capdag.test.js:1161
-- `testCapGraphDistinctRegistryNames` — capdag.test.js:1200
-- `testCapGraphGetOutgoingConformsToMatching` — capdag.test.js:1179
+- `testCapFabAddCapPopulatesEdgesAndNodes` — capdag.test.js:1161
+- `testCapFabDistinctRegistryNames` — capdag.test.js:1200
+- `testCapFabGetOutgoingConformsToMatching` — capdag.test.js:1179
 - `testJS_buildExtensionIndex` — capdag.test.js:1442
 - `testJS_capDocumentationOmittedWhenNull` — capdag.test.js:1559
 - `testJS_capDocumentationRoundTrip` — capdag.test.js:1537
