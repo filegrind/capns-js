@@ -1144,7 +1144,7 @@ function test110_multipleExtensions() {
 }
 
 // ============================================================================
-// cap_graph: browse-mode API used by cap-graph-renderer.js
+// cap_fab: browse-mode API used by cap-graph-renderer.js
 //
 // The renderer builds its browse graph by:
 //   const capFab = new CapFab();
@@ -5372,10 +5372,10 @@ async function runTests() {
   // cap-graph-renderer.js uses CapFab in browse mode (static registry from
   // /api/capabilities). These tests guard the minimal API the renderer relies
   // on: new CapFab(), addCap(cap, registryName), getEdges(), getOutgoing().
-  console.log('\n--- cap_graph (browse-mode API used by cap-graph-renderer) ---');
-  runTest('cap_graph: add_cap_populates_edges_and_nodes', testCapFabAddCapPopulatesEdgesAndNodes);
-  runTest('cap_graph: get_outgoing_conforms_to_matching', testCapFabGetOutgoingConformsToMatching);
-  runTest('cap_graph: distinct_registry_names_recorded_per_edge', testCapFabDistinctRegistryNames);
+  console.log('\n--- cap_fab (browse-mode API used by cap-graph-renderer) ---');
+  runTest('cap_fab: add_cap_populates_edges_and_nodes', testCapFabAddCapPopulatesEdgesAndNodes);
+  runTest('cap_fab: get_outgoing_conforms_to_matching', testCapFabGetOutgoingConformsToMatching);
+  runTest('cap_fab: distinct_registry_names_recorded_per_edge', testCapFabDistinctRegistryNames);
 
   // caller.rs: TEST156-TEST159
   console.log('\n--- caller.rs (StdinSource) ---');
