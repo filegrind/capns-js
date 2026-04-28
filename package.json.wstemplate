@@ -10,7 +10,7 @@
   },
   "files": [
     "capdag.js",
-    "cap-graph-renderer.js",
+    "cap-fab-renderer.js",
     "build-browser.js",
     "capdag.test.js",
     "machine.pegjs",

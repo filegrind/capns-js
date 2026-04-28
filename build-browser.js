@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // Build browser-compatible bundles of tagged-urn, capdag, and
-// cap-graph-renderer from the local sources + resolved tagged-urn
+// cap-fab-renderer from the local sources + resolved tagged-urn
 // dependency. Outputs three self-contained IIFE-wrapped JS files to
 // `dist/` that each expose their exported classes as window globals.
 //
@@ -13,9 +13,9 @@
 // Load order at the consumer:
 //   1. tagged-urn.js       — defines window.TaggedUrn, etc.
 //   2. capdag.js           — reads window.TaggedUrn, defines CapUrn,
-//                            MediaUrn, Cap, CapGraph, createCap, …
-//   3. cap-graph-renderer.js — reads window.cytoscape + capdag globals
-//                              at call time, defines CapGraphRenderer.
+//                            MediaUrn, Cap, CapFab, createCap, …
+//   3. cap-fab-renderer.js — reads window.cytoscape + capdag globals
+//                              at call time, defines CapFabRenderer.
 //
 // Running: `node build-browser.js [outDir]`. Default outDir is ./dist.
 
@@ -144,9 +144,9 @@ window.resolveMediaUrn = resolveMediaUrn;
 window.buildExtensionIndex = buildExtensionIndex;
 window.mediaUrnsForExtension = mediaUrnsForExtension;
 window.getExtensionMappings = getExtensionMappings;
-window.CapGraphEdge = CapGraphEdge;
-window.CapGraphStats = CapGraphStats;
-window.CapGraph = CapGraph;
+window.CapFabEdge = CapFabEdge;
+window.CapFabStats = CapFabStats;
+window.CapFab = CapFab;
 window.StdinSource = StdinSource;
 window.StdinSourceKind = StdinSourceKind;
 window.CapArgumentValue = CapArgumentValue;
@@ -164,8 +164,8 @@ window.parseMachine = parseMachine;
   console.log(`  wrote ${path.join(outDir, 'capdag.js')}`);
 }
 
-function buildCapGraphRenderer() {
-  const srcPath = path.join(here, 'cap-graph-renderer.js');
+function buildCapFabRenderer() {
+  const srcPath = path.join(here, 'cap-fab-renderer.js');
   const src = fs.readFileSync(srcPath, 'utf8');
   // The file's CJS exports block is at the bottom, guarded by
   // `typeof module !== 'undefined'`. Strip everything from that guard
@@ -174,8 +174,8 @@ function buildCapGraphRenderer() {
     /if\s*\(\s*typeof\s+module\s*!==\s*'undefined'[\s\S]*$/,
     ''
   );
-  const wrapped = `// cap-graph-renderer — browser build
-// Generated from capdag-js/cap-graph-renderer.js by capdag-js/build-browser.js.
+  const wrapped = `// cap-fab-renderer — browser build
+// Generated from capdag-js/cap-fab-renderer.js by capdag-js/build-browser.js.
 // Do not edit directly. Requires cytoscape, cytoscape-elk, tagged-urn.js,
 // and capdag.js to be loaded first.
 
@@ -184,15 +184,15 @@ function buildCapGraphRenderer() {
 
 ${stripped}
 
-window.CapGraphRenderer = CapGraphRenderer;
+window.CapFabRenderer = CapFabRenderer;
 
 })();
 `;
-  fs.writeFileSync(path.join(outDir, 'cap-graph-renderer.js'), wrapped);
-  console.log(`  wrote ${path.join(outDir, 'cap-graph-renderer.js')}`);
+  fs.writeFileSync(path.join(outDir, 'cap-fab-renderer.js'), wrapped);
+  console.log(`  wrote ${path.join(outDir, 'cap-fab-renderer.js')}`);
 }
 
 buildTaggedUrn();
 buildCapdag();
-buildCapGraphRenderer();
+buildCapFabRenderer();
 console.log(`browser bundles written to ${outDir}`);

@@ -2177,7 +2177,7 @@ class CapFabRenderer {
 
     const elements = this._buildCytoscapeElements();
     if (elements.length === 0) {
-      this.container.innerHTML = '<div class="cap-graph-empty"><p>No graph data</p></div>';
+      this.container.innerHTML = '<div class="cap-fab-empty"><p>No graph data</p></div>';
       return this;
     }
 

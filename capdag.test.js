@@ -1144,7 +1144,7 @@ function test110_multipleExtensions() {
 }
 
 // ============================================================================
-// cap_fab: browse-mode API used by cap-graph-renderer.js
+// cap_fab: browse-mode API used by cap-fab-renderer.js
 //
 // The renderer builds its browse graph by:
 //   const capFab = new CapFab();
@@ -3665,7 +3665,7 @@ function assertThrowsWithCode(fn, expectedCode) {
 }
 
 // ============================================================================
-// cap-graph-renderer helpers — pure functions that do not require a DOM.
+// cap-fab-renderer helpers — pure functions that do not require a DOM.
 // The renderer class itself needs cytoscape + DOM and is exercised by hand
 // in the browser; these tests cover the pure data transforms underneath it.
 // ============================================================================
@@ -3688,7 +3688,7 @@ const {
   validateResolvedMachinePayload: rendererValidateResolvedMachinePayload,
   validateStrandStep: rendererValidateStrandStep,
   validateBodyOutcome: rendererValidateBodyOutcome,
-} = require('./cap-graph-renderer.js');
+} = require('./cap-fab-renderer.js');
 
 // The renderer module reads its dependencies off `window` or `global` at
 // call time (it is browser-first). Node has no window, so we install the
@@ -5369,10 +5369,10 @@ async function runTests() {
   runTest('TEST109: extensions_with_metadata_and_validation', test109_extensionsWithMetadataAndValidation);
   runTest('TEST110: multiple_extensions', test110_multipleExtensions);
 
-  // cap-graph-renderer.js uses CapFab in browse mode (static registry from
+  // cap-fab-renderer.js uses CapFab in browse mode (static registry from
   // /api/capabilities). These tests guard the minimal API the renderer relies
   // on: new CapFab(), addCap(cap, registryName), getEdges(), getOutgoing().
-  console.log('\n--- cap_fab (browse-mode API used by cap-graph-renderer) ---');
+  console.log('\n--- cap_fab (browse-mode API used by cap-fab-renderer) ---');
   runTest('cap_fab: add_cap_populates_edges_and_nodes', testCapFabAddCapPopulatesEdgesAndNodes);
   runTest('cap_fab: get_outgoing_conforms_to_matching', testCapFabGetOutgoingConformsToMatching);
   runTest('cap_fab: distinct_registry_names_recorded_per_edge', testCapFabDistinctRegistryNames);
@@ -5591,8 +5591,8 @@ async function runTests() {
   runTest('REGISTRY: capRegistryClient_construction', testMachine_capRegistryClient_construction);
   runTest('REGISTRY: capRegistryEntry_defaults', testMachine_capRegistryEntry_defaults);
 
-  // cap-graph-renderer pure helpers (no DOM dependency)
-  console.log('\n--- cap-graph-renderer helpers ---');
+  // cap-fab-renderer pure helpers (no DOM dependency)
+  console.log('\n--- cap-fab-renderer helpers ---');
   runTest('RENDERER: cardinalityLabel_allFourCases',          testRenderer_cardinalityLabel_allFourCases);
   runTest('RENDERER: cardinalityLabel_usesUnicodeArrow',      testRenderer_cardinalityLabel_usesUnicodeArrow);
   runTest('RENDERER: cardinalityFromCap_findsStdinArg',       testRenderer_cardinalityFromCap_findsStdinArgNotFirstArg);
@@ -5606,7 +5606,7 @@ async function runTests() {
   runTest('RENDERER: mediaNodeLabel_rejectsUrnDerived',       testRenderer_mediaNodeLabel_rejectsUrnDerivedLabels);
   runTest('RENDERER: buildBrowse_rejectsMissingMediaTitles',  testRenderer_buildBrowseGraphData_rejectsMissingMediaTitles);
 
-  console.log('\n--- cap-graph-renderer strand builder ---');
+  console.log('\n--- cap-fab-renderer strand builder ---');
   runTest('RENDERER: validateStrandStep_unknownVariant',      testRenderer_validateStrandStep_rejectsUnknownVariant);
   runTest('RENDERER: validateStrandStep_booleanIsSequence',   testRenderer_validateStrandStep_requiresBooleanIsSequence);
   runTest('RENDERER: classifyStrandCapSteps_simple',          testRenderer_classifyStrandCapSteps_capFlags);
@@ -5625,7 +5625,7 @@ async function runTests() {
   runTest('RENDERER: collapseStrand_plainCapDistinctTarget',  testRenderer_collapseStrand_plainCapDistinctTargetNoMerge);
   runTest('RENDERER: validateStrand_missingSourceSpec',       testRenderer_validateStrandPayload_missingSourceSpec);
 
-  console.log('\n--- cap-graph-renderer run builder ---');
+  console.log('\n--- cap-fab-renderer run builder ---');
   runTest('RENDERER: validateBodyOutcome_negativeIndex',      testRenderer_validateBodyOutcome_rejectsNegativeIndex);
   runTest('RENDERER: buildRun_pagesSuccessesAndFailures',     testRenderer_buildRunGraphData_pagesSuccessesAndFailures);
   runTest('RENDERER: buildRun_failureWithoutFailedCap',       testRenderer_buildRunGraphData_failureWithoutFailedCapRendersFullTrace);
@@ -5635,7 +5635,7 @@ async function runTests() {
   runTest('RENDERER: buildRun_unclosedForeachNoMerge',        testRenderer_buildRunGraphData_unclosedForeachSuccessNoMerge);
   runTest('RENDERER: buildRun_closedForeachMerges',           testRenderer_buildRunGraphData_closedForeachSuccessMergesAtCollectTarget);
 
-  console.log('\n--- cap-graph-renderer editor-graph builder ---');
+  console.log('\n--- cap-fab-renderer editor-graph builder ---');
   runTest('RENDERER: validateEditorGraph_unknownKind',          testRenderer_validateEditorGraphPayload_rejectsUnknownKind);
   runTest('RENDERER: buildEditorGraph_collapsesCapsIntoEdges',  testRenderer_buildEditorGraphData_collapsesCapsIntoLabeledEdges);
   runTest('RENDERER: buildEditorGraph_loopEdgeGetsClass',       testRenderer_buildEditorGraphData_loopMarkedEdgeGetsLoopClass);
@@ -5643,7 +5643,7 @@ async function runTests() {
   runTest('RENDERER: buildEditorGraph_incompleteCapDropped',    testRenderer_buildEditorGraphData_capWithoutCompleteArgsIsDropped);
   runTest('RENDERER: buildEditorGraph_rejectsEdgeMissingSrc',   testRenderer_buildEditorGraphData_rejectsEdgeWithMissingSource);
 
-  console.log('\n--- cap-graph-renderer resolved-machine builder ---');
+  console.log('\n--- cap-fab-renderer resolved-machine builder ---');
   runTest('RENDERER: buildResolvedMachine_singleStrandLinear',     testRenderer_buildResolvedMachineGraphData_singleStrandLinearChain);
   runTest('RENDERER: buildResolvedMachine_loopGetsLoopClass',      testRenderer_buildResolvedMachineGraphData_loopEdgeGetsLoopClass);
   runTest('RENDERER: buildResolvedMachine_fanInOneEdgePerSrc',     testRenderer_buildResolvedMachineGraphData_fanInProducesEdgePerAssignment);

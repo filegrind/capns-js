@@ -3142,7 +3142,7 @@ class CapArgumentValue {
 
 
 // ============================================================================
-// CAP GRAPH - Directed graph of capability conversions
+// CAPFAB - Directed graph of capability conversions
 // ============================================================================
 
 /**

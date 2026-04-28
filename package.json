@@ -10,7 +10,7 @@
   },
   "files": [
     "capdag.js",
-    "cap-graph-renderer.js",
+    "cap-fab-renderer.js",
     "build-browser.js",
     "capdag.test.js",
     "machine.pegjs",
@@ -40,5 +40,5 @@
     "pretest": "npm run build:parser",
     "test": "node capdag.test.js"
   },
-  "version": "0.156.360"
+  "version": "0.157.363"
 }
