@@ -843,10 +843,44 @@ const MEDIA_OBJECT_LIST = 'media:list;record';
 // Semantic media types for specialized content
 // Media URN for PNG image data
 const MEDIA_PNG = 'media:image;png';
+// Media URN for JPEG image data
+const MEDIA_JPEG = 'media:jpeg;image';
+// Media URN for GIF image data
+const MEDIA_GIF = 'media:gif;image';
+// Media URN for BMP image data
+const MEDIA_BMP = 'media:bmp;image';
+// Media URN for TIFF image data
+const MEDIA_TIFF = 'media:tiff;image';
+// Media URN for WebP image data
+const MEDIA_WEBP = 'media:webp;image';
 // Media URN for audio data (wav, mp3, flac, etc.)
 const MEDIA_AUDIO = 'media:wav;audio';
+// Media URN for MP3 audio data
+const MEDIA_MP3 = 'media:mp3;audio';
+// Media URN for WAV audio data
+const MEDIA_WAV = 'media:wav;audio';
+// Media URN for FLAC audio data
+const MEDIA_FLAC = 'media:flac;audio';
+// Media URN for OGG audio data
+const MEDIA_OGG = 'media:ogg;audio';
+// Media URN for AAC audio data
+const MEDIA_AAC = 'media:aac;audio';
+// Media URN for M4A audio data
+const MEDIA_M4A = 'media:m4a;audio';
+// Media URN for AIFF audio data
+const MEDIA_AIFF = 'media:aiff;audio';
+// Media URN for Opus audio data
+const MEDIA_OPUS = 'media:opus;audio';
 // Media URN for video data (mp4, webm, mov, etc.)
 const MEDIA_VIDEO = 'media:video';
+// Media URN for MP4 video data
+const MEDIA_MP4 = 'media:mp4;video';
+// Media URN for MOV video data
+const MEDIA_MOV = 'media:mov;video';
+// Media URN for WebM video data
+const MEDIA_WEBM = 'media:webm;video';
+// Media URN for MKV video data
+const MEDIA_MKV = 'media:mkv;video';
 
 // Semantic AI input types - distinguished by their purpose/context
 // Media URN for audio input containing speech for transcription (Whisper)
@@ -930,6 +964,16 @@ const MEDIA_TRANSCRIPTION_OUTPUT = 'media:record;textable;transcription';
 const MEDIA_DECISION = 'media:decision;json;record;textable';
 // Media URN for textable page output
 const MEDIA_TEXTABLE_PAGE = 'media:textable;page';
+// Media URN for Hugging Face API token (secret, textable)
+const MEDIA_HF_TOKEN = 'media:hf-token;secret;textable';
+// Media URN for a list of model architectures — JSON record
+const MEDIA_MODEL_ARCH_LIST = 'media:model-arch-list;json;record;textable';
+// Media URN for a model search request — JSON record
+const MEDIA_MODEL_SEARCH_REQUEST = 'media:model-search-request;json;record;textable';
+// Media URN for a model search response — JSON record
+const MEDIA_MODEL_SEARCH_RESPONSE = 'media:model-search-response;json;record;textable';
+// Media URN for model filter resolution — JSON record
+const MEDIA_MODEL_FILTER_RESOLUTION = 'media:model-filter-resolution;json;record;textable';
 // Collection types
 const MEDIA_COLLECTION = 'media:collection;record';
 const MEDIA_COLLECTION_LIST = 'media:collection;list;record';
@@ -2031,6 +2075,8 @@ class Cap {
     this.output = null;
     this.metadata_json = metadataJson;
     this.registered_by = null;  // Registration attribution
+    this.supported_model_types = [];  // Model types this cap supports (omitted when empty)
+    this.default_model_spec = null;   // Default model spec string (omitted when null)
   }
 
   /**
@@ -2247,7 +2293,9 @@ class Cap {
            JSON.stringify(this.args.map(a => a.toJSON())) === JSON.stringify(other.args.map(a => a.toJSON())) &&
            JSON.stringify(this.output) === JSON.stringify(other.output) &&
            JSON.stringify(this.metadata_json) === JSON.stringify(other.metadata_json) &&
-           JSON.stringify(this.registered_by) === JSON.stringify(other.registered_by);
+           JSON.stringify(this.registered_by) === JSON.stringify(other.registered_by) &&
+           JSON.stringify(this.supported_model_types) === JSON.stringify(other.supported_model_types) &&
+           this.default_model_spec === other.default_model_spec;
   }
 
   /**
@@ -2274,6 +2322,16 @@ class Cap {
 
     if (this.metadata_json !== null && this.metadata_json !== undefined) {
       result.metadata_json = this.metadata_json;
+    }
+
+    // supported_model_types: omit when empty, matching Rust skip_serializing_if = is_empty
+    if (Array.isArray(this.supported_model_types) && this.supported_model_types.length > 0) {
+      result.supported_model_types = this.supported_model_types;
+    }
+
+    // default_model_spec: omit when null, matching Rust skip_serializing_if = is_none
+    if (this.default_model_spec !== null && this.default_model_spec !== undefined) {
+      result.default_model_spec = this.default_model_spec;
     }
 
     return result;
@@ -2304,6 +2362,8 @@ class Cap {
     }
     cap.output = json.output;
     cap.registered_by = json.registered_by ? RegisteredBy.fromJSON(json.registered_by) : null;
+    cap.supported_model_types = Array.isArray(json.supported_model_types) ? json.supported_model_types : [];
+    cap.default_model_spec = (typeof json.default_model_spec === 'string') ? json.default_model_spec : null;
     return cap;
   }
 
@@ -2328,6 +2388,183 @@ class Cap {
    */
   clearRegisteredBy() {
     this.registered_by = null;
+  }
+}
+
+/**
+ * A cap group bundles caps and adapter URNs as an atomic registration unit.
+ *
+ * If any adapter in the group creates ambiguity with an already-registered
+ * adapter, the entire group is rejected — none of its caps or adapters get
+ * registered. Mirrors CSCapGroup / capdag::cap_group::CapGroup.
+ */
+class CapGroup {
+  /**
+   * @param {string} name - Group name (for diagnostics and error messages)
+   * @param {Cap[]} caps - Caps in this group
+   * @param {string[]} adapterUrns - Media URNs this group's adapter handles
+   */
+  constructor(name, caps = [], adapterUrns = []) {
+    if (!name || typeof name !== 'string') {
+      throw new Error('CapGroup name is required and must be a string');
+    }
+    this.name = name;
+    this.caps = caps;
+    this.adapter_urns = adapterUrns;
+  }
+
+  /**
+   * Create a CapGroup from JSON representation
+   * @param {Object} json - The JSON data
+   * @returns {CapGroup} The CapGroup instance
+   */
+  static fromJSON(json) {
+    if (!json.name) {
+      throw new Error('CapGroup missing required field: name');
+    }
+    const caps = Array.isArray(json.caps) ? json.caps.map(c => Cap.fromJSON(c)) : [];
+    const adapterUrns = Array.isArray(json.adapter_urns) ? json.adapter_urns : [];
+    return new CapGroup(json.name, caps, adapterUrns);
+  }
+
+  /**
+   * Convert to JSON representation
+   * @returns {Object} The JSON representation
+   */
+  toJSON() {
+    return {
+      name: this.name,
+      caps: this.caps.map(c => c.toJSON()),
+      adapter_urns: this.adapter_urns
+    };
+  }
+}
+
+/**
+ * Unified cap-based manifest for components (providers and cartridges).
+ *
+ * `(registry_url, channel, name, version)` is the cartridge's full
+ * identity — each (registry, channel) pair is an independent namespace.
+ * Mirrors CSCapManifest / capdag::cap_manifest::CapManifest.
+ */
+class CapManifest {
+  /**
+   * @param {string} name - Component name
+   * @param {string} version - Semver version string
+   * @param {string} channel - Distribution channel: 'release' or 'nightly'
+   * @param {string|null} registryUrl - Verbatim registry URL, or null for dev builds
+   * @param {string} description - Short plain-text description
+   * @param {CapGroup[]} capGroups - Cap groups (all caps must be in a group)
+   */
+  constructor(name, version, channel, registryUrl, description, capGroups = []) {
+    if (!name || typeof name !== 'string') {
+      throw new Error('CapManifest name is required and must be a string');
+    }
+    if (!version || typeof version !== 'string') {
+      throw new Error('CapManifest version is required and must be a string');
+    }
+    if (channel !== 'release' && channel !== 'nightly') {
+      throw new Error(`CapManifest channel must be 'release' or 'nightly', got: '${channel}'`);
+    }
+    if (registryUrl !== null && registryUrl !== undefined && typeof registryUrl !== 'string') {
+      throw new Error("CapManifest registry_url must be null (dev build) or a string");
+    }
+    if (!description || typeof description !== 'string') {
+      throw new Error('CapManifest description is required and must be a string');
+    }
+
+    this.name = name;
+    this.version = version;
+    this.channel = channel;
+    this.registry_url = registryUrl !== undefined ? registryUrl : null;
+    this.description = description;
+    this.cap_groups = capGroups;
+    this.author = null;
+    this.page_url = null;
+  }
+
+  /**
+   * Returns all caps flattened across all cap groups.
+   * @returns {Cap[]}
+   */
+  allCaps() {
+    return this.cap_groups.flatMap(g => g.caps);
+  }
+
+  /**
+   * Create a CapManifest from JSON / dictionary representation.
+   *
+   * `registry_url` must be present as a key; it may be `null` (dev build)
+   * or a non-empty string (registry build). A missing key is a hard parse
+   * error so old-schema payloads never silently pass.
+   *
+   * @param {Object} json - The JSON data
+   * @returns {CapManifest} The CapManifest instance
+   * @throws {Error} If required fields are missing or invalid
+   */
+  static fromJSON(json) {
+    if (!json.name) throw new Error('CapManifest missing required field: name');
+    if (!json.version) throw new Error('CapManifest missing required field: version');
+    if (!json.channel) throw new Error('CapManifest missing required field: channel');
+    if (!json.description) throw new Error('CapManifest missing required field: description');
+    if (!Array.isArray(json.cap_groups)) throw new Error('CapManifest missing required field: cap_groups');
+
+    // registry_url must be present as a key (may be null for dev builds)
+    if (!Object.prototype.hasOwnProperty.call(json, 'registry_url')) {
+      throw new Error(
+        'CapManifest missing required field: registry_url. ' +
+        'It must be present with value null for dev builds or a URL string for registry builds.'
+      );
+    }
+
+    if (json.channel !== 'release' && json.channel !== 'nightly') {
+      throw new Error(`CapManifest channel must be 'release' or 'nightly', got: '${json.channel}'`);
+    }
+
+    const registryUrl = (json.registry_url !== null && json.registry_url !== undefined)
+      ? json.registry_url
+      : null;
+
+    if (registryUrl !== null && typeof registryUrl !== 'string') {
+      throw new Error("CapManifest registry_url must be null or a string");
+    }
+
+    const capGroups = json.cap_groups.map(g => CapGroup.fromJSON(g));
+    const manifest = new CapManifest(
+      json.name,
+      json.version,
+      json.channel,
+      registryUrl,
+      json.description,
+      capGroups
+    );
+
+    if (json.author && typeof json.author === 'string') {
+      manifest.author = json.author;
+    }
+    if (json.page_url && typeof json.page_url === 'string') {
+      manifest.page_url = json.page_url;
+    }
+
+    return manifest;
+  }
+
+  /**
+   * Convert to JSON representation
+   * @returns {Object} The JSON representation
+   */
+  toJSON() {
+    const result = {
+      name: this.name,
+      version: this.version,
+      channel: this.channel,
+      registry_url: this.registry_url,
+      description: this.description,
+      cap_groups: this.cap_groups.map(g => g.toJSON())
+    };
+    if (this.author) result.author = this.author;
+    if (this.page_url) result.page_url = this.page_url;
+    return result;
   }
 }
 
@@ -4284,6 +4521,171 @@ class CartridgeRepoServer {
 }
 
 // ============================================================================
+// Bifaci — cartridge attachment & runtime identity types
+// ============================================================================
+
+/**
+ * Reasons why a cartridge attachment attempt failed.
+ * Mirrors Rust CartridgeAttachmentErrorKind.
+ */
+const CartridgeAttachmentErrorKind = Object.freeze({
+  INCOMPATIBLE: 'incompatible',
+  MANIFEST_INVALID: 'manifest_invalid',
+  HANDSHAKE_FAILED: 'handshake_failed',
+  IDENTITY_REJECTED: 'identity_rejected',
+  ENTRY_POINT_MISSING: 'entry_point_missing',
+  QUARANTINED: 'quarantined',
+});
+
+/**
+ * Describes a failed cartridge attachment attempt.
+ * Mirrors Rust CartridgeAttachmentError.
+ */
+class CartridgeAttachmentError {
+  /**
+   * @param {string} kind - CartridgeAttachmentErrorKind value
+   * @param {string} message - Human-readable error message
+   * @param {number|null} detectedAtUnixSeconds - Unix timestamp of detection
+   */
+  constructor(kind, message, detectedAtUnixSeconds) {
+    this.kind = kind;
+    this.message = message;
+    this.detected_at_unix_seconds = detectedAtUnixSeconds;
+  }
+
+  toJSON() {
+    return {
+      kind: this.kind,
+      message: this.message,
+      detected_at_unix_seconds: this.detected_at_unix_seconds,
+    };
+  }
+
+  static fromJSON(d) {
+    return new CartridgeAttachmentError(d.kind, d.message, d.detected_at_unix_seconds);
+  }
+}
+
+/**
+ * Runtime statistics for a running (or stopped) cartridge process.
+ * Mirrors Rust CartridgeRuntimeStats.
+ */
+class CartridgeRuntimeStats {
+  /**
+   * @param {Object} opts
+   * @param {boolean} [opts.running=false]
+   * @param {number|null} [opts.pid=null]
+   * @param {number} [opts.activeRequestCount=0]
+   * @param {number} [opts.peerRequestCount=0]
+   * @param {number} [opts.memoryFootprintMb=0]
+   * @param {number} [opts.memoryRssMb=0]
+   * @param {number|null} [opts.lastHeartbeatUnixSeconds=null]
+   * @param {number} [opts.restartCount=0]
+   */
+  constructor({
+    running = false,
+    pid = null,
+    activeRequestCount = 0,
+    peerRequestCount = 0,
+    memoryFootprintMb = 0,
+    memoryRssMb = 0,
+    lastHeartbeatUnixSeconds = null,
+    restartCount = 0,
+  } = {}) {
+    this.running = running;
+    this.pid = pid;
+    this.active_request_count = activeRequestCount;
+    this.peer_request_count = peerRequestCount;
+    this.memory_footprint_mb = memoryFootprintMb;
+    this.memory_rss_mb = memoryRssMb;
+    this.last_heartbeat_unix_seconds = lastHeartbeatUnixSeconds;
+    this.restart_count = restartCount;
+  }
+
+  /** Convenience constructor for a cartridge that is not running. */
+  static notRunning() {
+    return new CartridgeRuntimeStats();
+  }
+
+  toJSON() {
+    const obj = { running: this.running };
+    if (this.pid !== null) obj.pid = this.pid;
+    if (this.active_request_count) obj.active_request_count = this.active_request_count;
+    if (this.peer_request_count) obj.peer_request_count = this.peer_request_count;
+    if (this.memory_footprint_mb) obj.memory_footprint_mb = this.memory_footprint_mb;
+    if (this.memory_rss_mb) obj.memory_rss_mb = this.memory_rss_mb;
+    if (this.last_heartbeat_unix_seconds !== null) obj.last_heartbeat_unix_seconds = this.last_heartbeat_unix_seconds;
+    if (this.restart_count) obj.restart_count = this.restart_count;
+    return obj;
+  }
+
+  static fromJSON(d) {
+    return new CartridgeRuntimeStats({
+      running: d.running || false,
+      pid: d.pid !== undefined ? d.pid : null,
+      activeRequestCount: d.active_request_count || 0,
+      peerRequestCount: d.peer_request_count || 0,
+      memoryFootprintMb: d.memory_footprint_mb || 0,
+      memoryRssMb: d.memory_rss_mb || 0,
+      lastHeartbeatUnixSeconds: d.last_heartbeat_unix_seconds !== undefined ? d.last_heartbeat_unix_seconds : null,
+      restartCount: d.restart_count || 0,
+    });
+  }
+}
+
+/**
+ * Full identity of an installed cartridge, including optional attachment error
+ * and runtime statistics.
+ * Mirrors Rust InstalledCartridgeIdentity.
+ */
+class InstalledCartridgeIdentity {
+  /**
+   * @param {Object} opts
+   * @param {string|null} [opts.registryUrl=null]
+   * @param {string} opts.channel
+   * @param {string} opts.id
+   * @param {string} opts.version
+   * @param {string} opts.sha256
+   * @param {CartridgeAttachmentError|null} [opts.attachmentError=null]
+   * @param {CartridgeRuntimeStats|null} [opts.runtimeStats=null]
+   */
+  constructor({ registryUrl = null, channel, id, version, sha256, attachmentError = null, runtimeStats = null }) {
+    this.registry_url = registryUrl;
+    this.channel = channel;
+    this.id = id;
+    this.version = version;
+    this.sha256 = sha256;
+    this.attachment_error = attachmentError;
+    this.runtime_stats = runtimeStats;
+  }
+
+  toJSON() {
+    const obj = {
+      channel: this.channel,
+      id: this.id,
+      version: this.version,
+      sha256: this.sha256,
+    };
+    if (this.registry_url !== null) obj.registry_url = this.registry_url;
+    if (this.attachment_error !== null) obj.attachment_error = this.attachment_error.toJSON();
+    if (this.runtime_stats !== null) obj.runtime_stats = this.runtime_stats.toJSON();
+    return obj;
+  }
+
+  static fromJSON(d) {
+    return new InstalledCartridgeIdentity({
+      registryUrl: d.registry_url !== undefined ? d.registry_url : null,
+      channel: d.channel,
+      id: d.id,
+      version: d.version,
+      sha256: d.sha256,
+      attachmentError: d.attachment_error ? CartridgeAttachmentError.fromJSON(d.attachment_error) : null,
+      runtimeStats: d.runtime_stats ? CartridgeRuntimeStats.fromJSON(d.runtime_stats) : null,
+    });
+  }
+}
+
+// ============================================================================
 // Machine Notation — compact, round-trippable DAG path identifiers
 //
 // Machine notation describes capability transformation paths using bracket-
@@ -5393,6 +5795,8 @@ module.exports = {
   MediaUrnError,
   MediaUrnErrorCodes,
   Cap,
+  CapGroup,
+  CapManifest,
   CapArg,
   ArgSource,
   RegisteredBy,
@@ -5437,8 +5841,25 @@ module.exports = {
   MEDIA_IDENTITY,
   MEDIA_VOID,
   MEDIA_PNG,
+  MEDIA_JPEG,
+  MEDIA_GIF,
+  MEDIA_BMP,
+  MEDIA_TIFF,
+  MEDIA_WEBP,
   MEDIA_AUDIO,
+  MEDIA_MP3,
+  MEDIA_WAV,
+  MEDIA_FLAC,
+  MEDIA_OGG,
+  MEDIA_AAC,
+  MEDIA_M4A,
+  MEDIA_AIFF,
+  MEDIA_OPUS,
   MEDIA_VIDEO,
+  MEDIA_MP4,
+  MEDIA_MOV,
+  MEDIA_WEBM,
+  MEDIA_MKV,
   MEDIA_AUDIO_SPEECH,
   // Document types (PRIMARY naming)
   MEDIA_PDF,
@@ -5484,6 +5905,12 @@ module.exports = {
   // File path type — single URN; cardinality lives on is_sequence.
   MEDIA_FILE_PATH,
   MEDIA_MLX_MODEL_PATH,
+  // HF token and model search types
+  MEDIA_HF_TOKEN,
+  MEDIA_MODEL_ARCH_LIST,
+  MEDIA_MODEL_SEARCH_REQUEST,
+  MEDIA_MODEL_SEARCH_RESPONSE,
+  MEDIA_MODEL_FILTER_RESOLUTION,
   // Collection types
   MEDIA_COLLECTION,
   MEDIA_COLLECTION_LIST,
@@ -5514,6 +5941,11 @@ module.exports = {
   CartridgeRepoClient,
   CartridgeRepoServer,
   CartridgeChannel,
+  // Bifaci — cartridge attachment & runtime identity
+  CartridgeAttachmentErrorKind,
+  CartridgeAttachmentError,
+  CartridgeRuntimeStats,
+  InstalledCartridgeIdentity,
   // Registry slug
   DEV_SLUG,
   SLUG_HEX_LEN,
