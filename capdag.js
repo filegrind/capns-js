@@ -4646,15 +4646,17 @@ class InstalledCartridgeIdentity {
    * @param {string} opts.id
    * @param {string} opts.version
    * @param {string} opts.sha256
+   * @param {Array<Object>} [opts.capGroups=[]] - Cartridge's manifest cap_groups; each element is `{name, caps, adapter_urns}`.
    * @param {CartridgeAttachmentError|null} [opts.attachmentError=null]
    * @param {CartridgeRuntimeStats|null} [opts.runtimeStats=null]
    */
-  constructor({ registryUrl = null, channel, id, version, sha256, attachmentError = null, runtimeStats = null }) {
+  constructor({ registryUrl = null, channel, id, version, sha256, capGroups = [], attachmentError = null, runtimeStats = null }) {
     this.registry_url = registryUrl;
     this.channel = channel;
     this.id = id;
     this.version = version;
     this.sha256 = sha256;
+    this.cap_groups = capGroups;
     this.attachment_error = attachmentError;
     this.runtime_stats = runtimeStats;
   }
@@ -4667,6 +4669,7 @@ class InstalledCartridgeIdentity {
       sha256: this.sha256,
     };
     if (this.registry_url !== null) obj.registry_url = this.registry_url;
+    if (this.cap_groups && this.cap_groups.length > 0) obj.cap_groups = this.cap_groups;
     if (this.attachment_error !== null) obj.attachment_error = this.attachment_error.toJSON();
     if (this.runtime_stats !== null) obj.runtime_stats = this.runtime_stats.toJSON();
     return obj;
@@ -4679,9 +4682,30 @@ class InstalledCartridgeIdentity {
       id: d.id,
       version: d.version,
       sha256: d.sha256,
+      capGroups: Array.isArray(d.cap_groups) ? d.cap_groups : [],
       attachmentError: d.attachment_error ? CartridgeAttachmentError.fromJSON(d.attachment_error) : null,
       runtimeStats: d.runtime_stats ? CartridgeRuntimeStats.fromJSON(d.runtime_stats) : null,
     });
+  }
+
+  /**
+   * Flat de-duplicated cap-URN view across this cartridge's groups,
+   * preserving first-seen order.
+   * @returns {Array<string>}
+   */
+  capUrns() {
+    const seen = new Set();
+    const out = [];
+    for (const group of this.cap_groups) {
+      const caps = (group && Array.isArray(group.caps)) ? group.caps : [];
+      for (const cap of caps) {
+        const urn = (cap && typeof cap.urn === 'string') ? cap.urn : '';
+        if (!urn || seen.has(urn)) continue;
+        seen.add(urn);
+        out.push(urn);
+      }
+    }
+    return out;
   }
 }
 
