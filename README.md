@@ -23,7 +23,7 @@ npm install capdag
 const { CapUrn, CapUrnBuilder, CapMatcher } = require('capdag');
 
 // Create from string (with required direction specifiers)
-const cap = CapUrn.fromString('cap:in="media:binary";op=extract;out="media:object"');
+const cap = CapUrn.fromString('cap:in="media:binary";extract;out="media:object"');
 console.log(cap.toString());
 
 // Use builder pattern
@@ -35,14 +35,14 @@ const built = new CapUrnBuilder()
   .build();
 
 // Matching
-const request = CapUrn.fromString('cap:in="media:binary";op=extract;out="media:object"');
+const request = CapUrn.fromString('cap:in="media:binary";extract;out="media:object"');
 console.log(cap.accepts(request)); // true
 
 // Find best match by specificity
 const caps = [
-  CapUrn.fromString('cap:in=*;op=extract;out=*'),
-  CapUrn.fromString('cap:in="media:binary";op=extract;out="media:object"'),
-  CapUrn.fromString('cap:ext=pdf;in="media:binary";op=extract;out="media:object"')
+  CapUrn.fromString('cap:in=*;extract;out=*'),
+  CapUrn.fromString('cap:in="media:binary";extract;out="media:object"'),
+  CapUrn.fromString('cap:ext=pdf;in="media:binary";extract;out="media:object"')
 ];
 const best = CapMatcher.findBestMatch(caps, request);
 console.log(best.toString()); // Most specific match

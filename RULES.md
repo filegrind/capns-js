@@ -14,7 +14,7 @@ Cap URNs **must** include `in` and `out` tags that specify input/output media ty
 
 ```javascript
 // Valid cap URN with direction specifiers
-const cap = CapUrn.fromString('cap:in="media:binary";op=extract;out="media:object"');
+const cap = CapUrn.fromString('cap:in="media:binary";extract;out="media:object"');
 
 // Invalid - missing direction specifiers
 CapUrn.fromString('cap:op=extract'); // throws ErrorCodes.MISSING_IN_SPEC
@@ -26,13 +26,13 @@ Direction specifier values must be valid Media URNs or special pattern values:
 
 ```javascript
 // Valid: Media URN value
-'cap:in="media:binary";op=extract;out="media:object"'
+'cap:in="media:binary";extract;out="media:object"'
 
 // Valid: Must-have-any (any media type)
-'cap:in=*;op=extract;out=*'
+'cap:in=*;extract;out=*'
 
 // Invalid: Not a Media URN or special value
-'cap:in=binary;op=extract;out=object' // throws ErrorCodes.INVALID_MEDIA_URN
+'cap:in=binary;extract;out=object' // throws ErrorCodes.INVALID_MEDIA_URN
 ```
 
 ### 3. Matching Semantics
@@ -59,8 +59,8 @@ Specificity uses graded scoring:
 | Unspecified (K=?) or missing | 0 |
 
 Examples:
-- `cap:in="media:binary";op=extract;out="media:object"` → 3+3+3 = 9
-- `cap:in=*;op=extract;out=*` → 2+3+2 = 7
+- `cap:in="media:binary";extract;out="media:object"` → 3+3+3 = 9
+- `cap:in=*;extract;out=*` → 2+3+2 = 7
 
 ## Cap-Specific Error Codes
 

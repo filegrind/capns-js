@@ -922,7 +922,7 @@ const MEDIA_YAML_RECORD = 'media:record;textable;yaml';
 const MEDIA_YAML_LIST = 'media:list;textable;yaml';
 const MEDIA_YAML_LIST_RECORD = 'media:list;record;textable;yaml';
 const MEDIA_CSV = 'media:csv;list;record;textable';
-const MEDIA_CSV_LIST = 'media:csv;list;textable';
+const MEDIA_CSV_LIST = 'media:csv;list;record;textable';
 
 // File path type — for arguments that represent filesystem paths.
 // There is a single media URN; cardinality (single file vs many files)
