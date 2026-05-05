@@ -4528,6 +4528,24 @@ class CartridgeRepoServer {
  * Reasons why a cartridge attachment attempt failed.
  * Mirrors Rust CartridgeAttachmentErrorKind.
  */
+const CartridgeLifecycle = Object.freeze({
+  // Discovery scan has found the version directory and is about
+  // to inspect it. Transient.
+  DISCOVERED: 'discovered',
+  // Reading cartridge.json, computing directory hash, validating
+  // on-disk install context. Hashing can take seconds for large
+  // model cartridges; runs on a background queue so other
+  // cartridges' inspections proceed in parallel.
+  INSPECTING: 'inspecting',
+  // Inspection succeeded; awaiting a verdict from the registry
+  // verifier service. Skipped for dev cartridges
+  // (registry_url == null) and bundle cartridges.
+  VERIFYING: 'verifying',
+  // Cleared every gate. Caps are registered with the engine and
+  // dispatch can route requests to this cartridge.
+  OPERATIONAL: 'operational',
+});
+
 const CartridgeAttachmentErrorKind = Object.freeze({
   INCOMPATIBLE: 'incompatible',
   MANIFEST_INVALID: 'manifest_invalid',
@@ -4636,9 +4654,9 @@ class CartridgeRuntimeStats {
 /**
  * Full identity of an installed cartridge, including optional attachment error
  * and runtime statistics.
- * Mirrors Rust InstalledCartridgeIdentity.
+ * Mirrors Rust InstalledCartridgeRecord.
  */
-class InstalledCartridgeIdentity {
+class InstalledCartridgeRecord {
   /**
    * @param {Object} opts
    * @param {string|null} [opts.registryUrl=null]
@@ -4649,8 +4667,9 @@ class InstalledCartridgeIdentity {
    * @param {Array<Object>} [opts.capGroups=[]] - Cartridge's manifest cap_groups; each element is `{name, caps, adapter_urns}`.
    * @param {CartridgeAttachmentError|null} [opts.attachmentError=null]
    * @param {CartridgeRuntimeStats|null} [opts.runtimeStats=null]
+   * @param {string} [opts.lifecycle='discovered'] - One of `discovered` | `inspecting` | `verifying` | `operational`. Mutually exclusive with attachmentError; see `machfab-mac/docs/cartridge state machine.md`.
    */
-  constructor({ registryUrl = null, channel, id, version, sha256, capGroups = [], attachmentError = null, runtimeStats = null }) {
+  constructor({ registryUrl = null, channel, id, version, sha256, capGroups = [], attachmentError = null, runtimeStats = null, lifecycle = 'discovered' }) {
     this.registry_url = registryUrl;
     this.channel = channel;
     this.id = id;
@@ -4659,6 +4678,7 @@ class InstalledCartridgeIdentity {
     this.cap_groups = capGroups;
     this.attachment_error = attachmentError;
     this.runtime_stats = runtimeStats;
+    this.lifecycle = lifecycle;
   }
 
   toJSON() {
@@ -4667,6 +4687,7 @@ class InstalledCartridgeIdentity {
       id: this.id,
       version: this.version,
       sha256: this.sha256,
+      lifecycle: this.lifecycle,
     };
     if (this.registry_url !== null) obj.registry_url = this.registry_url;
     if (this.cap_groups && this.cap_groups.length > 0) obj.cap_groups = this.cap_groups;
@@ -4676,7 +4697,7 @@ class InstalledCartridgeIdentity {
   }
 
   static fromJSON(d) {
-    return new InstalledCartridgeIdentity({
+    return new InstalledCartridgeRecord({
       registryUrl: d.registry_url !== undefined ? d.registry_url : null,
       channel: d.channel,
       id: d.id,
@@ -4685,6 +4706,9 @@ class InstalledCartridgeIdentity {
       capGroups: Array.isArray(d.cap_groups) ? d.cap_groups : [],
       attachmentError: d.attachment_error ? CartridgeAttachmentError.fromJSON(d.attachment_error) : null,
       runtimeStats: d.runtime_stats ? CartridgeRuntimeStats.fromJSON(d.runtime_stats) : null,
+      // Default to 'discovered' (the safe sentinel) — never
+      // 'operational' — when the field is missing from the wire.
+      lifecycle: typeof d.lifecycle === 'string' ? d.lifecycle : 'discovered',
     });
   }
 
@@ -5966,10 +5990,11 @@ module.exports = {
   CartridgeRepoServer,
   CartridgeChannel,
   // Bifaci — cartridge attachment & runtime identity
+  CartridgeLifecycle,
   CartridgeAttachmentErrorKind,
   CartridgeAttachmentError,
   CartridgeRuntimeStats,
-  InstalledCartridgeIdentity,
+  InstalledCartridgeRecord,
   // Registry slug
   DEV_SLUG,
   SLUG_HEX_LEN,
