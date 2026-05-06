@@ -326,23 +326,41 @@ function test019_missingTagHandling() {
   assert(request2.accepts(cap2), 'General request should accept more specific instance');
 }
 
-// TEST020: Test specificity calculation (direction specs use MediaUrn tag count, wildcards don't count)
+// TEST020: Specificity is the sum of per-tag truth-table scores
+// across in/out/y. Marker tags (bare segments and `key=*`) score 2
+// (must-have-any), exact `key=value` tags score 3, missing/`?` score
+// 0, `!` scores 1.
+//
+// testUrn() builds "cap:in=media:void;out=media:record;<tags>" so
+// the directional baseline is:
+//   in:  media:void   -> {void=*}    -> 2
+//   out: media:record -> {record=*}  -> 2
+// Total directional baseline: 4.
 function test020_specificity() {
-  // Direction specs contribute their MediaUrn tag count:
-  // MEDIA_VOID = "media:void" -> 1 tag (void)
-  // MEDIA_OBJECT = "media:record" -> 1 tag (record)
+  // testUrn() prepends in="media:void" (1 marker, score 2) and
+  // out="media:record" (1 marker, score 2). Cap-URN spec is
+  // 10000*spec_U(out) + 100*spec_U(in) + spec_U(y).
+
   const cap1 = CapUrn.fromString(testUrn('type=general'));
-  assertEqual(cap1.specificity(), 3, 'void(1) + record(1) + type(1)');
+  // out=2, in=2, y=4 (type=general exact)
+  assertEqual(cap1.specificity(), 10000*2 + 100*2 + 4,
+    'out=2, in=2, y=type=general exact=4 -> 20204');
 
   const cap2 = CapUrn.fromString(testUrn('generate'));
-  assertEqual(cap2.specificity(), 3, 'void(1) + record(1) + op(1)');
+  // out=2, in=2, y=2 (generate marker = must-have-any)
+  assertEqual(cap2.specificity(), 10000*2 + 100*2 + 2,
+    'out=2, in=2, y=generate marker=2 -> 20202');
 
   const cap3 = CapUrn.fromString(testUrn('op;ext=pdf'));
-  assertEqual(cap3.specificity(), 3, 'void(1) + record(1) + ext(1) (wildcard op doesn\'t count)');
+  // out=2, in=2, y=2+4 (op marker, ext=pdf exact)
+  assertEqual(cap3.specificity(), 10000*2 + 100*2 + 6,
+    'out=2, in=2, y=op marker(2)+ext=pdf exact(4) -> 20206');
 
-  // Wildcard in direction doesn't count
+  // Wildcard in direction normalizes to media: (no tags, score 0).
   const cap4 = CapUrn.fromString(`cap:in=*;out="${MEDIA_OBJECT}";test`);
-  assertEqual(cap4.specificity(), 2, 'record(1) + op(1) (in wildcard doesn\'t count)');
+  // out=2 (record=*), in=0 (media: empty), y=2 (test marker)
+  assertEqual(cap4.specificity(), 10000*2 + 100*0 + 2,
+    'out=record=2, in=*->0, y=test marker=2 -> 20002');
 }
 
 // TEST021: Test builder creates cap URN with correct tags and direction specs
@@ -706,7 +724,10 @@ function test890_directionSemanticMatching() {
     'Generic output cap must NOT satisfy specific output request');
 }
 
-// TEST891: Semantic direction specificity - more media URN tags = higher specificity
+// TEST891: Semantic direction specificity — more constraints in
+// either axis means a higher score under the truth-table-driven sum.
+// media: (top, no tags) scores 0; each marker tag scores 2; each
+// exact tag scores 3.
 function test891_directionSemanticSpecificity() {
   const genericCap = CapUrn.fromString(
     'cap:in="media:";generate-thumbnail;out="media:image;png;thumbnail"'
@@ -715,8 +736,20 @@ function test891_directionSemanticSpecificity() {
     'cap:in="media:pdf";generate-thumbnail;out="media:image;png;thumbnail"'
   );
 
-  assertEqual(genericCap.specificity(), 4, 'media:(0) + image;png;thumbnail(3) + op(1) = 4');
-  assertEqual(specificCap.specificity(), 5, 'pdf(1) + image;png;thumbnail(3) + op(1) = 5');
+  // generic:
+  //   out=media:image;png;thumbnail -> 2+2+2 = 6
+  //   in=media:                     -> 0
+  //   y: generate-thumbnail marker  -> 2
+  //   spec_C = 10000*6 + 100*0 + 2 = 60002
+  assertEqual(genericCap.specificity(), 10000*6 + 100*0 + 2,
+    'out=image;png;thumbnail(6) + in=media:(0) + generate-thumbnail marker(2) = 60002');
+  // specific:
+  //   out=media:image;png;thumbnail -> 6
+  //   in=media:pdf                  -> 2
+  //   y: generate-thumbnail marker  -> 2
+  //   spec_C = 10000*6 + 100*2 + 2 = 60202
+  assertEqual(specificCap.specificity(), 10000*6 + 100*2 + 2,
+    'out=image;png;thumbnail(6) + in=pdf(2) + generate-thumbnail marker(2) = 60202');
   assert(specificCap.specificity() > genericCap.specificity(), 'pdf should be more specific');
 
   // CapMatcher should prefer more specific
@@ -5330,6 +5363,44 @@ function test1804_kindTransformForNormalDataProcessors() {
     'fully generic in/out with a tag is a Transform, not Identity');
 }
 
+// TEST1810: media:void is atomic — refinements are parse errors.
+//
+// Mirrored across every language port (Rust, Go, Python, Swift/ObjC,
+// JS) under the SAME number. Any divergence is a wire-level
+// inconsistency — the unit type's atomicity is part of the protocol's
+// deepest layer, not a per-port detail.
+function test1810_mediaVoidIsAtomic() {
+  // Bare void: must parse successfully.
+  const bare = MediaUrn.fromString('media:void');
+  assert(bare.isVoid(), 'bare media:void must parse — it is the unit type');
+
+  const badInputs = [
+    'media:void;text',
+    'media:void;pdf',
+    'media:void;audio',
+    'media:void;reason=warmup',
+    'media:void;heartbeat',
+    'media:void;manual',
+    // Order must not matter — the parser canonicalizes tags.
+    'media:warmup;void',
+    'media:reason=foo;void',
+  ];
+
+  for (const input of badInputs) {
+    let threw = false;
+    let code = null;
+    try {
+      MediaUrn.fromString(input);
+    } catch (e) {
+      threw = true;
+      code = e.code;
+    }
+    assert(threw, `${input}: expected parse error, but parsed successfully`);
+    assertEqual(code, MediaUrnErrorCodes.VOID_NOT_ATOMIC,
+      `${input}: expected VOID_NOT_ATOMIC error code`);
+  }
+}
+
 // TEST1805: Kind is invariant under canonicalization. The same
 // morphism written in many surface forms must classify the same way
 // once parsed.
@@ -5356,6 +5427,216 @@ function test1805_kindInvariantUnderCanonicalSpellings() {
     assertEqual(kindA, kindB,
       `${a} and ${b} parse to the same cap and must classify identically`);
   }
+}
+
+// ============================================================================
+// Truth-table specificity tests (test1820–test1824)
+//
+// Mirrored across every language port (Rust, Go, Python, Swift/ObjC,
+// JS) under the SAME numbers. Specificity must be the truth-table
+// sum across all three axes using the six-form ladder:
+//
+//   ?x or missing     -> 0   (no constraint)
+//   x?=v              -> 1   (absent OR not v)
+//   x (=x=*) marker   -> 2   (must-have-any)
+//   x!=v              -> 3   (present and not v)
+//   x=v exact         -> 4   (must-have-this-value)
+//   !x                -> 5   (must-not-have)
+// ============================================================================
+
+// TEST1820: A `?`-valued cap-tag scores 0. Same as missing.
+function test1820_specificityQuestionIsZero() {
+  const bare = CapUrn.fromString('cap:');
+  assertEqual(bare.specificity(), 0, 'cap: must score 0 (top of order)');
+
+  const withQ = CapUrn.fromString('cap:?target');
+  assertEqual(withQ.specificity(), 0,
+    '?x must score 0 (explicit no-constraint, same as missing)');
+}
+
+// TEST1821: A `!`-valued cap-tag scores 5 (top of negative chain).
+function test1821_specificityMustNotHaveIsFive() {
+  const cap = CapUrn.fromString('cap:!constrained');
+  assertEqual(cap.specificity(), 5,
+    '!constrained (must-not-have) must score 5');
+}
+
+// TEST1822: A `*`-valued cap-tag (including bare markers) scores 2.
+function test1822_specificityMustHaveAnyIsTwo() {
+  const bareMarker = CapUrn.fromString('cap:extract');
+  assertEqual(bareMarker.specificity(), 2,
+    'bare `extract` parses as extract=* (must-have-any) and scores 2');
+
+  const explicitStar = CapUrn.fromString('cap:extract=*');
+  assertEqual(explicitStar.specificity(), 2,
+    'explicit key=* must score 2 (same as bare marker)');
+
+  assertEqual(bareMarker.specificity(), explicitStar.specificity(),
+    'bare marker and explicit key=* are the same form and must score identically');
+}
+
+// TEST1823: An exact-valued cap-tag scores 4.
+function test1823_specificityExactValueIsFour() {
+  const cap = CapUrn.fromString('cap:target=metadata');
+  assertEqual(cap.specificity(), 4,
+    'target=metadata (exact value) must score 4');
+}
+
+// TEST1824: All six forms compose additively on a single cap.
+// y combining 0+1+2+3+4+5 must sum to 15.
+function test1824_specificityCombinedYAxis() {
+  const cap = CapUrn.fromString('cap:!constrained;?target;extract;stage!=alpha;target2=metadata;ver?=draft');
+  assertEqual(cap.specificity(), 15,
+    'y combining all six forms (0+1+2+3+4+5) must sum to 15');
+}
+
+// ============================================================================
+// Six-form canonicalization tests (test1830–test1835).
+// ============================================================================
+
+// TEST1830: ?x ≡ x? ≡ x=? all canonicalize to ?x.
+function test1830_canonicalizeNoConstraint() {
+  const canonical = 'cap:?x';
+  for (const input of ['cap:?x', 'cap:x?', 'cap:x=?']) {
+    const cap = CapUrn.fromString(input);
+    assertEqual(cap.toString(), canonical,
+      `input ${input} must canonicalize to ${canonical}`);
+  }
+}
+
+// TEST1831: ?x=v and x?=v both canonicalize to x?=v. The third
+// hypothetical form `x=?v` is NOT recognized as a qualifier — a
+// value starting with `?` is just an exact value beginning with
+// a `?` character.
+function test1831_canonicalizeAbsentOrNotValue() {
+  const canonical = 'cap:x?=foo';
+  for (const input of ['cap:?x=foo', 'cap:x?=foo']) {
+    const cap = CapUrn.fromString(input);
+    assertEqual(cap.toString(), canonical,
+      `input ${input} must canonicalize to ${canonical}`);
+  }
+
+  // `x=?foo` is a plain exact tag whose value is the string `?foo`
+  // — NOT a canonicalization alias.
+  const exact = CapUrn.fromString('cap:x=?foo');
+  assertEqual(exact.toString(), 'cap:x=?foo');
+  assertEqual(exact.getTag('x'), '?foo');
+}
+
+// TEST1832: x ≡ x=* both canonicalize to bare x.
+function test1832_canonicalizeMustHaveAny() {
+  const canonical = 'cap:x';
+  for (const input of ['cap:x', 'cap:x=*']) {
+    const cap = CapUrn.fromString(input);
+    assertEqual(cap.toString(), canonical,
+      `input ${input} must canonicalize to ${canonical}`);
+  }
+}
+
+// TEST1833: !x=v and x!=v both canonicalize to x!=v. The third
+// hypothetical form `x=!v` is NOT recognized as a qualifier — a
+// value starting with `!` is just an exact value beginning with
+// a `!` character.
+function test1833_canonicalizePresentNotValue() {
+  const canonical = 'cap:x!=foo';
+  for (const input of ['cap:!x=foo', 'cap:x!=foo']) {
+    const cap = CapUrn.fromString(input);
+    assertEqual(cap.toString(), canonical,
+      `input ${input} must canonicalize to ${canonical}`);
+  }
+
+  // `x=!foo` is a plain exact tag whose value is the string `!foo`
+  // — NOT a canonicalization alias.
+  const exact = CapUrn.fromString('cap:x=!foo');
+  assertEqual(exact.toString(), 'cap:x=!foo');
+  assertEqual(exact.getTag('x'), '!foo');
+}
+
+// TEST1834: x=v stays as x=v.
+function test1834_canonicalizeExactValue() {
+  const cap = CapUrn.fromString('cap:x=foo');
+  assertEqual(cap.toString(), 'cap:x=foo');
+}
+
+// TEST1835: !x ≡ x! ≡ x=! all canonicalize to !x.
+function test1835_canonicalizeMustNotHave() {
+  const canonical = 'cap:!x';
+  for (const input of ['cap:!x', 'cap:x!', 'cap:x=!']) {
+    const cap = CapUrn.fromString(input);
+    assertEqual(cap.toString(), canonical,
+      `input ${input} must canonicalize to ${canonical}`);
+  }
+}
+
+// TEST1842: Full 6×6 truth table.
+function test1842_truthTableFullCrossProduct() {
+  const forms = ['', '?x', 'x?=v', 'x', 'x!=v', 'x=v', '!x'];
+  // miss   ?x    x?=v   x      x!=v   x=v    !x
+  const expected = [
+    [true,  true, true,  false, false, false, true ], // missing
+    [true,  true, true,  true,  true,  true,  true ], // ?x
+    [true,  true, true,  false, false, false, true ], // x?=v
+    [true,  true, true,  true,  true,  true,  false], // x
+    [true,  true, true,  true,  true,  false, false], // x!=v
+    [true,  true, false, true,  false, true,  false], // x=v
+    [true,  true, true,  false, false, false, true ], // !x
+  ];
+  for (let i = 0; i < forms.length; i++) {
+    for (let j = 0; j < forms.length; j++) {
+      const instForm = forms[i];
+      const pattForm = forms[j];
+      const instStr = instForm === '' ? 'cap:' : 'cap:' + instForm;
+      const pattStr = pattForm === '' ? 'cap:' : 'cap:' + pattForm;
+      const inst = CapUrn.fromString(instStr);
+      const patt = CapUrn.fromString(pattStr);
+      const actual = patt.accepts(inst);
+      assertEqual(actual, expected[i][j],
+        `cell (inst=${instForm}, patt=${pattForm}) expected ${expected[i][j]} got ${actual}`);
+    }
+  }
+}
+
+// TEST1843: Invalid qualifier combinations must be rejected.
+function test1843_rejectInvalidCombinations() {
+  const invalid = [
+    'cap:?x?=v', 'cap:!x!=v', 'cap:?!x', 'cap:!?x',
+    'cap:?x=*', 'cap:!x=*',
+    'cap:?x=?', 'cap:?x=!', 'cap:!x=?', 'cap:!x=!',
+    'cap:?', 'cap:!',
+  ];
+  for (const input of invalid) {
+    let threw = false;
+    try { CapUrn.fromString(input); } catch (_e) { threw = true; }
+    assert(threw, `input ${input} must be rejected`);
+  }
+}
+
+// TEST1844: out-axis difference dominates combined in+y differences.
+function test1844_axisWeightingOutDominates() {
+  const bigOut = CapUrn.fromString('cap:in=media:;out="media:record;textable"');
+  const bigInAndY = CapUrn.fromString(
+    'cap:in=media:pdf;out=media:record;!constrained;?target;extract;stage!=alpha;target2=metadata;ver?=draft'
+  );
+  assert(bigOut.specificity() > bigInAndY.specificity(),
+    'out-axis difference must dominate combined in+y differences');
+}
+
+// TEST1845: With equal out, in-axis dominates over y-axis.
+function test1845_axisWeightingInDominatesY() {
+  const bigIn = CapUrn.fromString('cap:in=media:pdf;out=media:record');
+  const bigY = CapUrn.fromString(
+    'cap:in=media:;out=media:record;!constrained;?target;extract;stage!=alpha;target2=metadata;ver?=draft'
+  );
+  assert(bigIn.specificity() > bigY.specificity(),
+    'in-axis difference must dominate y-axis');
+}
+
+// TEST1846: Decoded layout — 10000*out + 100*in + y.
+function test1846_axisWeightingDecodedLayout() {
+  const cap = CapUrn.fromString('cap:in="media:a;b";out="media:a;b;c;d";extract');
+  // out=4 markers (8), in=2 markers (4), y=1 marker (2)
+  // 10000*8 + 100*4 + 2 = 80402
+  assertEqual(cap.specificity(), 10000*8 + 100*4 + 2);
 }
 
 // ============================================================================
@@ -5758,6 +6039,31 @@ async function runTests() {
   runTest('TEST1803: kind_effect_when_both_sides_void',     test1803_kindEffectWhenBothSidesVoid);
   runTest('TEST1804: kind_transform_for_normal_processors', test1804_kindTransformForNormalDataProcessors);
   runTest('TEST1805: kind_invariant_under_canonical',       test1805_kindInvariantUnderCanonicalSpellings);
+
+  console.log('\n--- media:void atomicity (test1810) ---');
+  runTest('TEST1810: media_void_is_atomic',                 test1810_mediaVoidIsAtomic);
+
+  console.log('\n--- Truth-table specificity (test1820–test1824) ---');
+  runTest('TEST1820: specificity_question_is_zero',         test1820_specificityQuestionIsZero);
+  runTest('TEST1821: specificity_must_not_have_is_five',    test1821_specificityMustNotHaveIsFive);
+  runTest('TEST1822: specificity_must_have_any_is_two',     test1822_specificityMustHaveAnyIsTwo);
+  runTest('TEST1823: specificity_exact_value_is_four',      test1823_specificityExactValueIsFour);
+  runTest('TEST1824: specificity_combined_y_axis',          test1824_specificityCombinedYAxis);
+
+  console.log('\n--- Six-form canonicalization (test1830–test1835) ---');
+  runTest('TEST1830: canonicalize_no_constraint',           test1830_canonicalizeNoConstraint);
+  runTest('TEST1831: canonicalize_absent_or_not_value',     test1831_canonicalizeAbsentOrNotValue);
+  runTest('TEST1832: canonicalize_must_have_any',           test1832_canonicalizeMustHaveAny);
+  runTest('TEST1833: canonicalize_present_not_value',       test1833_canonicalizePresentNotValue);
+  runTest('TEST1834: canonicalize_exact_value',             test1834_canonicalizeExactValue);
+  runTest('TEST1835: canonicalize_must_not_have',           test1835_canonicalizeMustNotHave);
+
+  console.log('\n--- Truth-table cross-product + axis weighting (test1842–test1846) ---');
+  runTest('TEST1842: truth_table_full_cross_product',       test1842_truthTableFullCrossProduct);
+  runTest('TEST1843: reject_invalid_combinations',          test1843_rejectInvalidCombinations);
+  runTest('TEST1844: axis_weighting_out_dominates',         test1844_axisWeightingOutDominates);
+  runTest('TEST1845: axis_weighting_in_dominates_y',        test1845_axisWeightingInDominatesY);
+  runTest('TEST1846: axis_weighting_decoded_layout',        test1846_axisWeightingDecodedLayout);
 
   // Summary
   console.log(`\n${passCount + failCount} tests: ${passCount} passed, ${failCount} failed`);

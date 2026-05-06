@@ -2,7 +2,7 @@
 // Follows the exact same rules as Rust, Go, and Objective-C implementations
 
 // Import TaggedUrn from the tagged-urn package
-const { TaggedUrn } = require('tagged-urn');
+const { TaggedUrn, valuesMatch: taggedUrnValuesMatch } = require('tagged-urn');
 
 /**
  * Error types for Cap URN operations
@@ -113,6 +113,12 @@ function validatePreservedDirectionSpec(spec, tagName) {
   }
 }
 
+// Per-tag truth-table specificity scoring is owned by the
+// tagged-urn module — same scorer applies uniformly to media-URN
+// tags, cap-tag y-axis, and any other Tagged URN dimension. We
+// re-use the canonical implementation rather than duplicate it.
+const { scoreTagValue } = require('tagged-urn');
+
 /**
  * Functional category of a cap, derived from all three axes (`in`,
  * `out`, and the remaining tags). The classification is **logical** —
@@ -146,6 +152,13 @@ const CapKind = Object.freeze({
 });
 
 class CapUrn {
+  // Per-axis weights for cap-URN specificity. Two orders of
+  // magnitude separate each axis to keep them in distinct digit
+  // slots while folding into a single comparable integer.
+  //   spec_C(c) = WEIGHT_OUT*spec_U(out) + WEIGHT_IN*spec_U(in) + spec_U(y)
+  static WEIGHT_OUT = 10000;
+  static WEIGHT_IN = 100;
+
   /**
    * Create a new CapUrn with direction specs.
    * @param {string} inSpec - Input media URN (e.g., "media:void")
@@ -526,23 +539,25 @@ class CapUrn {
       }
     }
 
-    // Check all tags required by the pattern. Missing tags in the instance reject.
-    for (const [patternKey, patternValue] of Object.entries(this.tags)) {
-      const requestValue = request.tags[patternKey];
-
-      if (requestValue === undefined) {
-        return false;
-      }
-
-      if (patternValue === '*' || requestValue === '*') {
-        continue;
-      }
-
-      if (patternValue !== requestValue) {
+    // Y-axis: every tag's per-key match runs through the six-form
+    // truth table (taggedUrnValuesMatch). Walk the union of all keys
+    // appearing on either side so missing-on-pattern and
+    // missing-on-instance cells both get evaluated.
+    const allKeys = new Set([
+      ...Object.keys(this.tags),
+      ...Object.keys(request.tags),
+    ]);
+    for (const key of allKeys) {
+      const patt = Object.prototype.hasOwnProperty.call(this.tags, key)
+        ? this.tags[key]
+        : undefined;
+      const inst = Object.prototype.hasOwnProperty.call(request.tags, key)
+        ? request.tags[key]
+        : undefined;
+      if (!taggedUrnValuesMatch(inst, patt)) {
         return false;
       }
     }
-
     return true;
   }
 
@@ -558,29 +573,42 @@ class CapUrn {
   }
 
   /**
-   * Calculate specificity score for cap matching
+   * Calculate specificity score for cap matching.
    *
-   * More specific caps have higher scores and are preferred.
-   * Direction specs contribute their MediaUrn tag count (more tags = more specific).
-   * Other tags contribute 1 per non-wildcard value.
+   * Weighted sum of the per-tag truth-table score across the three
+   * axes (`out`, `in`, `y`):
+   *
+   *   spec_C(c) = WEIGHT_OUT * spec_U(c.out)
+   *             + WEIGHT_IN  * spec_U(c.in)
+   *             +              spec_U(c.y)
+   *
+   * Per-tag ladder:
+   *
+   *   "?"            -> 0   (no constraint)
+   *   starts "?="    -> 1   (absent or not v)
+   *   "*"            -> 2   (must-have-any)
+   *   starts "!="    -> 3   (present and not v)
+   *   exact value    -> 4   (exact match)
+   *   "!"            -> 5   (must-not-have)
+   *
+   * The lexicographic priority `(out, in, y)` reflects the routing
+   * intent: producing different things is the largest semantic
+   * difference between two caps; consuming different things is next;
+   * descriptive y-axis metadata is last.
    *
    * @returns {number} The specificity score
    */
   specificity() {
-    let count = 0;
-    // Direction specs contribute their MediaUrn tag count. `media:` is the
-    // wildcard top and contributes zero.
-    if (this.inSpec !== 'media:' && this.inSpec !== '*') {
-      const inMedia = TaggedUrn.fromString(this.inSpec);
-      count += Object.keys(inMedia.tags).length;
+    const inUrn = TaggedUrn.fromString(this.inSpec);
+    const outUrn = TaggedUrn.fromString(this.outSpec);
+
+    let yScore = 0;
+    for (const value of Object.values(this.tags)) {
+      yScore += scoreTagValue(value);
     }
-    if (this.outSpec !== 'media:' && this.outSpec !== '*') {
-      const outMedia = TaggedUrn.fromString(this.outSpec);
-      count += Object.keys(outMedia.tags).length;
-    }
-    // Count non-wildcard tags
-    count += Object.values(this.tags).filter(value => value !== '*').length;
-    return count;
+    return CapUrn.WEIGHT_OUT * outUrn.specificity()
+         + CapUrn.WEIGHT_IN  * inUrn.specificity()
+         + yScore;
   }
 
   /**
@@ -1119,6 +1147,11 @@ class MediaUrnError extends Error {
 
 const MediaUrnErrorCodes = {
   INVALID_PREFIX: 'INVALID_PREFIX',
+  /** `media:void` was combined with one or more other tags. The unit
+   * type is atomic — there is no lattice underneath it. Reasons for
+   * "why void was used" belong on cap-tags or args, not on the
+   * media URN. */
+  VOID_NOT_ATOMIC: 'VOID_NOT_ATOMIC',
 };
 
 /**
@@ -1134,6 +1167,17 @@ class MediaUrn {
       throw new MediaUrnError(
         MediaUrnErrorCodes.INVALID_PREFIX,
         `Expected prefix 'media', got '${taggedUrn.getPrefix()}'`
+      );
+    }
+    // Enforce media:void atomicity. The unit type has no lattice
+    // underneath it; refinements are conceptually wrong.
+    const tagKeys = Object.keys(taggedUrn.tags);
+    if (tagKeys.includes('void') && tagKeys.length > 1) {
+      const extras = tagKeys.filter((k) => k !== 'void').sort();
+      throw new MediaUrnError(
+        MediaUrnErrorCodes.VOID_NOT_ATOMIC,
+        `media:void is atomic and cannot be refined; got extra tag(s): ${extras.join(', ')}. ` +
+          'Move why/how this void is used into cap-tags or args, not the media URN.'
       );
     }
     this._urn = taggedUrn;
