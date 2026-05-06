@@ -17,7 +17,7 @@ Cap URNs **must** include `in` and `out` tags that specify input/output media ty
 const cap = CapUrn.fromString('cap:in="media:binary";extract;out="media:object"');
 
 // Invalid - missing direction specifiers
-CapUrn.fromString('cap:op=extract'); // throws ErrorCodes.MISSING_IN_SPEC
+CapUrn.fromString('cap:extract;in=media:;out=media:'); // throws ErrorCodes.MISSING_IN_SPEC
 ```
 
 ### 2. Media URN Validation

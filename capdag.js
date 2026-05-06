@@ -328,6 +328,25 @@ class CapUrn {
   }
 
   /**
+   * Check whether a marker tag (a tag whose value is "*") is present at the
+   * given key. Equivalent to hasTag(tagName, "*") but expresses authorial
+   * intent: this tag is present as a marker (a wildcard-valued tag that
+   * serializes as just the key), not as a key=value pair. Direction specs
+   * (in/out) are not markers.
+   * Example: cap:constrained;... has marker tag "constrained".
+   *
+   * @param {string} tagName - The marker key
+   * @returns {boolean} Whether the tag exists with value "*"
+   */
+  hasMarkerTag(tagName) {
+    const keyLower = tagName.toLowerCase();
+    if (keyLower === 'in' || keyLower === 'out') {
+      return false;
+    }
+    return this.tags[keyLower] === '*';
+  }
+
+  /**
    * Create a new cap URN with an added or updated tag.
    * Attempts to set `in` / `out` through `withTag` are ignored; use
    * `withInSpec` / `withOutSpec` instead.
@@ -5230,19 +5249,14 @@ class Machine {
       return ea.target.toString().localeCompare(eb.target.toString());
     });
 
-    // Step 2: Generate aliases from op= tag
+    // Step 2: Generate edge aliases. The Rust reference implementation
+    // uses `edge_<idx>` unconditionally — there is no privileged tag (such
+    // as the legacy `op=…` tag) we can derive a friendlier name from, so
+    // we mirror the same pure-index scheme here.
     const aliases = new Map();
-    const aliasCounts = new Map();
-
     for (const idx of edgeOrder) {
       const edge = this._edges[idx];
-      const opTag = edge.capUrn.getTag('op');
-      const baseAlias = opTag !== undefined ? opTag : `edge_${idx}`;
-
-      const count = aliasCounts.get(baseAlias) || 0;
-      const alias = count === 0 ? baseAlias : `${baseAlias}_${count}`;
-      aliasCounts.set(baseAlias, count + 1);
-
+      const alias = `edge_${idx}`;
       const capStr = edge.capUrn.toString();
       aliases.set(alias, { edgeIdx: idx, capStr });
     }
@@ -5313,16 +5327,17 @@ class Machine {
     // Define edges
     for (const edgeIdx of edgeOrder) {
       const edge = this._edges[edgeIdx];
-      // Find alias for this edge
-      let edgeLabel = null;
+      // Find alias for this edge. The label on the rendered diagram is the
+      // edge's alias (`edge_<idx>`), matching the Rust serializer which
+      // also uses pure-index aliases — no special tag (like the legacy
+      // `op=…`) is privileged for label derivation.
+      let label = null;
       for (const [a, info] of aliases) {
         if (info.edgeIdx === edgeIdx) {
-          edgeLabel = a;
+          label = a;
           break;
         }
       }
-      const opTag = edge.capUrn.getTag('op');
-      const label = opTag !== undefined ? opTag : edgeLabel;
 
       const targetKey = edge.target.toString();
       const targetName = nodeNames.get(targetKey);

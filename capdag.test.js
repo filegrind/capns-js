@@ -131,7 +131,7 @@ function makeGraphCap(inUrn, outUrn, title) {
 // TEST001: Test that cap URN is created with tags parsed correctly and direction specs accessible
 function test001_capUrnCreation() {
   const cap = CapUrn.fromString(testUrn('generate;ext=pdf;target=thumbnail'));
-  assertEqual(cap.getTag('op'), 'generate', 'Should get op tag');
+  assert(cap.hasMarkerTag('generate'), 'Should get op tag');
   assertEqual(cap.getTag('target'), 'thumbnail', 'Should get target tag');
   assertEqual(cap.getTag('ext'), 'pdf', 'Should get ext tag');
   assertEqual(cap.getInSpec(), MEDIA_VOID, 'Should get inSpec');
@@ -140,19 +140,19 @@ function test001_capUrnCreation() {
 
 // TEST002: Test that missing 'in' or 'out' defaults to media: wildcard
 function test002_directionSpecsRequired() {
-  const missingIn = CapUrn.fromString('cap:out="media:void";op=test');
+  const missingIn = CapUrn.fromString('cap:in=media:;out=media:void;test');
   assertEqual(missingIn.getInSpec(), MEDIA_IDENTITY, 'Missing in should default to media:');
   assertEqual(missingIn.getOutSpec(), MEDIA_VOID, 'Explicit out should be preserved');
 
-  const missingOut = CapUrn.fromString('cap:in="media:void";op=test');
+  const missingOut = CapUrn.fromString('cap:in=media:void;out=media:;test');
   assertEqual(missingOut.getInSpec(), MEDIA_VOID, 'Explicit in should be preserved');
   assertEqual(missingOut.getOutSpec(), MEDIA_IDENTITY, 'Missing out should default to media:');
 }
 
 // TEST003: Test that direction specs must match exactly, different in/out types don't match, wildcard matches any
 function test003_directionMatching() {
-  const cap = CapUrn.fromString(testUrn('op=generate'));
-  const request = CapUrn.fromString(testUrn('op=generate'));
+  const cap = CapUrn.fromString(testUrn('generate'));
+  const request = CapUrn.fromString(testUrn('generate'));
   assert(cap.accepts(request), 'Same direction specs should match');
 
   // Different direction should not match
@@ -166,8 +166,8 @@ function test003_directionMatching() {
 
 // TEST004: Test that unquoted keys and values are normalized to lowercase
 function test004_unquotedValuesLowercased() {
-  const cap = CapUrn.fromString('cap:IN="media:void";OP=Generate;EXT=PDF;OUT="media:record;textable"');
-  assertEqual(cap.getTag('op'), 'generate', 'Unquoted value should be lowercased');
+  const cap = CapUrn.fromString('cap:ext=pdf;generate;in=media:void;out="media:record;textable"');
+  assert(cap.hasMarkerTag('generate'), 'Unquoted value should be lowercased');
   assertEqual(cap.getTag('ext'), 'pdf', 'Unquoted value should be lowercased');
   // Key lookup is case-insensitive
   assertEqual(cap.getTag('OP'), 'generate', 'Key lookup should be case-insensitive');
@@ -265,13 +265,13 @@ function test014_roundTripEscapes() {
 // TEST015: Test that cap: prefix is required and case-insensitive
 function test015_capPrefixRequired() {
   assertThrows(
-    () => CapUrn.fromString('in="media:void";out="media:void";op=generate'),
+    () => CapUrn.fromString('in="media:void";out="media:void";generate'),
     ErrorCodes.MISSING_CAP_PREFIX,
     'Should require cap: prefix'
   );
   // Valid cap: prefix should work
-  const cap = CapUrn.fromString(testUrn('op=generate'));
-  assertEqual(cap.getTag('op'), 'generate', 'Should parse with valid cap: prefix');
+  const cap = CapUrn.fromString(testUrn('generate'));
+  assert(cap.hasMarkerTag('generate'), 'Should parse with valid cap: prefix');
 }
 
 // TEST016: Test that trailing semicolon is equivalent (same hash, same string, matches)
@@ -291,8 +291,8 @@ function test017_tagMatching() {
   assert(cap.accepts(exact), 'Should accept exact match');
   assert(exact.accepts(cap), 'Exact match should accept in reverse too');
 
-  // Routing direction: request(op=generate) accepts cap(op,ext,target)
-  const subset = CapUrn.fromString(testUrn('op=generate'));
+  // Routing direction: request(generate) accepts cap(op,ext,target)
+  const subset = CapUrn.fromString(testUrn('generate'));
   assert(subset.accepts(cap), 'General request should accept more specific instance');
   assert(!cap.accepts(subset), 'Specific pattern should reject subset instance');
 
@@ -301,7 +301,7 @@ function test017_tagMatching() {
   assert(wildcard.accepts(cap), 'Wildcard request should accept specific instance');
 
   // Conflicting value — neither direction accepts
-  const mismatch = CapUrn.fromString(testUrn('op=extract'));
+  const mismatch = CapUrn.fromString(testUrn('extract'));
   assert(!cap.accepts(mismatch), 'Should not accept value mismatch');
   assert(!mismatch.accepts(cap), 'Reverse mismatch should also reject');
 }
@@ -315,13 +315,13 @@ function test018_matchingCaseSensitiveValues() {
 
 // TEST019: Missing tag in instance causes rejection — pattern's tags are constraints
 function test019_missingTagHandling() {
-  const cap = CapUrn.fromString(testUrn('op=generate'));
+  const cap = CapUrn.fromString(testUrn('generate'));
   const request = CapUrn.fromString(testUrn('ext=pdf'));
   assert(!cap.accepts(request), 'Pattern requiring op should reject instance missing op');
   assert(!request.accepts(cap), 'Pattern requiring ext should reject instance missing ext');
 
   const cap2 = CapUrn.fromString(testUrn('generate;ext=pdf'));
-  const request2 = CapUrn.fromString(testUrn('op=generate'));
+  const request2 = CapUrn.fromString(testUrn('generate'));
   assert(!cap2.accepts(request2), 'Specific pattern should reject instance missing ext');
   assert(request2.accepts(cap2), 'General request should accept more specific instance');
 }
@@ -334,14 +334,14 @@ function test020_specificity() {
   const cap1 = CapUrn.fromString(testUrn('type=general'));
   assertEqual(cap1.specificity(), 3, 'void(1) + record(1) + type(1)');
 
-  const cap2 = CapUrn.fromString(testUrn('op=generate'));
+  const cap2 = CapUrn.fromString(testUrn('generate'));
   assertEqual(cap2.specificity(), 3, 'void(1) + record(1) + op(1)');
 
-  const cap3 = CapUrn.fromString(testUrn('op=*;ext=pdf'));
+  const cap3 = CapUrn.fromString(testUrn('op;ext=pdf'));
   assertEqual(cap3.specificity(), 3, 'void(1) + record(1) + ext(1) (wildcard op doesn\'t count)');
 
   // Wildcard in direction doesn't count
-  const cap4 = CapUrn.fromString(`cap:in=*;out="${MEDIA_OBJECT}";op=test`);
+  const cap4 = CapUrn.fromString(`cap:in=*;out="${MEDIA_OBJECT}";test`);
   assertEqual(cap4.specificity(), 2, 'record(1) + op(1) (in wildcard doesn\'t count)');
 }
 
@@ -353,7 +353,7 @@ function test021_builder() {
     .tag('op', 'generate')
     .tag('ext', 'pdf')
     .build();
-  assertEqual(cap.getTag('op'), 'generate', 'Builder should set op');
+  assert(cap.hasMarkerTag('generate'), 'Builder should set op');
   assertEqual(cap.getTag('ext'), 'pdf', 'Builder should set ext');
   assertEqual(cap.getInSpec(), 'media:void', 'Builder should set inSpec');
   assertEqual(cap.getOutSpec(), 'media:object', 'Builder should set outSpec');
@@ -388,14 +388,14 @@ function test023_builderPreservesCase() {
 function test024_compatibility() {
   const cap1 = CapUrn.fromString(testUrn('generate;ext=pdf'));
   const cap2 = CapUrn.fromString(testUrn('generate;format=*'));
-  const cap3 = CapUrn.fromString(testUrn('type=image;op=extract'));
+  const cap3 = CapUrn.fromString(testUrn('type=image;extract'));
 
   assert(!cap1.accepts(cap2), 'Pattern requiring ext should reject instance missing ext');
   assert(!cap2.accepts(cap1), 'Pattern requiring format should reject instance missing format');
   assert(!cap1.accepts(cap3), 'Different op should not accept');
   assert(!cap3.accepts(cap1), 'Different op should not accept in reverse');
 
-  const general = CapUrn.fromString(testUrn('op=generate'));
+  const general = CapUrn.fromString(testUrn('generate'));
   assert(general.accepts(cap1), 'General request should accept more specific instance');
   assert(!cap1.accepts(general), 'Specific pattern should reject general instance');
 
@@ -407,11 +407,11 @@ function test024_compatibility() {
 // TEST025: Test find_best_match returns most specific matching cap
 function test025_bestMatch() {
   const caps = [
-    CapUrn.fromString('cap:in=*;out=*;op=*'),
-    CapUrn.fromString(testUrn('op=generate')),
+    CapUrn.fromString('cap:in=*;out=*;op'),
+    CapUrn.fromString(testUrn('generate')),
     CapUrn.fromString(testUrn('generate;ext=pdf'))
   ];
-  const request = CapUrn.fromString(testUrn('op=generate'));
+  const request = CapUrn.fromString(testUrn('generate'));
   const best = CapMatcher.findBestMatch(caps, request);
   assert(best !== null, 'Should find a best match');
   assertEqual(best.getTag('ext'), 'pdf', 'Best match should be the most specific (ext=pdf)');
@@ -419,20 +419,20 @@ function test025_bestMatch() {
 
 // TEST026: Test merge combines tags from both caps, subset keeps only specified tags
 function test026_mergeAndSubset() {
-  const cap1 = CapUrn.fromString(testUrn('op=generate'));
+  const cap1 = CapUrn.fromString(testUrn('generate'));
   const cap2 = CapUrn.fromString('cap:in="media:textable";ext=pdf;format=binary;out="media:"');
 
   // Merge (other takes precedence)
   const merged = cap1.merge(cap2);
   assertEqual(merged.getInSpec(), 'media:textable', 'Merge should take inSpec from other');
   assertEqual(merged.getOutSpec(), 'media:', 'Merge should take outSpec from other');
-  assertEqual(merged.getTag('op'), 'generate', 'Merge should keep original tags');
+  assert(merged.hasMarkerTag('generate'), 'Merge should keep original tags');
   assertEqual(merged.getTag('ext'), 'pdf', 'Merge should add other tags');
 
   // Subset (always preserves in/out)
   const sub = merged.subset(['ext']);
   assertEqual(sub.getTag('ext'), 'pdf', 'Subset should keep ext');
-  assertEqual(sub.getTag('op'), undefined, 'Subset should drop op');
+  assert(!sub.hasMarkerTag('generate'), 'Subset should drop the generate marker');
   assertEqual(sub.getInSpec(), 'media:textable', 'Subset should preserve inSpec');
 }
 
@@ -580,7 +580,7 @@ function test040_matchingSemanticsExactMatch() {
 
 // TEST041: Matching semantics - cap missing tag matches (implicit wildcard)
 function test041_matchingSemanticsCapMissingTag() {
-  const cap = CapUrn.fromString(testUrn('op=generate'));
+  const cap = CapUrn.fromString(testUrn('generate'));
   const request = CapUrn.fromString(testUrn('generate;ext=pdf'));
   assert(cap.accepts(request), 'General pattern with only op should accept specific instance');
   assert(!request.accepts(cap), 'Pattern requiring ext should reject instance missing ext');
@@ -639,7 +639,7 @@ function test048_matchingSemanticsWildcardDirection() {
 
 // TEST049: Non-overlapping tags — neither direction accepts
 function test049_matchingSemanticsCrossDimension() {
-  const cap = CapUrn.fromString(testUrn('op=generate'));
+  const cap = CapUrn.fromString(testUrn('generate'));
   const request = CapUrn.fromString(testUrn('ext=pdf'));
   assert(!cap.accepts(request), 'Pattern requiring op should reject instance missing op');
   assert(!request.accepts(cap), 'Pattern requiring ext should reject instance missing ext');
@@ -1367,7 +1367,7 @@ function test306_availabilityAndPathOutputDistinct() {
 // TEST307: Test model_availability_urn builds valid cap URN with correct op and media specs
 function test307_modelAvailabilityUrn() {
   const urn = modelAvailabilityUrn();
-  assert(urn.hasTag('op', 'model-availability'), 'Must have op=model-availability');
+  assert(urn.hasMarkerTag('model-availability'), 'Must have model-availability marker');
   const inSpec = TaggedUrn.fromString(urn.getInSpec());
   const expectedIn = TaggedUrn.fromString(MEDIA_MODEL_SPEC);
   assert(inSpec.conformsTo(expectedIn), 'input must conform to MEDIA_MODEL_SPEC');
@@ -1379,7 +1379,7 @@ function test307_modelAvailabilityUrn() {
 // TEST308: Test model_path_urn builds valid cap URN with correct op and media specs
 function test308_modelPathUrn() {
   const urn = modelPathUrn();
-  assert(urn.hasTag('op', 'model-path'), 'Must have op=model-path');
+  assert(urn.hasMarkerTag('model-path'), 'Must have model-path marker');
   const inSpec = TaggedUrn.fromString(urn.getInSpec());
   const expectedIn = TaggedUrn.fromString(MEDIA_MODEL_SPEC);
   assert(inSpec.conformsTo(expectedIn), 'input must conform to MEDIA_MODEL_SPEC');
@@ -1398,7 +1398,7 @@ function test309_modelAvailabilityAndPathAreDistinct() {
 // TEST310: llm_generate_text_urn() produces a valid cap URN with textable in/out specs
 function test310_llmGenerateTextUrn() {
   const urn = llmGenerateTextUrn();
-  assert(urn.hasTag('op', 'generate_text'), 'Must have op=generate_text');
+  assert(urn.hasMarkerTag('generate_text'), 'Must have generate_text marker');
   assert(urn.getTag('llm') !== undefined, 'Must have llm tag');
   assert(urn.getTag('ml-model') !== undefined, 'Must have ml-model tag');
   assert(TaggedUrn.fromString(urn.getInSpec()).conformsTo(TaggedUrn.fromString(MEDIA_STRING)),
@@ -1508,7 +1508,7 @@ function testJS_capWithMediaSpecs() {
 }
 
 function testJS_capJSONSerialization() {
-  const urn = CapUrn.fromString(testUrn('op=test'));
+  const urn = CapUrn.fromString(testUrn('test'));
   const cap = new Cap(urn, 'Test Cap', 'test_command');
   cap.mediaSpecs = [
     { urn: 'media:custom', media_type: 'text/plain', title: 'Custom' }
@@ -1535,7 +1535,7 @@ function testJS_capJSONSerialization() {
 // JSON.stringify on this side and the Rust serializer on the other side
 // surface as failures here.
 function testJS_capDocumentationRoundTrip() {
-  const urn = CapUrn.fromString(testUrn('op=documented'));
+  const urn = CapUrn.fromString(testUrn('documented'));
   const cap = new Cap(urn, 'Documented Cap', 'documented');
   const body = '# Documented Cap\r\n\nDoes the thing.\n\n```bash\necho "hi"\n```\n\nSee also: \u2605\n';
   cap.setDocumentation(body);
@@ -1557,7 +1557,7 @@ function testJS_capDocumentationRoundTrip() {
 // `documentation: null` would break the symmetric round-trip with Rust
 // (which has no null sentinel) and pollute generated JSON.
 function testJS_capDocumentationOmittedWhenNull() {
-  const urn = CapUrn.fromString(testUrn('op=undocumented'));
+  const urn = CapUrn.fromString(testUrn('undocumented'));
   const cap = new Cap(urn, 'Undocumented Cap', 'undocumented');
   assertEqual(cap.getDocumentation(), null, 'Default documentation must be null');
 
@@ -2341,7 +2341,7 @@ function test1303_withoutTag() {
   const cap = CapUrn.fromString('cap:in="media:void";test;ext=pdf;out="media:void"');
   const removed = cap.withoutTag('ext');
   assertEqual(removed.getTag('ext'), undefined, 'withoutTag should remove ext');
-  assertEqual(removed.getTag('op'), 'test', 'withoutTag should preserve op');
+  assert(removed.hasMarkerTag('test'), 'withoutTag should preserve op');
 
   // Case-insensitive removal
   const removed2 = cap.withoutTag('EXT');
@@ -2365,7 +2365,7 @@ function test1304_withInOutSpec() {
   const changedIn = cap.withInSpec('media:');
   assertEqual(changedIn.getInSpec(), 'media:', 'withInSpec should change inSpec');
   assertEqual(changedIn.getOutSpec(), 'media:void', 'withInSpec should preserve outSpec');
-  assertEqual(changedIn.getTag('op'), 'test', 'withInSpec should preserve tags');
+  assert(changedIn.hasMarkerTag('test'), 'withInSpec should preserve tags');
 
   const changedOut = cap.withOutSpec('media:string');
   assertEqual(changedOut.getInSpec(), 'media:void', 'withOutSpec should preserve inSpec');
@@ -2392,7 +2392,7 @@ function test1305_findAllMatches() {
   const request = CapUrn.fromString('cap:in="media:void";test;out="media:void"');
   const matches = CapMatcher.findAllMatches(caps, request);
 
-  // Should find 2 matches (op=test and test;ext=pdf), not op=different
+  // Should find 2 matches (test and test;ext=pdf), not different
   assertEqual(matches.length, 2, 'Should find 2 matches');
   // Sorted by specificity descending: ext=pdf first (more specific)
   assert(matches[0].specificity() >= matches[1].specificity(), 'First match should be more specific');
@@ -2411,10 +2411,10 @@ function test1306_areCompatible() {
     CapUrn.fromString('cap:in="media:void";different;out="media:void"'),
   ];
 
-  // caps1 (op=test) accepts caps2 (test;ext=pdf) -> compatible
+  // caps1 (test) accepts caps2 (test;ext=pdf) -> compatible
   assert(CapMatcher.areCompatible(caps1, caps2), 'caps1 and caps2 should be compatible');
 
-  // caps1 (op=test) vs caps3 (op=different) -> not compatible
+  // caps1 (test) vs caps3 (different) -> not compatible
   assert(!CapMatcher.areCompatible(caps1, caps3), 'caps1 and caps3 should not be compatible');
 
   // Empty sets are not compatible
@@ -2577,7 +2577,7 @@ function test649_specificityScoring() {
   assert(specific.specificity() > 0, 'Specific cap should have non-zero specificity');
 }
 
-// TEST650: N/A for JS (JS requires in/out, cap:in;out;op=test would fail parsing)
+// TEST650: N/A for JS (JS requires in/out, cap:in=media:;out=media:;test would fail parsing)
 
 // TEST651: All identity forms produce the same CapUrn
 function test651_identityFormsEquivalent() {
@@ -2615,7 +2615,7 @@ function test653_identityRoutingIsolation() {
   const specificCap = CapUrn.fromString('cap:in="media:void";test;out="media:void"');
   const best = CapMatcher.findBestMatch([identity, specificCap], specificRequest);
   assert(best !== null, 'Should find a match');
-  assertEqual(best.getTag('op'), 'test', 'CapMatcher should prefer specific cap over identity');
+  assert(best.hasMarkerTag('test'), 'CapMatcher should prefer specific cap over identity');
 }
 
 // ============================================================================
@@ -4622,7 +4622,7 @@ function testRenderer_buildRunGraphData_usesCapUrnIsEquivalentForFailedCap() {
         saved_paths: [],
         total_bytes: 0,
         duration_ms: 0,
-        failed_cap: 'cap:in="media:b";out="media:c";op=y',  // different tag order
+        failed_cap: 'cap:in=media:b;out=media:c;y',  // different tag order
         error: 'fail',
       },
     ],

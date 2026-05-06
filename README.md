@@ -95,7 +95,7 @@ Utility for matching sets of caps:
 const { CapUrnError, ErrorCodes } = require('capdag');
 
 try {
-  const cap = CapUrn.fromString('cap:op=extract'); // Missing in/out
+  const cap = CapUrn.fromString('cap:extract;in=media:;out=media:'); // Missing in/out
 } catch (error) {
   if (error instanceof CapUrnError) {
     console.log(`Error code: ${error.code}`); // MISSING_IN_SPEC
