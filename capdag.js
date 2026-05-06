@@ -688,6 +688,22 @@ class CapUrnBuilder {
   }
 
   /**
+   * Add a marker tag (a wildcard-valued tag that serializes as just the key).
+   * Equivalent to tag(key, "*") but expresses authorial intent: this tag is
+   * present as a marker, not a key=value pair.
+   *
+   * @param {string} key - The marker key
+   * @returns {CapUrnBuilder} This builder instance for chaining
+   */
+  marker(key) {
+    const keyLower = key.toLowerCase();
+    if (keyLower !== 'in' && keyLower !== 'out') {
+      this._tags[keyLower] = '*';
+    }
+    return this;
+  }
+
+  /**
    * Build the final CapUrn
    *
    * @returns {CapUrn} A new CapUrn instance
@@ -1232,7 +1248,7 @@ class MediaUrn {
  */
 function llmGenerateTextUrn() {
   return new CapUrnBuilder()
-    .tag('op', 'generate_text')
+    .marker('generate_text')
     .tag('llm', '*')
     .tag('ml-model', '*')
     .inSpec(MEDIA_STRING)
@@ -1247,7 +1263,7 @@ function llmGenerateTextUrn() {
  */
 function renderPageImageUrn(inputMedia) {
   return new CapUrnBuilder()
-    .tag('op', 'render_page_image')
+    .marker('render_page_image')
     .inSpec(inputMedia)
     .outSpec(MEDIA_PNG)
     .build();
@@ -1261,7 +1277,7 @@ function renderPageImageUrn(inputMedia) {
  */
 function formatConversionUrn(inMedia, outMedia) {
   return new CapUrnBuilder()
-    .tag('op', 'convert_format')
+    .marker('convert_format')
     .inSpec(inMedia)
     .outSpec(outMedia)
     .build();
@@ -1294,7 +1310,7 @@ function mediaUrnForType(typeName) {
  */
 function modelAvailabilityUrn() {
   return new CapUrnBuilder()
-    .tag('op', 'model-availability')
+    .marker('model-availability')
     .inSpec(MEDIA_MODEL_SPEC)
     .outSpec(MEDIA_AVAILABILITY_OUTPUT)
     .build();
@@ -1306,7 +1322,7 @@ function modelAvailabilityUrn() {
  */
 function modelPathUrn() {
   return new CapUrnBuilder()
-    .tag('op', 'model-path')
+    .marker('model-path')
     .inSpec(MEDIA_MODEL_SPEC)
     .outSpec(MEDIA_PATH_OUTPUT)
     .build();
