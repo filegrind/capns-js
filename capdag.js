@@ -113,6 +113,38 @@ function validatePreservedDirectionSpec(spec, tagName) {
   }
 }
 
+/**
+ * Functional category of a cap, derived from all three axes (`in`,
+ * `out`, and the remaining tags). The classification is **logical** —
+ * the dispatch protocol does not branch on CapKind. Exposed so tools,
+ * UIs, planners, and tests can reason about a cap's role without
+ * re-deriving the rules.
+ *
+ * `media:void` is the **unit type** (no meaningful value). `media:`
+ * is the **top type** (universal wildcard). With those anchors the
+ * five kinds fall out:
+ *
+ *   IDENTITY   in=media:, out=media:, no other tags  → A → A
+ *   SOURCE     in=media:void, out!=void              → () → B
+ *   SINK       in!=void,    out=media:void           → A → ()
+ *   EFFECT     in=media:void, out=media:void         → () → ()
+ *   TRANSFORM  anything else
+ *
+ * IDENTITY is the **fully generic** cap on every axis. Adding any
+ * tag specifies something on the third axis and demotes the morphism
+ * to a TRANSFORM whose in/out happen to be the wildcards.
+ *
+ * String values are snake_case to match other capdag enum
+ * serializations on the wire.
+ */
+const CapKind = Object.freeze({
+  IDENTITY: 'identity',
+  SOURCE: 'source',
+  SINK: 'sink',
+  EFFECT: 'effect',
+  TRANSFORM: 'transform',
+});
+
 class CapUrn {
   /**
    * Create a new CapUrn with direction specs.
@@ -165,6 +197,39 @@ class CapUrn {
    */
   outMediaUrn() {
     return MediaUrn.fromString(this.outSpec);
+  }
+
+  /**
+   * Functional category of this cap, derived from all three axes:
+   * `in` (parsed MediaUrn), `out` (parsed MediaUrn), and the rest of
+   * the tags (the operation/metadata axis — `this.tags` does NOT
+   * include in/out, those live in this.inSpec/this.outSpec).
+   *
+   * Identity requires every axis to be in its most generic form: in
+   * is the top media URN (`media:`), out is the top media URN, and
+   * there are no other tags. Source/Sink/Effect are decided by void
+   * on either directional axis. Anything else is Transform.
+   *
+   * @returns {string} A {@link CapKind} value (snake_case string).
+   * @throws {MediaUrnError} If either side is not a valid media URN
+   *   (only happens on internally inconsistent state since
+   *   construction validates both sides).
+   */
+  kind() {
+    const inMedia = this.inMediaUrn();
+    const outMedia = this.outMediaUrn();
+
+    const inVoid = inMedia.isVoid();
+    const outVoid = outMedia.isVoid();
+    const inTop = inMedia.isTop();
+    const outTop = outMedia.isTop();
+    const noExtraTags = Object.keys(this.tags).length === 0;
+
+    if (inTop && outTop && noExtraTags) return CapKind.IDENTITY;
+    if (inVoid && outVoid) return CapKind.EFFECT;
+    if (inVoid) return CapKind.SOURCE;
+    if (outVoid) return CapKind.SINK;
+    return CapKind.TRANSFORM;
   }
 
   /**
@@ -279,10 +344,20 @@ class CapUrn {
    * @returns {string} The canonical string representation
    */
   toString() {
-    // Build complete tags map including in and out
-    const allTags = { ...this.tags, 'in': this.inSpec, 'out': this.outSpec };
+    // `in` and `out` segments are emitted only when they refine beyond
+    // the trivial wildcard `media:`. A cap whose in/out are both
+    // `media:` and which has no other tags has the canonical form
+    // `cap:` — the bare identity URN. The canonicalizer collapses both
+    // written forms (`cap:` and `cap:in=media:;out=media:`) to one
+    // representative so byte-equality matches semantic identity.
+    const allTags = { ...this.tags };
+    if (this.inSpec !== 'media:') {
+      allTags['in'] = this.inSpec;
+    }
+    if (this.outSpec !== 'media:') {
+      allTags['out'] = this.outSpec;
+    }
 
-    // Use TaggedUrn for canonical serialization
     const taggedUrn = new TaggedUrn('cap', allTags, true);
     return taggedUrn.toString();
   }
@@ -1138,8 +1213,17 @@ class MediaUrn {
   /** @returns {boolean} True if the "textable" marker tag is present */
   isText() { return this._urn.getTag('textable') !== undefined; }
 
-  /** @returns {boolean} True if the "void" marker tag is present */
+  /** @returns {boolean} True if the "void" marker tag is present —
+   *  the **unit type** in the type-theoretic reading. media:void is
+   *  the nullary value; NOT "invalid" or "absent". */
   isVoid() { return this._urn.getTag('void') !== undefined; }
+
+  /** @returns {boolean} True if this is the **top** media URN — the
+   *  universal wildcard `media:` with no tags. Order-theoretically,
+   *  every other media URN conformsTo this one. Distinct from
+   *  isVoid(): top means "any data type accepted here," void means
+   *  "no data flows here." */
+  isTop() { return Object.keys(this._urn.tags).length === 0; }
 
   /** @returns {boolean} True if the "image" marker tag is present */
   isImage() { return this._urn.getTag('image') !== undefined; }
@@ -5866,6 +5950,7 @@ class CapRegistryClient {
 // Export for CommonJS
 module.exports = {
   CapUrn,
+  CapKind,
   CapUrnBuilder,
   CapMatcher,
   CapUrnError,

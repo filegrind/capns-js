@@ -3,7 +3,7 @@
 // All implementations (Rust, Go, JS, ObjC, Python) must pass these identically.
 
 const {
-  CapUrn, CapUrnBuilder, CapMatcher, CapUrnError, ErrorCodes,
+  CapUrn, CapKind, CapUrnBuilder, CapMatcher, CapUrnError, ErrorCodes,
   MediaUrn, MediaUrnError, MediaUrnErrorCodes,
   Cap, MediaSpec, MediaSpecError, MediaSpecErrorCodes,
   resolveMediaUrn, buildExtensionIndex, mediaUrnsForExtension, getExtensionMappings,
@@ -5259,6 +5259,106 @@ function testRenderer_validateResolvedMachinePayload_rejectsMissingFields() {
 }
 
 // ============================================================================
+// CapKind classifier tests (test1800–test1805)
+//
+// Mirrored across every language port (Rust, Go, Python, Swift/ObjC,
+// JS) under the SAME numbers. Any divergence is a wire-level
+// inconsistency — the kind taxonomy is part of the protocol's public
+// surface, not a per-port detail.
+// ============================================================================
+
+// TEST1800: Identity classifier — only the bare cap: form qualifies.
+// Adding any tag (even one that doesn't constrain in/out) demotes
+// the cap to Transform because the operation/metadata axis is no
+// longer fully generic.
+function test1800_kindIdentityOnlyForBareCap() {
+  const identity = CapUrn.fromString('cap:');
+  assertEqual(identity.kind(), CapKind.IDENTITY, 'cap: should be Identity');
+
+  for (const spelling of [
+    'cap:in=media:;out=media:',
+    'cap:in=*;out=*',
+    'cap:in=media:',
+    'cap:out=media:',
+  ]) {
+    const cap = CapUrn.fromString(spelling);
+    assertEqual(cap.kind(), CapKind.IDENTITY,
+      `${spelling} should classify as Identity (canonical form is cap:)`);
+  }
+
+  const withOp = CapUrn.fromString('cap:passthrough');
+  assertEqual(withOp.kind(), CapKind.TRANSFORM,
+    'cap:passthrough specifies the operation axis — not Identity');
+}
+
+// TEST1801: Source classifier — in=media:void, out non-void.
+function test1801_kindSourceWhenInputIsVoid() {
+  const warm = CapUrn.fromString('cap:in=media:void;out="media:model-artifact";warm');
+  assertEqual(warm.kind(), CapKind.SOURCE, 'warm cap is a Source');
+
+  const gen = CapUrn.fromString('cap:in=media:void;out=media:textable');
+  assertEqual(gen.kind(), CapKind.SOURCE, 'in=void with concrete out is a Source');
+}
+
+// TEST1802: Sink classifier — out=media:void, in non-void.
+function test1802_kindSinkWhenOutputIsVoid() {
+  const discard = CapUrn.fromString('cap:discard;in=media:;out=media:void');
+  assertEqual(discard.kind(), CapKind.SINK, 'discard cap is a Sink');
+
+  const log = CapUrn.fromString('cap:in="media:json;textable";log;out=media:void');
+  assertEqual(log.kind(), CapKind.SINK, 'log cap is a Sink');
+}
+
+// TEST1803: Effect classifier — both sides void. Reads as `() → ()`.
+function test1803_kindEffectWhenBothSidesVoid() {
+  const ping = CapUrn.fromString('cap:in=media:void;out=media:void;ping');
+  assertEqual(ping.kind(), CapKind.EFFECT, 'ping is an Effect');
+
+  const bare = CapUrn.fromString('cap:in=media:void;out=media:void');
+  assertEqual(bare.kind(), CapKind.EFFECT,
+    'in=void;out=void with empty y is still an Effect');
+}
+
+// TEST1804: Transform classifier — at least one side non-void, and
+// the cap is not the bare identity.
+function test1804_kindTransformForNormalDataProcessors() {
+  const extract = CapUrn.fromString('cap:extract;in=media:pdf;out="media:record;textable"');
+  assertEqual(extract.kind(), CapKind.TRANSFORM, 'extract is a Transform');
+
+  const labeled = CapUrn.fromString('cap:passthrough;in=media:;out=media:');
+  assertEqual(labeled.kind(), CapKind.TRANSFORM,
+    'fully generic in/out with a tag is a Transform, not Identity');
+}
+
+// TEST1805: Kind is invariant under canonicalization. The same
+// morphism written in many surface forms must classify the same way
+// once parsed.
+function test1805_kindInvariantUnderCanonicalSpellings() {
+  const cases = [
+    { a: 'cap:', b: 'cap:in=media:;out=media:', expected: CapKind.IDENTITY },
+    {
+      a: 'cap:extract;in=media:pdf;out=media:textable',
+      b: 'cap:extract;in="media:pdf";out="media:textable"',
+      expected: CapKind.TRANSFORM,
+    },
+    {
+      a: 'cap:in=media:void;out=media:textable;warm',
+      b: 'cap:warm;out=media:textable;in=media:void',
+      expected: CapKind.SOURCE,
+    },
+  ];
+
+  for (const { a, b, expected } of cases) {
+    const kindA = CapUrn.fromString(a).kind();
+    const kindB = CapUrn.fromString(b).kind();
+    assertEqual(kindA, expected, `${a} should classify as ${expected}`);
+    assertEqual(kindB, expected, `${b} should classify as ${expected}`);
+    assertEqual(kindA, kindB,
+      `${a} and ${b} parse to the same cap and must classify identically`);
+  }
+}
+
+// ============================================================================
 // Test runner
 // ============================================================================
 
@@ -5650,6 +5750,14 @@ async function runTests() {
   runTest('RENDERER: buildResolvedMachine_multiStrandDisjoint',    testRenderer_buildResolvedMachineGraphData_multiStrandKeepsStrandsDisjoint);
   runTest('RENDERER: buildResolvedMachine_dupNodeIdFails',         testRenderer_buildResolvedMachineGraphData_duplicateNodeIdAcrossStrandsFailsHard);
   runTest('RENDERER: validateResolvedMachine_rejectsMissingFields', testRenderer_validateResolvedMachinePayload_rejectsMissingFields);
+
+  console.log('\n--- CapKind classifier (test1800–test1805) ---');
+  runTest('TEST1800: kind_identity_only_for_bare_cap',      test1800_kindIdentityOnlyForBareCap);
+  runTest('TEST1801: kind_source_when_input_is_void',       test1801_kindSourceWhenInputIsVoid);
+  runTest('TEST1802: kind_sink_when_output_is_void',        test1802_kindSinkWhenOutputIsVoid);
+  runTest('TEST1803: kind_effect_when_both_sides_void',     test1803_kindEffectWhenBothSidesVoid);
+  runTest('TEST1804: kind_transform_for_normal_processors', test1804_kindTransformForNormalDataProcessors);
+  runTest('TEST1805: kind_invariant_under_canonical',       test1805_kindInvariantUnderCanonicalSpellings);
 
   // Summary
   console.log(`\n${passCount + failCount} tests: ${passCount} passed, ${failCount} failed`);
