@@ -5381,13 +5381,17 @@ class Machine {
     // uses `edge_<idx>` unconditionally — there is no privileged tag (such
     // as the legacy `op=…` tag) we can derive a friendlier name from, so
     // we mirror the same pure-index scheme here.
+    // Number aliases by position in the canonical (sorted) edge order so
+    // that two graphs with the same edges in different insertion orders
+    // produce identical notation. Without this the alias number tracks
+    // insertion order and serialization is non-canonical.
     const aliases = new Map();
-    for (const idx of edgeOrder) {
+    edgeOrder.forEach((idx, position) => {
       const edge = this._edges[idx];
-      const alias = `edge_${idx}`;
+      const alias = `edge_${position}`;
       const capStr = edge.capUrn.toString();
       aliases.set(alias, { edgeIdx: idx, capStr });
-    }
+    });
 
     // Step 3: Generate node names
     // Collect all unique media URNs, assign names in order of first appearance

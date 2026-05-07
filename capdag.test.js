@@ -164,13 +164,14 @@ function test003_directionMatching() {
   assert(wildcardCap.accepts(request), 'Wildcard direction should match any');
 }
 
-// TEST004: Test that unquoted keys and values are normalized to lowercase
+// TEST004: Test that unquoted keys and values are normalized to lowercase.
+// Key lookup is case-insensitive: uppercase variants of `ext` resolve
+// to the same keyed tag.
 function test004_unquotedValuesLowercased() {
   const cap = CapUrn.fromString('cap:ext=pdf;generate;in=media:void;out="media:record;textable"');
   assert(cap.hasMarkerTag('generate'), 'Unquoted value should be lowercased');
   assertEqual(cap.getTag('ext'), 'pdf', 'Unquoted value should be lowercased');
-  // Key lookup is case-insensitive
-  assertEqual(cap.getTag('OP'), 'generate', 'Key lookup should be case-insensitive');
+  assertEqual(cap.getTag('EXT'), 'pdf', 'Key lookup should be case-insensitive');
 }
 
 // TEST005: Test that quoted values preserve case while unquoted are lowercased
@@ -363,15 +364,16 @@ function test020_specificity() {
     'out=record=2, in=*->0, y=test marker=2 -> 20002');
 }
 
-// TEST021: Test builder creates cap URN with correct tags and direction specs
+// TEST021: Test builder creates cap URN with marker + keyed tags and direction specs.
+// `op` is no longer a special key — operation names are markers (value-less tags).
 function test021_builder() {
   const cap = new CapUrnBuilder()
     .inSpec('media:void')
     .outSpec('media:object')
-    .tag('op', 'generate')
+    .marker('generate')
     .tag('ext', 'pdf')
     .build();
-  assert(cap.hasMarkerTag('generate'), 'Builder should set op');
+  assert(cap.hasMarkerTag('generate'), 'Builder should set the generate marker');
   assertEqual(cap.getTag('ext'), 'pdf', 'Builder should set ext');
   assertEqual(cap.getInSpec(), 'media:void', 'Builder should set inSpec');
   assertEqual(cap.getOutSpec(), 'media:object', 'Builder should set outSpec');
@@ -2906,8 +2908,9 @@ function testMachine_lineBasedFormatSerialization() {
   const lineBased = g.toMachineNotationFormatted('line-based');
   assert(!lineBased.includes('['), 'Line-based format must not contain brackets');
   assert(!lineBased.includes(']'), 'Line-based format must not contain brackets');
-  assert(lineBased.includes('extract cap:'), 'Should contain header');
-  assert(lineBased.includes('-> extract ->'), 'Should contain wiring');
+  // Aliases are pure-index `edge_<N>` (no privileged tag to derive a friendlier name).
+  assert(lineBased.includes('edge_0 cap:'), 'Should contain header');
+  assert(lineBased.includes('-> edge_0 ->'), 'Should contain wiring');
 
   // Round-trip
   const reparsed = Machine.fromString(lineBased);
@@ -3177,8 +3180,9 @@ function testMachine_serializeSingleEdge() {
     false
   )]);
   const notation = g.toMachineNotation();
-  assert(notation.includes('[extract '), 'Should use extract alias: ' + notation);
-  assert(notation.includes('-> extract ->'), 'Should have extract in wiring: ' + notation);
+  // Aliases are pure-index `edge_<N>` (no privileged tag to derive a friendlier name).
+  assert(notation.includes('[edge_0 '), 'Should use edge_0 alias: ' + notation);
+  assert(notation.includes('-> edge_0 ->'), 'Should have edge_0 in wiring: ' + notation);
   assert(notation.includes('[n0 ->'), 'Should use n0 for source: ' + notation);
   assert(notation.includes('-> n1]'), 'Should use n1 for target: ' + notation);
 }
@@ -3298,6 +3302,8 @@ function testMachine_multilineSerializeFormat() {
   assert(g.isEquivalent(reparsed), 'Multi-line round-trip failed');
 }
 
+// Aliases are pure-index `edge_<N>` regardless of the cap's tags; there is
+// no privileged `op` tag to derive a friendlier name from.
 function testMachine_aliasFromOpTag() {
   const g = new Machine([new MachineEdge(
     [MediaUrn.fromString('media:pdf')],
@@ -3306,7 +3312,7 @@ function testMachine_aliasFromOpTag() {
     false
   )]);
   const notation = g.toMachineNotation();
-  assert(notation.includes('[extract '), 'Expected extract alias, got: ' + notation);
+  assert(notation.includes('[edge_0 '), 'Expected edge_0 alias, got: ' + notation);
 }
 
 function testMachine_aliasFallbackWithoutOpTag() {
@@ -3320,6 +3326,7 @@ function testMachine_aliasFallbackWithoutOpTag() {
   assert(notation.includes('edge_'), 'Expected fallback alias, got: ' + notation);
 }
 
+// Pure-index aliases inherently disambiguate edges that share a marker tag.
 function testMachine_duplicateOpTagsDisambiguated() {
   const g = new Machine([
     new MachineEdge(
@@ -3336,8 +3343,8 @@ function testMachine_duplicateOpTagsDisambiguated() {
     ),
   ]);
   const notation = g.toMachineNotation();
-  assert(notation.includes('extract_1') || notation.includes('extract_2'),
-    'Duplicate ops must be disambiguated: ' + notation);
+  assert(notation.includes('edge_0') && notation.includes('edge_1'),
+    'Two edges must serialize with two distinct aliases: ' + notation);
 }
 
 // --- Machine builder tests ---
@@ -3575,7 +3582,10 @@ function testMachine_toMermaid_linearChain() {
   );
   const mermaid = machine.toMermaid();
   assert(mermaid.startsWith('flowchart LR'), 'Should start with flowchart LR');
-  assert(mermaid.includes('extract'), 'Should include extract label');
+  // Edge labels are pure-index `edge_<N>` aliases from the canonical
+  // serializer (the input alias name is not preserved in the rendered
+  // diagram — it's a serialization artefact, not part of the machine).
+  assert(mermaid.includes('edge_0'), 'Should include edge_0 label');
   assert(mermaid.includes('media:pdf'), 'Should include media:pdf node');
   assert(mermaid.includes('media:textable;txt'), 'Should include media:textable;txt node');
   assert(mermaid.includes('-->'), 'Should include arrow');
