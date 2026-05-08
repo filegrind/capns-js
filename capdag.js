@@ -2,7 +2,7 @@
 // Follows the exact same rules as Rust, Go, and Objective-C implementations
 
 // Import TaggedUrn from the tagged-urn package
-const { TaggedUrn, valuesMatch: taggedUrnValuesMatch } = require('tagged-urn');
+const { TaggedUrn, valuesMatch: taggedUrnValuesMatch, scoreTagValue } = require('tagged-urn');
 
 /**
  * Error types for Cap URN operations
@@ -112,12 +112,6 @@ function validatePreservedDirectionSpec(spec, tagName) {
     );
   }
 }
-
-// Per-tag truth-table specificity scoring is owned by the
-// tagged-urn module — same scorer applies uniformly to media-URN
-// tags, cap-tag y-axis, and any other Tagged URN dimension. We
-// re-use the canonical implementation rather than duplicate it.
-const { scoreTagValue } = require('tagged-urn');
 
 /**
  * Functional category of a cap, derived from all three axes (`in`,
