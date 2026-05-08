@@ -31,13 +31,19 @@ const outDir = process.argv[2]
 fs.mkdirSync(outDir, { recursive: true });
 
 function stripCJS(src) {
-  // Strip the CJS `const { TaggedUrn } = require('tagged-urn')` line and
-  // the trailing `module.exports = {...}` block. Both are at known
-  // positions in the source; the regex matches the full single-line
-  // require and the multi-line module.exports object literal.
+  // Strip the CJS `Import TaggedUrn` comment and the trailing
+  // `module.exports = {...}` block, then rewrite any single-line
+  // `const { ... } = require('tagged-urn')` destructure into a
+  // destructure from `window`. The destructure may include any subset
+  // of names (TaggedUrn, valuesMatch, scoreTagValue, …) so long as it
+  // is one line; renames like `valuesMatch: taggedUrnValuesMatch` are
+  // preserved verbatim.
   return src
     .replace(/^\/\/.*Import TaggedUrn.*\n/m, '')
-    .replace(/^const\s*\{\s*TaggedUrn\s*\}\s*=\s*require\s*\(\s*['"]tagged-urn['"]\s*\)\s*;?\s*$/m, '')
+    .replace(
+      /^const\s*(\{[^}]*\})\s*=\s*require\s*\(\s*['"]tagged-urn['"]\s*\)\s*;?\s*$/gm,
+      'const $1 = window;'
+    )
     .replace(/^module\.exports\s*=\s*\{[\s\S]*?\};?\s*$/m, '');
 }
 
@@ -60,6 +66,8 @@ window.TaggedUrnBuilder = TaggedUrnBuilder;
 window.UrnMatcher = UrnMatcher;
 window.TaggedUrnError = TaggedUrnError;
 window.TaggedUrnErrorCodes = ErrorCodes;
+window.valuesMatch = valuesMatch;
+window.scoreTagValue = scoreTagValue;
 
 })();
 `;
@@ -102,8 +110,7 @@ ${parserSrc}
 (function() {
 'use strict';
 
-const { TaggedUrn } = window;
-if (!TaggedUrn) {
+if (!window.TaggedUrn) {
   throw new Error('TaggedUrn global is not defined. Load tagged-urn.js before capdag.js.');
 }
 
