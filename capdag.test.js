@@ -283,6 +283,37 @@ function test016_trailingSemicolonEquivalence() {
   assertEqual(cap1.toString(), cap2.toString(), 'Canonical forms should match');
 }
 
+// TEST939: The canonical form drops `in=media:` and `out=media:`
+// segments. Every spelling of "the same cap with wildcard in/out"
+// collapses to one byte-identical canonical string. This is the
+// contract that makes registry lookups work: the cap-publisher hashes
+// `<canonical-urn>` to compute the cache key, and every language port
+// (Rust, Go, Python, JS, ObjC) must agree on the canonical form for
+// cross-language lookups to land on the same key. A regression that
+// emitted the wildcard segments would silently move the published cap
+// to a different SHA-256 bucket, 404'ing every reader that hashes the
+// canonical form.
+function test939_capUrnCanonicalFormDropsWildcardInOut() {
+  const canonical = 'cap:decimate-sequence';
+  const variants = [
+    'cap:decimate-sequence',
+    'cap:decimate-sequence;in=media:;out=media:',
+    'cap:in=media:;out=media:;decimate-sequence',
+    'cap:in=media:;decimate-sequence;out=media:',
+  ];
+  for (const v of variants) {
+    const parsed = CapUrn.fromString(v);
+    assertEqual(
+      parsed.toString(),
+      canonical,
+      `input ${JSON.stringify(v)} canonicalized to ${JSON.stringify(parsed.toString())}, expected ${JSON.stringify(canonical)} — wildcard in/out segments must be elided so the registry SHA-256 key is stable across input spellings`
+    );
+  }
+  // Bare-identity round-trip.
+  const identity = CapUrn.fromString('cap:in=media:;out=media:');
+  assertEqual(identity.toString(), 'cap:', 'cap with wildcard in/out and no other tags must canonicalize to bare "cap:"');
+}
+
 // TEST017: Test tag matching: exact match, subset match, wildcard match, value mismatch
 function test017_tagMatching() {
   const cap = CapUrn.fromString(testUrn('generate;ext=pdf;target=thumbnail'));
@@ -5668,6 +5699,7 @@ async function runTests() {
   runTest('TEST014: round_trip_escapes', test014_roundTripEscapes);
   runTest('TEST015: cap_prefix_required', test015_capPrefixRequired);
   runTest('TEST016: trailing_semicolon_equivalence', test016_trailingSemicolonEquivalence);
+  runTest('TEST939: cap_urn_canonical_form_drops_wildcard_in_out', test939_capUrnCanonicalFormDropsWildcardInOut);
   runTest('TEST017: tag_matching', test017_tagMatching);
   runTest('TEST018: matching_case_sensitive_values', test018_matchingCaseSensitiveValues);
   runTest('TEST019: missing_tag_handling', test019_missingTagHandling);
