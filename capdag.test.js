@@ -14,7 +14,7 @@ const {
   CapArgumentValue, CapArg, ArgSource, validateCapArgs, ValidationError,
   llmGenerateTextUrn, modelAvailabilityUrn, modelPathUrn,
   MachineSyntaxError, MachineSyntaxErrorCodes, MachineEdge, Machine, MachineBuilder, parseMachine, parseMachineWithAST,
-  CapRegistryEntry, MediaRegistryEntry, CapRegistryClient,
+  FabricRegistryEntry, MediaRegistryEntry, FabricRegistryClient,
   MEDIA_STRING, MEDIA_INTEGER, MEDIA_NUMBER, MEDIA_BOOLEAN,
   MEDIA_OBJECT, MEDIA_STRING_LIST, MEDIA_INTEGER_LIST,
   MEDIA_NUMBER_LIST, MEDIA_BOOLEAN_LIST, MEDIA_OBJECT_LIST,
@@ -1528,16 +1528,14 @@ function testJS_getExtensionMappings() {
   assertEqual(mappings.length, 3, 'Should have 3 mappings');
 }
 
-function testJS_capWithMediaSpecs() {
-  const urn = CapUrn.fromString('cap:in="media:string";test;out="media:custom"');
-  const cap = new Cap(urn, 'Test Cap', 'test_command');
-  cap.mediaSpecs = [
+function testJS_resolveMediaUrnFromSpecs() {
+  const mediaSpecs = [
     { urn: MEDIA_STRING, media_type: 'text/plain', title: 'String', profile_uri: 'https://capdag.com/schema/str' },
     { urn: 'media:custom', media_type: 'application/json', title: 'Custom Output', schema: { type: 'object' } }
   ];
-  const strSpec = cap.resolveMediaUrn(MEDIA_STRING);
+  const strSpec = resolveMediaUrn(MEDIA_STRING, mediaSpecs);
   assertEqual(strSpec.contentType, 'text/plain', 'Should resolve string spec');
-  const outputSpec = cap.resolveMediaUrn('media:custom');
+  const outputSpec = resolveMediaUrn('media:custom', mediaSpecs);
   assertEqual(outputSpec.contentType, 'application/json', 'Should resolve custom spec');
   assert(outputSpec.schema !== null, 'Should have schema');
 }
@@ -1545,9 +1543,6 @@ function testJS_capWithMediaSpecs() {
 function testJS_capJSONSerialization() {
   const urn = CapUrn.fromString(testUrn('test'));
   const cap = new Cap(urn, 'Test Cap', 'test_command');
-  cap.mediaSpecs = [
-    { urn: 'media:custom', media_type: 'text/plain', title: 'Custom' }
-  ];
   cap.arguments = {
     required: [{ name: 'input', media_urn: MEDIA_STRING }],
     optional: []
@@ -1555,11 +1550,10 @@ function testJS_capJSONSerialization() {
   cap.output = { media_urn: 'media:custom', output_description: 'Test output' };
 
   const json = cap.toJSON();
-  assert(json.media_specs !== undefined, 'Should have media_specs');
   assertEqual(typeof json.urn, 'string', 'URN should be string');
+  assert(json.media_specs === undefined, 'Cap JSON must not contain media_specs (registry-resolved)');
 
   const restored = Cap.fromJSON(json);
-  assert(restored.mediaSpecs !== undefined, 'Should restore mediaSpecs');
   assertEqual(restored.urn.getInSpec(), MEDIA_VOID, 'Should restore inSpec');
   assertEqual(restored.urn.getOutSpec(), MEDIA_OBJECT, 'Should restore outSpec');
 }
@@ -3638,11 +3632,11 @@ function testMachine_toMermaid_fanOut() {
 }
 
 // ============================================================================
-// Phase 0B: CapRegistryClient tests
+// Phase 0B: FabricRegistryClient tests
 // ============================================================================
 
 function testMachine_capRegistryEntry_construction() {
-  const entry = new CapRegistryEntry({
+  const entry = new FabricRegistryEntry({
     urn: 'cap:in="media:pdf";extract;out="media:txt;textable"',
     title: 'PDF Extractor',
     command: 'extract',
@@ -3678,7 +3672,7 @@ function testMachine_mediaRegistryEntry_construction() {
 }
 
 function testMachine_capRegistryClient_construction() {
-  const client = new CapRegistryClient('https://example.com', 600);
+  const client = new FabricRegistryClient('https://example.com', 600);
   assert(client !== null, 'Client should be constructed');
   // Invalidate should not throw
   client.invalidate();
@@ -3686,7 +3680,7 @@ function testMachine_capRegistryClient_construction() {
 
 function testMachine_capRegistryEntry_defaults() {
   // Verify that missing fields default gracefully
-  const entry = new CapRegistryEntry({ urn: 'cap:in=media:;test;out=media:' });
+  const entry = new FabricRegistryEntry({ urn: 'cap:in=media:;test;out=media:' });
   assertEqual(entry.urn, 'cap:in=media:;test;out=media:', 'URN should match');
   assertEqual(entry.title, '', 'Title should default to empty');
   assertEqual(entry.description, '', 'Description should default to empty');
@@ -5803,7 +5797,7 @@ async function runTests() {
   runTest('JS: build_extension_index', testJS_buildExtensionIndex);
   runTest('JS: media_urns_for_extension', testJS_mediaUrnsForExtension);
   runTest('JS: get_extension_mappings', testJS_getExtensionMappings);
-  runTest('JS: cap_with_media_specs', testJS_capWithMediaSpecs);
+  runTest('JS: resolve_media_urn_from_specs', testJS_resolveMediaUrnFromSpecs);
   runTest('JS: cap_json_serialization', testJS_capJSONSerialization);
   runTest('JS: cap_documentation_round_trip', testJS_capDocumentationRoundTrip);
   runTest('JS: cap_documentation_omitted_when_null', testJS_capDocumentationOmittedWhenNull);
@@ -5975,7 +5969,7 @@ async function runTests() {
   runTest('MACHINE:toMermaid_fanIn', testMachine_toMermaid_fanIn);
   runTest('MACHINE:toMermaid_fanOut', testMachine_toMermaid_fanOut);
 
-  // Phase 0B: CapRegistryClient
+  // Phase 0B: FabricRegistryClient
   console.log('\n--- registry/client ---');
   runTest('REGISTRY: capRegistryEntry_construction', testMachine_capRegistryEntry_construction);
   runTest('REGISTRY: mediaRegistryEntry_construction', testMachine_mediaRegistryEntry_construction);

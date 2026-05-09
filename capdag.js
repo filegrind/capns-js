@@ -1111,6 +1111,12 @@ const MEDIA_COLLECTION = 'media:collection;record';
 const MEDIA_COLLECTION_LIST = 'media:collection;list;record';
 // Media URN for adapter selection output - JSON record
 const MEDIA_ADAPTER_SELECTION = 'media:adapter-selection;json;record';
+// Fabric registry lookup wire types (consumed/produced by cap:lookup-cap;fabric
+// and cap:lookup-media-spec;fabric, both implemented by netaccesscartridge).
+const MEDIA_CAP_URN = 'media:cap-urn;textable';
+const MEDIA_MEDIA_URN = 'media:media-urn;textable';
+const MEDIA_CAP_DEFINITION = 'media:cap-definition;json;record;textable';
+const MEDIA_MEDIA_SPEC_DEFINITION = 'media:media-spec-definition;json;record;textable';
 
 // =============================================================================
 // STANDARD CAP URN CONSTANTS
@@ -1123,6 +1129,12 @@ const CAP_IDENTITY = 'cap:in=media:;out=media:';
 // Adapter-selection capability. Default implementation returns empty END (no match).
 // Cartridges that inspect file content override this with a handler that returns {"media_urns": [...]}.
 const CAP_ADAPTER_SELECTION = 'cap:in="media:";out="media:adapter-selection;json;record"';
+
+// Fabric registry lookup caps. Implemented by netaccesscartridge.
+// CAP_LOOKUP_CAP_FABRIC resolves a canonical cap URN to its full flattened
+// cap definition; CAP_LOOKUP_MEDIA_SPEC_FABRIC does the same for media specs.
+const CAP_LOOKUP_CAP_FABRIC = 'cap:in="media:cap-urn;textable";fabric;lookup-cap;out="media:cap-definition;json;record;textable"';
+const CAP_LOOKUP_MEDIA_SPEC_FABRIC = 'cap:in="media:media-urn;textable";fabric;lookup-media-spec;out="media:media-spec-definition;json;record;textable"';
 
 // =============================================================================
 // MEDIA URN CLASS
@@ -2227,7 +2239,6 @@ class Cap {
     this.cap_description = capDescription;
     this.documentation = documentation;
     this.metadata = metadata || {};
-    this.mediaSpecs = [];  // Media spec definitions array
     this.args = [];  // Array of CapArg - unified argument format
     this.output = null;
     this.metadata_json = metadataJson;
@@ -2287,16 +2298,6 @@ class Cap {
    */
   acceptsStdin() {
     return this.getStdinMediaUrn() !== null;
-  }
-
-  /**
-   * Resolve a media URN to a MediaSpec using this cap's mediaSpecs table
-   * @param {string} mediaUrn - The media URN (e.g., "media:string")
-   * @returns {MediaSpec} The resolved MediaSpec
-   * @throws {MediaSpecError} If media URN cannot be resolved
-   */
-  resolveMediaUrn(mediaUrn) {
-    return resolveMediaUrn(mediaUrn, this.mediaSpecs);
   }
 
   /**
@@ -2446,7 +2447,6 @@ class Cap {
            this.cap_description === other.cap_description &&
            this.documentation === other.documentation &&
            JSON.stringify(this.metadata) === JSON.stringify(other.metadata) &&
-           JSON.stringify(this.mediaSpecs) === JSON.stringify(other.mediaSpecs) &&
            JSON.stringify(this.args.map(a => a.toJSON())) === JSON.stringify(other.args.map(a => a.toJSON())) &&
            JSON.stringify(this.output) === JSON.stringify(other.output) &&
            JSON.stringify(this.metadata_json) === JSON.stringify(other.metadata_json) &&
@@ -2466,7 +2466,6 @@ class Cap {
       command: this.command,
       cap_description: this.cap_description,
       metadata: this.metadata,
-      media_specs: this.mediaSpecs,
       args: this.args.map(a => a.toJSON()),
       output: this.output
     };
@@ -2510,7 +2509,6 @@ class Cap {
       ? json.documentation
       : null;
     const cap = new Cap(urn, json.title, json.command, json.cap_description, json.metadata, json.metadata_json, documentation);
-    cap.mediaSpecs = json.media_specs || json.mediaSpecs || [];
     // Parse args (new format)
     if (json.args && Array.isArray(json.args)) {
       cap.args = json.args.map(a => CapArg.fromJSON(a));
@@ -2951,9 +2949,16 @@ function validateCapArgs(cap) {
  */
 class InputValidator {
   /**
-   * Validate positional arguments against cap input schema
+   * Validate positional arguments against cap input schema.
+   *
+   * @param {Cap} cap
+   * @param {Array} argValues
+   * @param {Array} mediaSpecs - Media specs the cap's args reference;
+   *   threaded through to `resolveMediaUrn` for schema resolution.
+   *   Required for any cap whose args reference media URNs that
+   *   resolve through the registry.
    */
-  static validatePositionalArguments(cap, argValues) {
+  static validatePositionalArguments(cap, argValues, mediaSpecs = []) {
     const capUrn = cap.urnString();
     const args = cap.arguments;
 
@@ -2974,7 +2979,7 @@ class InputValidator {
         });
       }
 
-      InputValidator.validateSingleArgument(cap, args.required[i], argValues[i]);
+      InputValidator.validateSingleArgument(cap, args.required[i], argValues[i], mediaSpecs);
     }
 
     // Validate optional arguments if provided
@@ -2982,15 +2987,20 @@ class InputValidator {
     for (let i = 0; i < args.optional.length; i++) {
       const argIndex = requiredCount + i;
       if (argIndex < argValues.length) {
-        InputValidator.validateSingleArgument(cap, args.optional[i], argValues[argIndex]);
+        InputValidator.validateSingleArgument(cap, args.optional[i], argValues[argIndex], mediaSpecs);
       }
     }
   }
 
   /**
-   * Validate named arguments against cap input schema
+   * Validate named arguments against cap input schema.
+   *
+   * @param {Cap} cap
+   * @param {Array} namedArgs
+   * @param {Array} mediaSpecs - Media specs the cap's args reference;
+   *   threaded through to `resolveMediaUrn` for schema resolution.
    */
-  static validateNamedArguments(cap, namedArgs) {
+  static validateNamedArguments(cap, namedArgs, mediaSpecs = []) {
     const capUrn = cap.urnString();
     const args = cap.arguments;
 
@@ -3012,14 +3022,14 @@ class InputValidator {
 
       // Validate the provided argument value
       const providedValue = providedArgs.get(reqArg.name);
-      InputValidator.validateSingleArgument(cap, reqArg, providedValue);
+      InputValidator.validateSingleArgument(cap, reqArg, providedValue, mediaSpecs);
     }
 
     // Validate optional arguments if provided
     for (const optArg of args.optional) {
       if (providedArgs.has(optArg.name)) {
         const providedValue = providedArgs.get(optArg.name);
-        InputValidator.validateSingleArgument(cap, optArg, providedValue);
+        InputValidator.validateSingleArgument(cap, optArg, providedValue, mediaSpecs);
       }
     }
 
@@ -3043,9 +3053,9 @@ class InputValidator {
    * Two-pass validation:
    * 1. Type validation + media spec validation rules (inherent to semantic type)
    */
-  static validateSingleArgument(cap, argDef, value) {
+  static validateSingleArgument(cap, argDef, value, mediaSpecs = []) {
     // Type validation - returns the resolved MediaSpec
-    const mediaSpec = InputValidator.validateArgumentType(cap, argDef, value);
+    const mediaSpec = InputValidator.validateArgumentType(cap, argDef, value, mediaSpecs);
 
     // Media spec validation rules (inherent to the semantic type)
     if (mediaSpec && mediaSpec.validation) {
@@ -3058,7 +3068,7 @@ class InputValidator {
    * Resolves spec ID to MediaSpec before validation
    * @returns {MediaSpec|null} The resolved MediaSpec
    */
-  static validateArgumentType(cap, argDef, value) {
+  static validateArgumentType(cap, argDef, value, mediaSpecs = []) {
     const capUrn = cap.urnString();
 
     // Get mediaUrn field (now contains a media URN)
@@ -3071,7 +3081,7 @@ class InputValidator {
     // Resolve media URN to MediaSpec - FAIL HARD if unresolvable
     let mediaSpec;
     try {
-      mediaSpec = cap.resolveMediaUrn(mediaUrn);
+      mediaSpec = resolveMediaUrn(mediaUrn, mediaSpecs);
     } catch (e) {
       throw new ValidationError('InvalidCapSchema', capUrn, {
         issue: `Cannot resolve media URN '${mediaUrn}' for argument '${argDef.name}': ${e.message}`
@@ -3253,17 +3263,20 @@ class InputValidator {
  */
 class OutputValidator {
   /**
-   * Validate output against cap output schema using MediaSpec
-   * Resolves spec ID to MediaSpec before validation
+   * Validate output against cap output schema using MediaSpec.
+   *
+   * @param {Cap} cap
+   * @param {*} output
+   * @param {Array} mediaSpecs - Media specs the cap output references;
+   *   threaded through to `resolveMediaUrn` for schema resolution.
    */
-  static validateOutput(cap, output) {
-    const capUrn = cap.urnString();
+  static validateOutput(cap, output, mediaSpecs = []) {
     const outputDef = cap.output;
 
     if (!outputDef) return; // No output definition to validate against
 
     // Type validation - returns the resolved MediaSpec
-    const mediaSpec = OutputValidator.validateOutputType(cap, outputDef, output);
+    const mediaSpec = OutputValidator.validateOutputType(cap, outputDef, output, mediaSpecs);
 
     // Media spec validation rules (inherent to the semantic type)
     if (mediaSpec && mediaSpec.validation) {
@@ -3275,7 +3288,7 @@ class OutputValidator {
    * Validate output type using MediaSpec
    * @returns {MediaSpec|null} The resolved MediaSpec
    */
-  static validateOutputType(cap, outputDef, value) {
+  static validateOutputType(cap, outputDef, value, mediaSpecs = []) {
     const capUrn = cap.urnString();
 
     // Get mediaUrn field (now contains a media URN)
@@ -3288,7 +3301,7 @@ class OutputValidator {
     // Resolve media URN to MediaSpec - FAIL HARD if unresolvable
     let mediaSpec;
     try {
-      mediaSpec = cap.resolveMediaUrn(mediaUrn);
+      mediaSpec = resolveMediaUrn(mediaUrn, mediaSpecs);
     } catch (e) {
       throw new ValidationError('InvalidCapSchema', capUrn, {
         issue: `Cannot resolve media URN '${mediaUrn}' for output: ${e.message}`
@@ -5823,9 +5836,21 @@ class MachineBuilder {
 
 /**
  * A capability entry from the registry.
- * Matches the denormalized view format from capdag.com /api/capabilities.
+ *
+ * Wire shape mirrors the flattened entries published at
+ *   <base>/api/capabilities                    (the flat array)
+ *   <base>/views/capabilities                  (alias)
+ *   <base>/views/capabilities-by-urn           (map keyed by canonical URN)
+ *   <base>/caps/<sha256(canonical-urn)>        (per-URN object)
+ *
+ * Equality between an entry's URN and any caller-supplied URN MUST go
+ * through the CapUrn parser's `isEquivalent()` predicate — never via
+ * string comparison. The wire form is already canonical (the writer
+ * canonicalises before publishing), but a caller's URN may not be, so
+ * lookups parse both sides and compare via the parser's order-theoretic
+ * relations.
  */
-class CapRegistryEntry {
+class FabricRegistryEntry {
   constructor(data) {
     this.urn = data.urn;
     this.title = data.title || '';
@@ -5833,7 +5858,6 @@ class CapRegistryEntry {
     this.description = data.cap_description || '';
     this.args = data.args || [];
     this.output = data.output || null;
-    this.mediaSpecs = data.media_specs || [];
     this.urnTags = data.urn_tags || {};
     this.inSpec = data.in_spec || '';
     this.outSpec = data.out_spec || '';
@@ -5844,7 +5868,10 @@ class CapRegistryEntry {
 
 /**
  * A media spec entry from the registry.
- * Matches the media lookup format from capdag.com /media:*.
+ *
+ * Wire shape mirrors the per-URN objects published at
+ *   <base>/media/<sha256(canonical-urn)>
+ * and the values of `<base>/views/media-by-urn`.
  */
 class MediaRegistryEntry {
   constructor(data) {
@@ -5856,35 +5883,77 @@ class MediaRegistryEntry {
 }
 
 /**
- * Client for fetching and caching capability and media registries from capdag.com.
+ * SHA-256 hex digest of `s` UTF-8 bytes.
  *
- * Uses a time-based cache with configurable TTL. All methods are async.
- * Fails hard on network errors — no silent degradation.
+ * Used to derive registry object keys from canonical URN strings, so
+ * the URL surface is colon/quote/semicolon-free. All capdag
+ * implementations (capdag, capdag-js, capdag-py, capdag-go, capdag-objc)
+ * use this same algorithm so a URN's key is identical across languages.
+ *
+ * Runtime detection: `crypto.subtle` is available in browsers and
+ * modern Node (≥ 16, exposed via `globalThis.crypto`); CommonJS Node
+ * also has the synchronous `crypto` module. We prefer subtle for
+ * portability and fall back to the Node module when subtle is absent.
  */
-class CapRegistryClient {
+async function sha256Hex(s) {
+  const utf8 = new TextEncoder().encode(s);
+  if (typeof globalThis.crypto !== 'undefined' && globalThis.crypto.subtle) {
+    const buf = await globalThis.crypto.subtle.digest('SHA-256', utf8);
+    return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2, '0')).join('');
+  }
+  // Node CommonJS fallback. require() may throw in strict ESM contexts;
+  // we let it propagate because every supported runtime has a crypto API.
+  // eslint-disable-next-line global-require
+  const nodeCrypto = require('crypto');
+  return nodeCrypto.createHash('sha256').update(utf8).digest('hex');
+}
+
+/**
+ * Client for fetching and caching capabilities and media specs.
+ *
+ * Reads from `<baseUrl>/api/capabilities` (the flat catalogue) and
+ * `<baseUrl>/{caps,media}/<sha256>` (per-URN).
+ *
+ * URL safety: per-URN lookups hash the canonical URN string with SHA-256
+ * before constructing the URL, so the path contains only the literal
+ * prefix and a 64-character hex digest — no colons, quotes, semicolons,
+ * or equals signs to percent-encode.
+ *
+ * URN comparison: the cache lookup parses both sides through CapUrn /
+ * MediaUrn and uses the parser's `isEquivalent()` predicate. Two
+ * spellings of the same URN (different tag order, etc.) resolve to the
+ * same entry.
+ */
+class FabricRegistryClient {
   /**
-   * @param {string} [baseUrl='https://capdag.com'] - Registry base URL
+   * @param {string} [baseUrl='https://fabric.capdag.com'] - Registry base URL
    * @param {number} [cacheTtlSeconds=300] - Cache TTL in seconds
    */
-  constructor(baseUrl = 'https://capdag.com', cacheTtlSeconds = 300) {
+  constructor(baseUrl = 'https://fabric.capdag.com', cacheTtlSeconds = 300) {
     this._baseUrl = baseUrl.replace(/\/$/, '');
     this._cacheTtl = cacheTtlSeconds * 1000;
-    this._capCache = null;       // { entries: CapRegistryEntry[], fetchedAt: number }
-    this._mediaCache = new Map(); // media_urn_string → { entry: MediaRegistryEntry, fetchedAt: number }
+    // The full-catalogue cache is keyed by no key — there's only one.
+    this._capCache = null;
+    // Per-URN media cache, keyed by the canonical URN string. The
+    // canonical key only needs to be unique per equivalence class; we
+    // store one entry per equivalence class.
+    this._mediaCache = new Map();
   }
 
   /**
-   * Fetch all capabilities from the registry (cached).
-   * @returns {Promise<CapRegistryEntry[]>}
+   * Fetch the full flat capability catalogue (cached).
+   *
+   * @returns {Promise<FabricRegistryEntry[]>}
    */
   async fetchCapabilities() {
     if (this._capCache && (Date.now() - this._capCache.fetchedAt) < this._cacheTtl) {
       return this._capCache.entries;
     }
 
-    const response = await fetch(`${this._baseUrl}/api/capabilities`);
+    const url = `${this._baseUrl}/api/capabilities`;
+    const response = await fetch(url);
     if (!response.ok) {
-      throw new Error(`Cap registry request failed: HTTP ${response.status} from ${this._baseUrl}/api/capabilities`);
+      throw new Error(`Cap registry request failed: HTTP ${response.status} from ${url}`);
     }
 
     const data = await response.json();
@@ -5892,68 +5961,80 @@ class CapRegistryClient {
       throw new Error(`Invalid cap registry response: expected array, got ${typeof data}`);
     }
 
-    const entries = data.map(d => new CapRegistryEntry(d));
+    const entries = data.map(d => new FabricRegistryEntry(d));
     this._capCache = { entries, fetchedAt: Date.now() };
     return entries;
   }
 
   /**
    * Lookup a single capability by URN.
-   * Uses the capabilities cache if available, otherwise falls back to direct lookup.
-   * @param {string} capUrnStr - Cap URN string
-   * @returns {Promise<CapRegistryEntry|null>}
+   *
+   * Canonicalises the input URN through CapUrn, then either:
+   *   - returns the cache entry whose URN `isEquivalent()` to the
+   *     canonical input, OR
+   *   - GETs `<base>/caps/<sha256(canonical)>` and returns its body.
+   *
+   * @param {string} capUrnStr — caller's cap URN (any valid form)
+   * @returns {Promise<FabricRegistryEntry|null>}
    */
   async lookupCap(capUrnStr) {
-    // Try cache first
+    const requested = CapUrn.fromString(capUrnStr);
+
     if (this._capCache && (Date.now() - this._capCache.fetchedAt) < this._cacheTtl) {
-      const found = this._capCache.entries.find(e => e.urn === capUrnStr);
-      if (found) return found;
+      for (const entry of this._capCache.entries) {
+        const entryUrn = CapUrn.fromString(entry.urn);
+        if (entryUrn.isEquivalent(requested)) return entry;
+      }
     }
 
-    // Direct lookup
-    const encoded = encodeURIComponent(capUrnStr);
-    const response = await fetch(`${this._baseUrl}/${encoded}`);
-    if (response.status === 404) {
-      return null;
-    }
+    const canonical = requested.toString();
+    const hash = await sha256Hex(canonical);
+    const url = `${this._baseUrl}/caps/${hash}`;
+    const response = await fetch(url);
+    if (response.status === 404) return null;
     if (!response.ok) {
-      throw new Error(`Cap lookup failed: HTTP ${response.status} for ${capUrnStr}`);
+      throw new Error(`Cap lookup failed: HTTP ${response.status} for ${canonical} (${url})`);
     }
 
     const data = await response.json();
-    return new CapRegistryEntry(data);
+    return new FabricRegistryEntry(data);
   }
 
   /**
    * Lookup a single media spec by URN.
-   * @param {string} mediaUrnStr - Media URN string
+   *
+   * Canonicalises through MediaUrn and looks up by SHA-256 hash.
+   *
+   * @param {string} mediaUrnStr
    * @returns {Promise<MediaRegistryEntry|null>}
    */
   async lookupMedia(mediaUrnStr) {
-    // Check cache
-    const cached = this._mediaCache.get(mediaUrnStr);
+    const requested = MediaUrn.fromString(mediaUrnStr);
+    const canonical = requested.toString();
+
+    const cached = this._mediaCache.get(canonical);
     if (cached && (Date.now() - cached.fetchedAt) < this._cacheTtl) {
       return cached.entry;
     }
 
-    const encoded = encodeURIComponent(mediaUrnStr);
-    const response = await fetch(`${this._baseUrl}/${encoded}`);
-    if (response.status === 404) {
-      return null;
-    }
+    const hash = await sha256Hex(canonical);
+    const url = `${this._baseUrl}/media/${hash}`;
+    const response = await fetch(url);
+    if (response.status === 404) return null;
     if (!response.ok) {
-      throw new Error(`Media lookup failed: HTTP ${response.status} for ${mediaUrnStr}`);
+      throw new Error(`Media lookup failed: HTTP ${response.status} for ${canonical} (${url})`);
     }
 
     const data = await response.json();
     const entry = new MediaRegistryEntry(data);
-    this._mediaCache.set(mediaUrnStr, { entry, fetchedAt: Date.now() });
+    this._mediaCache.set(canonical, { entry, fetchedAt: Date.now() });
     return entry;
   }
 
   /**
-   * Get all known media URNs from cached capabilities (in and out specs).
-   * Fetches capabilities if not cached.
+   * All canonical media URNs referenced as in/out specs by any cap in
+   * the cached catalogue.
+   *
    * @returns {Promise<string[]>}
    */
   async getKnownMediaUrns() {
@@ -5967,7 +6048,13 @@ class CapRegistryClient {
   }
 
   /**
-   * Get all known op= tag values from cached capabilities.
+   * All distinct `op=` tag values present on any cap in the cached
+   * catalogue.
+   *
+   * `op` is just another arbitrary tag; this helper exists for the
+   * cap-navigator UI which surfaces operation labels. It is NOT part of
+   * dispatch — only the in/out tags carry functional meaning.
+   *
    * @returns {Promise<string[]>}
    */
   async getKnownOps() {
@@ -5981,7 +6068,7 @@ class CapRegistryClient {
   }
 
   /**
-   * Invalidate all caches. Next call to any method will fetch fresh data.
+   * Invalidate all caches. Next call to any method fetches fresh data.
    */
   invalidate() {
     this._capCache = null;
@@ -6121,8 +6208,15 @@ module.exports = {
   MEDIA_COLLECTION,
   MEDIA_COLLECTION_LIST,
   MEDIA_ADAPTER_SELECTION,
+  // Fabric registry lookup wire types
+  MEDIA_CAP_URN,
+  MEDIA_MEDIA_URN,
+  MEDIA_CAP_DEFINITION,
+  MEDIA_MEDIA_SPEC_DEFINITION,
   // Standard cap URN constants
   CAP_ADAPTER_SELECTION,
+  CAP_LOOKUP_CAP_FABRIC,
+  CAP_LOOKUP_MEDIA_SPEC_FABRIC,
   // Cap execution result
   CapResult,
   // Unified argument type
@@ -6167,7 +6261,7 @@ module.exports = {
   parseMachine,
   parseMachineWithAST,
   // Cap & Media Registry
-  CapRegistryEntry,
+  FabricRegistryEntry,
   MediaRegistryEntry,
-  CapRegistryClient,
+  FabricRegistryClient,
 };

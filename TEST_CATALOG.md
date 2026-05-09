@@ -213,7 +213,7 @@ This catalog lists all tests in the JS codebase.
 | unnumbered | `testMachine_builderSingleEdge` | --- Machine builder tests --- | capdag.test.js:3352 |
 | unnumbered | `testMachine_builderWithLoop` |  | capdag.test.js:3364 |
 | unnumbered | `testMachine_capRegistryClient_construction` |  | capdag.test.js:3680 |
-| unnumbered | `testMachine_capRegistryEntry_construction` | Phase 0B: CapRegistryClient tests | capdag.test.js:3644 |
+| unnumbered | `testMachine_capRegistryEntry_construction` | Phase 0B: FabricRegistryClient tests | capdag.test.js:3644 |
 | unnumbered | `testMachine_capRegistryEntry_defaults` |  | capdag.test.js:3687 |
 | unnumbered | `testMachine_capUrnInMediaUrn` |  | capdag.test.js:3423 |
 | unnumbered | `testMachine_capUrnIsComparable` |  | capdag.test.js:3416 |
