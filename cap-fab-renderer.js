@@ -2307,6 +2307,16 @@ class CapFabRenderer {
     // Rust `Machine::to_render_payload_json`).
     this._machineBuilt = null;
 
+    // True until the user first interacts with the graph (taps a
+    // node/edge, drags, or zooms via wheel). While false, every
+    // post-layout refit re-centers the entire graph in the viewport
+    // without animation — so the very first paint, plus the 100/300ms
+    // post-paint resize ticks (which catch container-size settling in
+    // WebKit), all land at a stable centered fit. Flipped to true on
+    // the first user gesture so subsequent refits respect selection,
+    // path-mode focus, and animate normally.
+    this._initialFitDone = false;
+
     // Theme observer.
     this.themeObserver = new MutationObserver((mutations) => {
       for (const mutation of mutations) {
@@ -2446,18 +2456,41 @@ class CapFabRenderer {
             // so its padding actually shows.
             self._stretchLayersForEdgeLabels();
             self._recomputeZoomLimits();
-            if (self._pendingFocusCap) {
+            const hadPendingFocus = !!self._pendingFocusCap;
+            if (hadPendingFocus) {
               const pending = self._pendingFocusCap;
               self._pendingFocusCap = null;
               self.highlightCapability(pending);
             }
-            // Always fit to the full graph on first paint. Selection-
-            // aware refits pivot to the active selection only if one
-            // was set BEFORE layout-stop (e.g. a `_pendingFocusCap`
-            // path); on a clean first render they fall through to
-            // the same `fitToVisibleViewport(undefined, …)` we'd want
-            // anyway.
-            self.refitCurrentSelection();
+            // First paint with no preselected focus: snap (no
+            // animation) to a centered fit of the full, post-stretch
+            // graph. Going through `_centerOnGraphInitial` rather
+            // than `refitCurrentSelection` guarantees three things
+            // on the bootstrap pass that the selection-aware refit
+            // can't:
+            //   - never animate, so the user never sees a transient
+            //     un-centered state on the way to the final fit;
+            //   - always operate on the entire element set, so
+            //     per-edge stretching can't push the centered focus
+            //     off-viewport;
+            //   - reapply on every post-paint resize tick (see
+            //     `resizeAndRefit` below) until the user first
+            //     interacts, absorbing late WebKit container-size
+            //     settling without surprising a user who's already
+            //     scrolled or zoomed.
+            //
+            // If a focus cap WAS pending (browse-mode deep link from
+            // capdag-dot-com), defer to the selection-aware refit so
+            // the linked element lands centered instead.
+            if (hadPendingFocus) {
+              self.refitCurrentSelection();
+              // Treat the deep-link landing as the user's chosen
+              // viewport — late resize ticks shouldn't yank them
+              // back to a fit-of-all.
+              self._markInitialFitDone();
+            } else {
+              self._centerOnGraphInitial();
+            }
           },
         }
       ),
@@ -2480,7 +2513,22 @@ class CapFabRenderer {
       // so "fit the entire graph" still corresponds to actual pixel
       // capacity, not the size we had at first paint.
       this._recomputeZoomLimits();
-      this.refitCurrentSelection();
+      // Until the user first interacts with the graph we keep
+      // re-centering on every resize tick. WebKit's container
+      // dimensions can lag the layout-stop callback by a frame or
+      // two (especially in the editor split view, where the graph
+      // pane width depends on a CSS grid that's still resolving),
+      // and the `setTimeout(_, 100/300)` ticks below are how we
+      // catch those late settles without an animation. Once the
+      // user has tapped, dragged, or zoomed we explicitly do NOT
+      // touch their viewport on these late ticks — the `cy.resize()`
+      // and `_recomputeZoomLimits` calls above are enough to keep
+      // the engine internally consistent with the new container
+      // size; yanking them back to a fit would be a hostile
+      // surprise.
+      if (!this._initialFitDone) {
+        this._centerOnGraphInitial();
+      }
     };
     this.cy.on('ready', resizeAndRefit);
     this.cy.on('resize', () => this._recomputeZoomLimits());
@@ -2520,6 +2568,74 @@ class CapFabRenderer {
   // `fitToVisibleViewport(undefined, 50)` produces on a typical
   // viewport (≈15% slack at 800×600).
   static get ZOOM_OUT_FIT_SLACK() { return 0.15; }
+
+  // Bootstrap fit: snap (no animation) to a centered, padded fit of
+  // the entire graph. Used during the first paint and the post-paint
+  // resize ticks while `_initialFitDone` is false. The padding here
+  // matches `fitToVisibleViewport(undefined, 50)` so the visual
+  // result is identical to the steady-state refit, just without the
+  // animation and without the selection-aware branching.
+  //
+  // Math: ELK lays the graph out at an arbitrary pan; we override
+  // both zoom and pan in one synchronous pair so the user never sees
+  // an intermediate state. We deliberately read the bbox AFTER
+  // `_stretchLayersForEdgeLabels` has run (the caller's
+  // responsibility) so the centering accounts for the per-edge
+  // stretch — without that, a graph whose layers shifted right would
+  // appear hugging the right edge of the viewport.
+  _centerOnGraphInitial() {
+    if (!this.cy) return;
+    const cy = this.cy;
+    const containerWidth = cy.width();
+    const containerHeight = cy.height();
+    if (containerWidth <= 0 || containerHeight <= 0) return;
+    const elements = cy.elements();
+    if (elements.length === 0) return;
+    const bb = elements.boundingBox();
+    if (bb.w === 0 && bb.h === 0) return;
+
+    const padding = 50;
+    const excluded = Math.max(0, this.bottomExcludedRegion() | 0);
+    const visibleWidth = containerWidth - padding * 2;
+    const visibleHeight = containerHeight - excluded - padding * 2;
+    if (visibleWidth <= 0 || visibleHeight <= 0) return;
+
+    const fitZoom = Math.min(visibleWidth / bb.w, visibleHeight / bb.h);
+    // Clamp to the dynamic per-graph limits set by
+    // `_recomputeZoomLimits` so the centered fit can't exceed them
+    // (the relaxed minZoom is `strictFit * (1 - ZOOM_OUT_FIT_SLACK)`,
+    // which sits a hair below `fitZoom` for typical viewports — so
+    // the clamp is usually a no-op, but we still apply it for
+    // tiny-viewport degenerate cases).
+    const clampedZoom = Math.min(Math.max(fitZoom, cy.minZoom()), cy.maxZoom());
+
+    const modelCenterX = (bb.x1 + bb.x2) / 2;
+    const modelCenterY = (bb.y1 + bb.y2) / 2;
+    const screenCenterX = containerWidth / 2;
+    const screenCenterY = (containerHeight - excluded) / 2;
+    const panX = screenCenterX - modelCenterX * clampedZoom;
+    const panY = screenCenterY - modelCenterY * clampedZoom;
+
+    // Stop any in-flight animation before snapping — otherwise a
+    // late-arriving `cy.animate` from an earlier path could fight
+    // our zoom/pan write and leave the graph drifting.
+    cy.stop(true);
+    this._internalPanZoom = true;
+    try {
+      cy.zoom(clampedZoom);
+      cy.pan({ x: panX, y: panY });
+    } finally {
+      this._internalPanZoom = false;
+    }
+  }
+
+  // Mark the bootstrap centering as complete so subsequent refits
+  // respect selection state, path-mode focus, and animation.
+  // Idempotent — safe to call from every interaction handler.
+  _markInitialFitDone() {
+    if (this._initialFitDone) return;
+    this._initialFitDone = true;
+  }
 
   _recomputeZoomLimits() {
     if (!this.cy) return;
@@ -2766,6 +2882,21 @@ class CapFabRenderer {
 
   _setupEventHandlers() {
     const self = this;
+
+    // First user interaction — tap, zoom, drag — flips
+    // `_initialFitDone` so subsequent post-paint resize ticks stop
+    // re-centering and let the user keep their viewport. Hooked here
+    // (cytoscape-side) for taps and zoom; the wheel-based zoom path
+    // also flips it from `_installZoomBackstop`.
+    //
+    // The zoom/pan listener checks `_internalPanZoom` so that
+    // renderer-initiated centering (`_centerOnGraphInitial`,
+    // `fitToVisibleViewport`) doesn't trip the flag — only genuine
+    // user-initiated viewport changes do.
+    this.cy.on('tap', function () { self._markInitialFitDone(); });
+    this.cy.on('zoom pan', function () {
+      if (!self._internalPanZoom) self._markInitialFitDone();
+    });
 
     this.cy.on('tap', 'node', function (evt) {
       evt.stopPropagation();
@@ -3261,16 +3392,27 @@ class CapFabRenderer {
     const panX = screenCenterX - modelCenterX * clampedZoom;
     const panY = screenCenterY - modelCenterY * clampedZoom;
 
+    // Same `_internalPanZoom` guard as `_centerOnGraphInitial` — a
+    // renderer-driven fit (highlight, dbltap, refit-after-resize)
+    // must not be mistaken for a user gesture, or the bootstrap
+    // re-centering ticks below would stop firing prematurely.
+    this._internalPanZoom = true;
     if (animate) {
       this.cy.animate({
         zoom: clampedZoom,
         pan: { x: panX, y: panY },
         duration: 400,
         easing: 'ease-out-cubic',
+        complete: () => { this._internalPanZoom = false; },
+        stop: () => { this._internalPanZoom = false; },
       });
     } else {
-      this.cy.zoom(clampedZoom);
-      this.cy.pan({ x: panX, y: panY });
+      try {
+        this.cy.zoom(clampedZoom);
+        this.cy.pan({ x: panX, y: panY });
+      } finally {
+        this._internalPanZoom = false;
+      }
     }
   }
 
