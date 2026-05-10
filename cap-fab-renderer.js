@@ -149,8 +149,218 @@ function cssVarNumber(name, fallback) {
 }
 
 // =============================================================================
+// Label shaping — fit-to-content with a soft max width. The renderer's
+// node sizing is `width: 'label'` / `height: 'label'` (the cytoscape style
+// rule), which means each node grows or shrinks to its text. We pre-shape
+// every label so:
+//
+//   * a single short label produces a single short line (no preset width);
+//   * a label longer than the soft max wraps to a second line;
+//   * a label longer than two soft-max-width lines is truncated with a
+//     trailing horizontal ellipsis instead of overflowing or wrapping
+//     further. Ellipses appear only past the second line.
+//
+// Cytoscape's label-wrap implementation respects newlines and the
+// `text-max-width` style rule, but it cannot truncate-after-N-lines on
+// its own. So we do the wrap+truncate here in JS, set the label to the
+// shaped string, and drop `text-max-width` from the stylesheet — the
+// label text itself dictates the node's width.
+// =============================================================================
+
+// Soft node label width in pixels. Picked to keep nodes readable on the
+// inline (non-expanded) panel while still tolerating the longer media
+// titles. Edge labels are NOT wrapped; their length feeds the layout
+// engine's between-layer spacing instead.
+const NODE_LABEL_SOFT_MAX_WIDTH_PX = 160;
+// Maximum number of wrapped lines for a node label. Beyond this we
+// truncate with `…` rather than letting the label overflow.
+const NODE_LABEL_MAX_LINES = 2;
+
+// Shared offscreen canvas used for label width measurement. Lives at
+// module scope so we don't churn the GC creating one per call.
+let __sharedMeasureCtx = null;
+function measureTextWidth(text, font) {
+  if (typeof document === 'undefined') {
+    // Non-DOM environment (e.g. node tests). Approximate with a
+    // monospace-ish constant so the wrap heuristic still produces
+    // sensible output and tests can exercise it without a canvas.
+    return text.length * 6.5;
+  }
+  if (__sharedMeasureCtx === null) {
+    const canvas = document.createElement('canvas');
+    __sharedMeasureCtx = canvas.getContext('2d');
+  }
+  __sharedMeasureCtx.font = font;
+  return __sharedMeasureCtx.measureText(text).width;
+}
+
+// Break `text` into chunks each of which fits within `maxWidth` when
+// rendered with `font`. Word-aware: prefers to break at whitespace, but
+// will hard-break a single word that is wider than `maxWidth`.
+function wrapTextToWidth(text, font, maxWidth) {
+  if (text.length === 0) return [''];
+  const words = text.split(/(\s+)/); // keep the whitespace runs
+  const lines = [];
+  let current = '';
+  function pushCurrent() {
+    if (current.length > 0) {
+      lines.push(current);
+      current = '';
+    }
+  }
+  for (const piece of words) {
+    if (piece.length === 0) continue;
+    const candidate = current + piece;
+    if (measureTextWidth(candidate, font) <= maxWidth) {
+      current = candidate;
+      continue;
+    }
+    if (/^\s+$/.test(piece)) {
+      // The whitespace itself overflows — start a new line and skip it.
+      pushCurrent();
+      continue;
+    }
+    if (current.length === 0) {
+      // Single word wider than maxWidth — hard-break it character by
+      // character. The terminal piece becomes `current` for the next
+      // round so a subsequent short word can still join it.
+      let chunk = '';
+      for (const ch of piece) {
+        if (measureTextWidth(chunk + ch, font) <= maxWidth) {
+          chunk += ch;
+        } else {
+          if (chunk.length > 0) lines.push(chunk);
+          chunk = ch;
+        }
+      }
+      current = chunk;
+    } else {
+      pushCurrent();
+      current = piece.replace(/^\s+/, '');
+    }
+  }
+  pushCurrent();
+  return lines.length === 0 ? [''] : lines;
+}
+
+// Truncate a single line so that it fits within `maxWidth` once a
+// trailing horizontal ellipsis has been appended. Used only for the
+// final line of an overflowing wrapped label.
+function truncateLineWithEllipsis(line, font, maxWidth) {
+  const ellipsis = '…';
+  if (measureTextWidth(line + ellipsis, font) <= maxWidth) return line + ellipsis;
+  let truncated = line;
+  while (truncated.length > 0 && measureTextWidth(truncated + ellipsis, font) > maxWidth) {
+    truncated = truncated.slice(0, -1);
+  }
+  return truncated + ellipsis;
+}
+
+// Shape a node label: fit-to-content with a soft cap, wrap to at most
+// NODE_LABEL_MAX_LINES, and truncate the last line with `…` only when
+// the underlying text would otherwise need a third line.
+//
+// Returns `{ shaped, widthPx }`. `widthPx` is the natural width of the
+// shaped label (the longer of the two line widths), which the renderer
+// uses to seed ELK's per-graph spacing.
+function shapeNodeLabel(rawLabel, font) {
+  const text = (rawLabel == null) ? '' : String(rawLabel);
+  if (text.length === 0) return { shaped: '', widthPx: 0 };
+  // Honour pre-existing newlines (some payload builders embed them on
+  // purpose, e.g. body titles): wrap each segment separately and
+  // concatenate.
+  const segments = text.split('\n');
+  const lines = [];
+  for (const segment of segments) {
+    const wrapped = wrapTextToWidth(segment, font, NODE_LABEL_SOFT_MAX_WIDTH_PX);
+    for (const line of wrapped) lines.push(line);
+  }
+  if (lines.length <= NODE_LABEL_MAX_LINES) {
+    const widthPx = lines.reduce(
+      (acc, line) => Math.max(acc, measureTextWidth(line, font)),
+      0
+    );
+    return { shaped: lines.join('\n'), widthPx };
+  }
+  const kept = lines.slice(0, NODE_LABEL_MAX_LINES - 1);
+  // Re-flow the leftover into the final line so the truncation
+  // happens at a natural boundary rather than mid-second-line.
+  const overflow = lines.slice(NODE_LABEL_MAX_LINES - 1).join(' ');
+  const finalLine = truncateLineWithEllipsis(
+    overflow, font, NODE_LABEL_SOFT_MAX_WIDTH_PX
+  );
+  kept.push(finalLine);
+  const widthPx = kept.reduce(
+    (acc, line) => Math.max(acc, measureTextWidth(line, font)),
+    0
+  );
+  return { shaped: kept.join('\n'), widthPx };
+}
+
+// Walk the cytoscape elements list once, returning a NEW array in
+// which every node has its `data.label` replaced by the shaped form.
+// Edges and non-shape-relevant fields are passed through by reference
+// to avoid an unnecessary clone — only the node objects whose labels
+// we touched get shallow-copied (one level into `data`) so re-renders
+// from the same source payload don't compound their shaping.
+//
+// Returns the metrics alongside the new elements so the renderer can
+// thread them to the layout engine and the zoom backstop.
+function shapeLabelsInElements(elements) {
+  // Cytoscape resolves node `font-size` against the element's computed
+  // style at render time; we shape against the renderer's static node
+  // font (defined in `buildStylesheet`). Kept in sync manually — bump
+  // both together.
+  const nodeFont = '500 9px "JetBrains Mono", ui-monospace, monospace';
+  const edgeFont = '500 8px "JetBrains Mono", ui-monospace, monospace';
+  let maxEdgeLabelPx = 0;
+  let maxNodeLabelPx = 0;
+  const reshaped = new Array(elements.length);
+  for (let i = 0; i < elements.length; i++) {
+    const element = elements[i];
+    if (!element || !element.data) {
+      reshaped[i] = element;
+      continue;
+    }
+    const isEdge = !!element.data.source && !!element.data.target;
+    if (isEdge) {
+      const edgeLabel = element.data.label;
+      const w = (typeof edgeLabel === 'string' && edgeLabel.length > 0)
+        ? measureTextWidth(edgeLabel, edgeFont)
+        : 0;
+      if (w > maxEdgeLabelPx) maxEdgeLabelPx = w;
+      // Stamp the per-edge label width onto the element's data so the
+      // post-layout per-edge stretcher can size each edge individually
+      // (rather than inflating the whole graph by the longest label).
+      reshaped[i] = Object.assign({}, element, {
+        data: Object.assign({}, element.data, { _labelPx: w }),
+      });
+      continue;
+    }
+    const { shaped, widthPx } = shapeNodeLabel(element.data.label, nodeFont);
+    if (widthPx > maxNodeLabelPx) maxNodeLabelPx = widthPx;
+    if (shaped === element.data.label) {
+      reshaped[i] = element;
+    } else {
+      reshaped[i] = Object.assign({}, element, {
+        data: Object.assign({}, element.data, { label: shaped }),
+      });
+    }
+  }
+  return { elements: reshaped, maxNodeLabelPx, maxEdgeLabelPx };
+}
+
+// =============================================================================
 // Layout configs per mode. Same ELK algorithm; spacing is tuned per mode
 // to match the typical graph density and reading direction of each.
+//
+// We do NOT inflate `nodeNodeBetweenLayers` to fit the longest edge
+// label — that punishes every short-labelled edge in the graph with
+// pointless empty space. Instead, the renderer post-processes the
+// laid-out positions in `_stretchLayersForEdgeLabels` to give each
+// edge the horizontal room its own label needs, leaving short-labelled
+// edges short. The per-mode defaults below are the floor; the
+// stretcher only ever pushes nodes further apart, never closer.
 // =============================================================================
 
 function layoutForMode(mode) {
@@ -249,8 +459,13 @@ function buildStylesheet() {
         'label': 'data(label)',
         'text-valign': 'center',
         'text-halign': 'center',
+        // Labels are pre-shaped in JS (see `shapeNodeLabel`): wrapped
+        // to a soft max width with a 2-line cap and trailing ellipsis
+        // when the text would otherwise need a third line. We honour
+        // the embedded newlines but never re-wrap, so `text-max-width`
+        // is intentionally absent — `width: 'label'` then makes each
+        // node fit its actual shaped text.
         'text-wrap': 'wrap',
-        'text-max-width': '150px',
         'line-height': 1.3,
         'font-family': '"JetBrains Mono", ui-monospace, monospace',
         'font-size': '9px',
@@ -306,7 +521,11 @@ function buildStylesheet() {
       style: {
         'label': 'data(label)',
         'font-family': '"JetBrains Mono", ui-monospace, monospace',
-        'font-size': '9px',
+        // Slightly smaller than the node label font (9px) so edge
+        // labels read as secondary metadata rather than primary
+        // identity. Kept in sync with the `edgeFont` constant in
+        // `shapeLabelsInElements`.
+        'font-size': '8px',
         'font-weight': '500',
         'color': 'data(color)',
         'text-background-color': edgeTextBg,
@@ -2175,11 +2394,23 @@ class CapFabRenderer {
       throw new Error('CapFabRenderer: container is missing');
     }
 
-    const elements = this._buildCytoscapeElements();
-    if (elements.length === 0) {
+    const rawElements = this._buildCytoscapeElements();
+    if (rawElements.length === 0) {
       this.container.innerHTML = '<div class="cap-fab-empty"><p>No graph data</p></div>';
       return this;
     }
+
+    // Shape every node label up-front (fit-to-content with a 2-line
+    // soft cap and trailing ellipsis past that) and measure the
+    // longest edge label in pixels. The latter feeds into ELK's
+    // between-layer spacing so edges are always long enough for their
+    // labels. Both the per-node label width and the per-graph edge
+    // label width are recorded on the renderer so the zoom-backstop
+    // logic can reason about them after layout-stop.
+    const labelMetrics = shapeLabelsInElements(rawElements);
+    const elements = labelMetrics.elements;
+    this._labelMaxNodeWidthPx = labelMetrics.maxNodeLabelPx;
+    this._labelMaxEdgeWidthPx = labelMetrics.maxEdgeLabelPx;
 
     // Clear container and size it to the window.
     this.container.innerHTML = '';
@@ -2203,18 +2434,40 @@ class CapFabRenderer {
           stop: function () {
             self.cy.resize();
             self._layoutReady = true;
+            // Per-edge stretch FIRST (mutates node x-coordinates so
+            // each edge has the horizontal room its own label needs),
+            // THEN lock the cytoscape wheel-zoom limits to the
+            // dynamic per-graph values, THEN fit the (possibly
+            // stretched) bounding box to the viewport so the user
+            // always opens at a fully-visible padded fit. Order
+            // matters: `_recomputeZoomLimits` needs the final
+            // post-stretch bounding box; `fitToVisibleViewport` needs
+            // the relaxed minZoom (it sits above the tight-fit zoom)
+            // so its padding actually shows.
+            self._stretchLayersForEdgeLabels();
+            self._recomputeZoomLimits();
             if (self._pendingFocusCap) {
               const pending = self._pendingFocusCap;
               self._pendingFocusCap = null;
               self.highlightCapability(pending);
             }
+            // Always fit to the full graph on first paint. Selection-
+            // aware refits pivot to the active selection only if one
+            // was set BEFORE layout-stop (e.g. a `_pendingFocusCap`
+            // path); on a clean first render they fall through to
+            // the same `fitToVisibleViewport(undefined, …)` we'd want
+            // anyway.
             self.refitCurrentSelection();
           },
         }
       ),
       style: buildStylesheet(),
-      minZoom: 0.05,
-      maxZoom: 10,
+      // Initial loose limits — `_recomputeZoomLimits()` tightens them
+      // on every layout-stop and resize. We keep an absolute safety
+      // floor/ceiling so a degenerate graph (zero bbox) can't make us
+      // pass NaN/Infinity to cytoscape.
+      minZoom: 0.01,
+      maxZoom: 100,
       wheelSensitivity: 0.3,
       boxSelectionEnabled: false,
       autounselectify: this.mode === 'editor-graph' || this.mode === 'machine',
@@ -2223,15 +2476,258 @@ class CapFabRenderer {
     const resizeAndRefit = () => {
       if (!this.cy) return;
       this.cy.resize();
+      // Container size may have changed — recompute the zoom limits
+      // so "fit the entire graph" still corresponds to actual pixel
+      // capacity, not the size we had at first paint.
+      this._recomputeZoomLimits();
       this.refitCurrentSelection();
     };
     this.cy.on('ready', resizeAndRefit);
+    this.cy.on('resize', () => this._recomputeZoomLimits());
     requestAnimationFrame(resizeAndRefit);
     setTimeout(resizeAndRefit, 100);
     setTimeout(resizeAndRefit, 300);
 
     this._setupEventHandlers();
+    this._installZoomBackstop();
     return this;
+  }
+
+  // ===========================================================================
+  // Zoom backstop — dynamic per-graph minimum and maximum zoom levels.
+  //
+  // Minimum zoom = the zoom at which the entire graph's bounding box just
+  //   fits inside the container. Below that the user is asking for more
+  //   blank canvas, which is what the parent scroll view should be doing.
+  // Maximum zoom = the zoom at which a representative ("default") node
+  //   would occupy more than a quarter of the *bigger* viewport dimension.
+  //   Past that the user is zoomed in past the point where any single
+  //   node still fits visually, so further wheel events are forwarded
+  //   to the parent responder instead of continuing to zoom.
+  //
+  // The wheel listener reports `{ atLimit, zoomingOut }` to
+  // `interaction.onZoomLimit` on every wheel event so the host can
+  // latch the direction and forward subsequent wheel events up the
+  // responder chain (see `ScrollPassthroughWebView` on the Swift side).
+  // ===========================================================================
+
+  // Slack below the strict "graph fits the viewport" zoom that the
+  // backstop allows. With the strict zoom (1.0× of fit) the graph
+  // touches all four viewport edges; the user expects a little visual
+  // padding at the zoomed-out limit, so we let cytoscape zoom out a
+  // further `1 - ZOOM_OUT_FIT_SLACK` of fit before forwarding the
+  // wheel to the parent responder. Picked to match the padding
+  // `fitToVisibleViewport(undefined, 50)` produces on a typical
+  // viewport (≈15% slack at 800×600).
+  static get ZOOM_OUT_FIT_SLACK() { return 0.15; }
+
+  _recomputeZoomLimits() {
+    if (!this.cy) return;
+    const w = this.cy.width();
+    const h = this.cy.height();
+    if (w <= 0 || h <= 0) return;
+    // A "default node" is what a typical (single-line, average-width)
+    // node looks like in this graph. We use the longest shaped node
+    // label width measured during element construction, falling back
+    // to a sensible constant when the graph has no labelled nodes
+    // (browse-mode title bars, blank slates, etc.).
+    const fallbackNodeWidthPx = 120;
+    const defaultNodePx = Math.max(
+      fallbackNodeWidthPx,
+      (this._labelMaxNodeWidthPx || 0) + /* node padding × 2 */ 24
+    );
+    // Maximum zoom: one default node fills > 1/4 of the bigger
+    // viewport dimension. Solving for the boundary:
+    //   defaultNodePx * zoomMax = max(w, h) / 4
+    const biggerDim = Math.max(w, h);
+    const zoomMax = (biggerDim / 4) / defaultNodePx;
+    // Minimum zoom: the entire graph's bounding box fits, with a
+    // small slack so the user can pull back a bit further for visual
+    // padding before the parent-scroll forwarding kicks in. The
+    // strict-fit zoom is `min(w/bb.w, h/bb.h)`; we multiply by
+    // `(1 - ZOOM_OUT_FIT_SLACK)` to relax it. The initial
+    // `fitToVisibleViewport(undefined, 50)` lands at a padded zoom
+    // that sits comfortably above this relaxed minimum, so opening
+    // the view shows the graph centred with margin rather than
+    // bleeding to all four edges.
+    const bb = this.cy.elements().boundingBox();
+    let zoomMin;
+    if (bb.w > 0 && bb.h > 0) {
+      const strictFit = Math.min(w / bb.w, h / bb.h);
+      zoomMin = strictFit * (1 - CapFabRenderer.ZOOM_OUT_FIT_SLACK);
+    } else {
+      // Empty / degenerate graph — leave the min loose; there's
+      // nothing to fit.
+      zoomMin = 0.05;
+    }
+    // Order-preserving guard: a graph small enough to fit the
+    // viewport at any zoom would otherwise produce zoomMin > zoomMax.
+    // Pin them together so cytoscape's internal `setZoom` clamp can't
+    // throw or oscillate.
+    if (zoomMin > zoomMax) zoomMin = zoomMax;
+    // Avoid infinitesimal / non-finite values reaching cytoscape.
+    if (!Number.isFinite(zoomMin) || zoomMin <= 0) zoomMin = 0.01;
+    if (!Number.isFinite(zoomMax) || zoomMax <= 0) zoomMax = 100;
+    this._dynamicMinZoom = zoomMin;
+    this._dynamicMaxZoom = zoomMax;
+    this.cy.minZoom(zoomMin);
+    this.cy.maxZoom(zoomMax);
+  }
+
+  // ===========================================================================
+  // Per-edge layer stretching.
+  //
+  // ELK's layered algorithm assigns each node to a discrete layer; every
+  // edge between layers L and L+1 gets the same horizontal length (the
+  // `nodeNodeBetweenLayers` spacing). That means we can size the gap per
+  // pair of consecutive layers, but not per individual edge. We do that
+  // here, after the layout has run: the source-side x-coordinate of
+  // each layer's nodes is shifted right just enough that every incoming
+  // edge has room for its own label, plus a small padding allowance.
+  // Edges with short labels keep the engine's tight default spacing;
+  // edges with long labels push their target layer (and every layer
+  // downstream) further to the right.
+  //
+  // Algorithm:
+  //   1. Snap nodes into layer buckets by their post-layout x.
+  //   2. Walk the buckets left-to-right.
+  //   3. For each edge whose source is in the previous layer and target
+  //      in the current one, compute the minimum target-x that would
+  //      give the edge label clearance:
+  //        srcEdge.x + sourceWidth/2 + targetWidth/2 + labelPx + pad
+  //      Take the max across the layer's incoming edges.
+  //   4. If that max exceeds the layer's current x, shift every node in
+  //      the layer (and only that layer) right by the difference.
+  //
+  // Cross-layer edges (skipping a layer) are accounted for by the same
+  // walk — the per-layer max is computed over every edge that lands in
+  // the layer, regardless of how many layers it skipped.
+  // ===========================================================================
+
+  _stretchLayersForEdgeLabels() {
+    if (!this.cy) return;
+    const cy = this.cy;
+    const nodes = cy.nodes();
+    if (nodes.length === 0) return;
+
+    // Padding around an edge label so its background and the source/
+    // target node's right/left edges don't touch. Sized to the
+    // stylesheet's `text-background-padding: 4px` plus arrow-head
+    // clearance and a few pixels of breathing room.
+    const LABEL_GAP_PX = 24;
+    // Layer-bucketing tolerance. Nodes within `EPS` of each other on x
+    // are treated as one layer. ELK places nodes within a layer at the
+    // same x within rounding error.
+    const EPS = 1.0;
+
+    // Group nodes into ordered layer buckets by current x.
+    const sortedNodes = nodes.toArray().slice().sort(
+      (a, b) => a.position('x') - b.position('x')
+    );
+    const layers = [];
+    for (const node of sortedNodes) {
+      const x = node.position('x');
+      const last = layers.length > 0 ? layers[layers.length - 1] : null;
+      if (last !== null && Math.abs(last.x - x) <= EPS) {
+        last.nodes.push(node);
+      } else {
+        layers.push({ x, nodes: [node] });
+      }
+    }
+    if (layers.length < 2) return; // Nothing to stretch.
+
+    // Build a quick layer-index lookup so we can ask "what layer is
+    // this node in?" in O(1) when iterating edges.
+    const layerIndexById = new Map();
+    for (let li = 0; li < layers.length; li++) {
+      for (const n of layers[li].nodes) layerIndexById.set(n.id(), li);
+    }
+
+    // Pre-bucket edges by their target layer so the per-layer pass
+    // below is O(layer-edges) rather than O(all-edges) per layer.
+    const incomingByTarget = layers.map(() => []);
+    cy.edges().forEach((edge) => {
+      const srcLayer = layerIndexById.get(edge.source().id());
+      const tgtLayer = layerIndexById.get(edge.target().id());
+      if (srcLayer === undefined || tgtLayer === undefined) return;
+      if (tgtLayer <= srcLayer) return; // Back-edge or self-loop.
+      incomingByTarget[tgtLayer].push(edge);
+    });
+
+    // Walk layers left-to-right. For each layer, compute the minimum
+    // x its nodes need based on the CURRENT positions of source-layer
+    // nodes (which already include any shift from earlier iterations).
+    // Only ever shift right — never compress. This way a long-labelled
+    // edge between layers k and k+1 stretches only the gap between
+    // those two layers, while every later layer shifts right by the
+    // same amount as a side-effect (so layer k+2 sits at its own
+    // tight default distance from k+1, never inflating the whole
+    // graph by the longest single label).
+    for (let li = 1; li < layers.length; li++) {
+      let minLayerX = layers[li].x;
+      for (const edge of incomingByTarget[li]) {
+        const labelPx = (typeof edge.data('_labelPx') === 'number')
+          ? edge.data('_labelPx')
+          : 0;
+        const srcNode = edge.source();
+        const tgtNode = edge.target();
+        // `outerWidth` includes the node's border so the gap sits
+        // outside the visible node, not under it.
+        const srcHalf = srcNode.outerWidth() / 2;
+        const tgtHalf = tgtNode.outerWidth() / 2;
+        const srcRightEdge = srcNode.position('x') + srcHalf;
+        const candidate = srcRightEdge + LABEL_GAP_PX + labelPx + LABEL_GAP_PX + tgtHalf;
+        if (candidate > minLayerX) minLayerX = candidate;
+      }
+      if (minLayerX > layers[li].x) {
+        const dx = minLayerX - layers[li].x;
+        for (const node of layers[li].nodes) {
+          const p = node.position();
+          node.position({ x: p.x + dx, y: p.y });
+        }
+        layers[li].x += dx;
+        // Cascade: every later layer must shift right by at least the
+        // same dx so the relative spacing produced by ELK between them
+        // is preserved. The per-layer recomputation above will only
+        // *add* to that, never subtract.
+        for (let lj = li + 1; lj < layers.length; lj++) {
+          for (const node of layers[lj].nodes) {
+            const p = node.position();
+            node.position({ x: p.x + dx, y: p.y });
+          }
+          layers[lj].x += dx;
+        }
+      }
+    }
+  }
+
+  _installZoomBackstop() {
+    if (!this.container) return;
+    if (this._zoomBackstopInstalled) return;
+    this._zoomBackstopInstalled = true;
+    const self = this;
+    // `passive: true` because we never call preventDefault — we only
+    // observe and report. Cytoscape's own wheel listener (registered
+    // separately on the same container) does the actual zoom and
+    // honours the dynamic min/max we set on `cy`.
+    this.container.addEventListener('wheel', function (evt) {
+      if (!self.cy) return;
+      const min = self._dynamicMinZoom;
+      const max = self._dynamicMaxZoom;
+      if (typeof min !== 'number' || typeof max !== 'number') return;
+      const currentZoom = self.cy.zoom();
+      // Tolerances to absorb the tiny rounding cytoscape's own
+      // clamping introduces — without them we never report
+      // at-limit because the actual zoom sits a few ulps inside.
+      const atMin = currentZoom <= min * 1.01;
+      const atMax = currentZoom >= max * 0.99;
+      const zoomingOut = evt.deltaY > 0;
+      const zoomingIn = evt.deltaY < 0;
+      const atLimit = (zoomingOut && atMin) || (zoomingIn && atMax);
+      if (typeof self.interaction.onZoomLimit === 'function') {
+        self.interaction.onZoomLimit({ atLimit, zoomingOut });
+      }
+    }, { passive: true });
   }
 
   _buildCytoscapeElements() {
