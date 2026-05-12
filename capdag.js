@@ -1118,7 +1118,7 @@ const MEDIA_COLLECTION_LIST = 'media:collection;list;record';
 // Media URN for adapter selection output - JSON record
 const MEDIA_ADAPTER_SELECTION = 'media:adapter-selection;json;record';
 // Fabric registry lookup wire types (consumed/produced by cap:lookup-cap;fabric
-// and cap:lookup-media-spec;fabric, both implemented by netaccesscartridge).
+// and cap:lookup-media-spec;fabric, both implemented by fetchcartridge).
 const MEDIA_CAP_URN = 'media:cap-urn;textable';
 const MEDIA_MEDIA_URN = 'media:media-urn;textable';
 const MEDIA_CAP_DEFINITION = 'media:cap-definition;json;record;textable';
@@ -1136,7 +1136,7 @@ const CAP_IDENTITY = 'cap:in=media:;out=media:';
 // Cartridges that inspect file content override this with a handler that returns {"media_urns": [...]}.
 const CAP_ADAPTER_SELECTION = 'cap:in="media:";out="media:adapter-selection;json;record"';
 
-// Fabric registry lookup caps. Implemented by netaccesscartridge.
+// Fabric registry lookup caps. Implemented by fetchcartridge.
 // CAP_LOOKUP_CAP_FABRIC resolves a canonical cap URN to its full flattened
 // cap definition; CAP_LOOKUP_MEDIA_SPEC_FABRIC does the same for media specs.
 const CAP_LOOKUP_CAP_FABRIC = 'cap:in="media:cap-urn;textable";fabric;lookup-cap;out="media:cap-definition;json;record;textable"';
