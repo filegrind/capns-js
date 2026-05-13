@@ -5,7 +5,7 @@
 const {
   CapUrn, CapKind, CapUrnBuilder, CapMatcher, CapUrnError, ErrorCodes,
   MediaUrn, MediaUrnError, MediaUrnErrorCodes,
-  Cap, MediaSpec, MediaSpecError, MediaSpecErrorCodes,
+  Cap, CapGroup, CapManifest, MediaSpec, MediaSpecError, MediaSpecErrorCodes,
   resolveMediaUrn, buildExtensionIndex, mediaUrnsForExtension, getExtensionMappings,
   CartridgeInfo, CartridgeCapSummary, CartridgeSuggestion, CartridgeRepoClient, CartridgeRepoServer,
   CapFabEdge, CapFabStats, CapFab,
@@ -1207,6 +1207,152 @@ function test110_multipleExtensions() {
   assertEqual(resolved.extensions.length, 2, 'Should have two extensions');
   assertEqual(resolved.extensions[0], 'jpg', 'First extension should be jpg');
   assertEqual(resolved.extensions[1], 'jpeg', 'Second extension should be jpeg');
+}
+
+// TEST115: Test CapArg serialization and deserialization with multiple sources
+function test115_capArgSerialization() {
+  const arg = new CapArg(
+    MEDIA_STRING,
+    true,
+    [new ArgSource({ cli_flag: '--name' }), new ArgSource({ position: 0 })],
+    {
+      arg_description: 'The name argument',
+      default_value: 400,
+      metadata: { kind: 'example', flags: [true, false] }
+    }
+  );
+
+  const json = arg.toJSON();
+  assertEqual(json.media_urn, MEDIA_STRING, 'media_urn must serialize');
+  assertEqual(json.required, true, 'required must serialize');
+  assertEqual(json.arg_description, 'The name argument', 'arg_description must serialize');
+  assertEqual(json.default_value, 400, 'numeric default_value must serialize as number');
+  assertEqual(JSON.stringify(json.metadata), JSON.stringify({ kind: 'example', flags: [true, false] }),
+    'metadata must serialize as arbitrary JSON');
+
+  const roundTripped = CapArg.fromJSON(JSON.parse(JSON.stringify(json)));
+  assertEqual(roundTripped.media_urn, arg.media_urn, 'media_urn must round-trip');
+  assertEqual(roundTripped.required, arg.required, 'required must round-trip');
+  assertEqual(roundTripped.arg_description, arg.arg_description, 'arg_description must round-trip');
+  assertEqual(roundTripped.default_value, 400, 'numeric default_value must round-trip');
+  assertEqual(JSON.stringify(roundTripped.metadata), JSON.stringify({ kind: 'example', flags: [true, false] }),
+    'metadata must round-trip');
+  assertEqual(roundTripped.sources.length, 2, 'sources length must round-trip');
+  assertEqual(roundTripped.sources[0].cli_flag, '--name', 'cli_flag source must round-trip');
+  assertEqual(roundTripped.sources[1].position, 0, 'position source must round-trip');
+}
+
+// TEST116: Test CapArg constructor methods basic and with_description create args correctly
+function test116_capArgConstructors() {
+  const basicArg = new CapArg(
+    MEDIA_STRING,
+    true,
+    [new ArgSource({ cli_flag: '--name' })]
+  );
+  assertEqual(basicArg.media_urn, MEDIA_STRING, 'basic arg media_urn must match');
+  assertEqual(basicArg.required, true, 'basic arg required must match');
+  assertEqual(basicArg.sources.length, 1, 'basic arg must keep one source');
+  assertEqual(basicArg.arg_description, null, 'basic arg arg_description must be absent');
+  assertEqual(basicArg.default_value, null, 'basic arg default_value must be absent');
+
+  const describedArg = new CapArg(
+    MEDIA_INTEGER,
+    false,
+    [new ArgSource({ position: 0 })],
+    {
+      arg_description: 'The count argument',
+      default_value: 10
+    }
+  );
+  assertEqual(describedArg.media_urn, MEDIA_INTEGER, 'described arg media_urn must match');
+  assertEqual(describedArg.required, false, 'described arg required must match');
+  assertEqual(describedArg.arg_description, 'The count argument', 'described arg description must match');
+  assertEqual(describedArg.default_value, 10, 'described arg default_value must match');
+}
+
+// TEST150: JSON roundtrip
+function test150_capManifestJsonSerialization() {
+  const capUrn = CapUrn.fromString(testUrn('extract;target=metadata'));
+  const cap = new Cap(capUrn, 'Extract Metadata', 'extract-metadata');
+  cap.addArg(new CapArg('media:pdf', true, [new ArgSource({ stdin: 'media:pdf' })]));
+  cap.addArg(new CapArg(
+    'media:chunk-size;textable;numeric',
+    false,
+    [new ArgSource({ cli_flag: '--chunk-size' })],
+    {
+      arg_description: 'Chunk size',
+      default_value: 400,
+      metadata: { unit: 'words' }
+    }
+  ));
+  cap.addArg(new CapArg(
+    'media:timestamps;textable;bool',
+    false,
+    [new ArgSource({ cli_flag: '--timestamps' })],
+    {
+      arg_description: 'Include timestamps',
+      default_value: false
+    }
+  ));
+
+  const manifest = new CapManifest(
+    'TestComponent',
+    '0.1.0',
+    'release',
+    null,
+    'A test component',
+    [new CapGroup('default', [cap], [])]
+  );
+
+  manifest.author = 'Test Author';
+
+  const json = manifest.toJSON();
+  assertEqual(json.name, 'TestComponent', 'manifest name must serialize');
+  assertEqual(json.author, 'Test Author', 'author must serialize');
+  assert(Array.isArray(json.cap_groups), 'cap_groups must serialize');
+  assertEqual(json.cap_groups.length, 1, 'cap_groups length must serialize');
+  assertEqual(json.cap_groups[0].caps[0].args[1].default_value, 400, 'numeric default must serialize as number');
+  assertEqual(json.cap_groups[0].caps[0].args[1].metadata.unit, 'words', 'metadata must serialize');
+  assertEqual(json.cap_groups[0].caps[0].args[2].default_value, false, 'boolean default must serialize as boolean');
+
+  const roundTripped = CapManifest.fromJSON(JSON.parse(JSON.stringify(json)));
+  const decodedCap = roundTripped.allCaps()[0];
+  assertEqual(roundTripped.name, manifest.name, 'manifest name must round-trip');
+  assertEqual(roundTripped.author, 'Test Author', 'author must round-trip');
+  assertEqual(roundTripped.cap_groups.length, 1, 'cap_groups length must round-trip');
+  assertEqual(decodedCap.args[1].default_value, 400, 'numeric default must round-trip');
+  assertEqual(JSON.stringify(decodedCap.args[1].metadata), JSON.stringify({ unit: 'words' }),
+    'metadata must round-trip');
+  assertEqual(decodedCap.args[2].default_value, false, 'boolean default must round-trip');
+}
+
+// TEST597: CapArg::with_full_definition stores all fields including optional ones
+function test597_capArgWithFullDefinition() {
+  const arg = new CapArg(
+    MEDIA_STRING,
+    true,
+    [new ArgSource({ cli_flag: '--name' })],
+    {
+      arg_description: 'User name',
+      default_value: { chunk_size: 400, timestamps: false },
+      metadata: { hint: 'enter name' }
+    }
+  );
+
+  assertEqual(arg.media_urn, MEDIA_STRING, 'media_urn must match');
+  assertEqual(arg.required, true, 'required must match');
+  assertEqual(arg.arg_description, 'User name', 'arg_description must match');
+  assertEqual(JSON.stringify(arg.default_value), JSON.stringify({ chunk_size: 400, timestamps: false }),
+    'object default_value must be preserved');
+  assertEqual(JSON.stringify(arg.metadata), JSON.stringify({ hint: 'enter name' }),
+    'metadata must be preserved');
+
+  const roundTripped = CapArg.fromJSON(JSON.parse(JSON.stringify(arg.toJSON())));
+  assertEqual(roundTripped.arg_description, 'User name', 'arg_description must round-trip');
+  assertEqual(JSON.stringify(roundTripped.default_value), JSON.stringify({ chunk_size: 400, timestamps: false }),
+    'object default_value must round-trip');
+  assertEqual(JSON.stringify(roundTripped.metadata), JSON.stringify({ hint: 'enter name' }),
+    'metadata must round-trip');
 }
 
 // ============================================================================
@@ -5785,6 +5931,10 @@ async function runTests() {
   runTest('TEST108: extensions_serialization', test108_extensionsSerialization);
   runTest('TEST109: extensions_with_metadata_and_validation', test109_extensionsWithMetadataAndValidation);
   runTest('TEST110: multiple_extensions', test110_multipleExtensions);
+  runTest('TEST115: cap_arg_serialization', test115_capArgSerialization);
+  runTest('TEST116: cap_arg_constructors', test116_capArgConstructors);
+  runTest('TEST150: cap_manifest_json_serialization', test150_capManifestJsonSerialization);
+  runTest('TEST597: cap_arg_with_full_definition', test597_capArgWithFullDefinition);
 
   // cap-fab-renderer.js uses CapFab in browse mode (static registry from
   // /api/capabilities). These tests guard the minimal API the renderer relies

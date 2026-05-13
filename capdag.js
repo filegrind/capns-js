@@ -2118,9 +2118,9 @@ class CapArg {
     this.required = required;
     this.is_sequence = options.is_sequence || false;
     this.sources = sources;  // Array of ArgSource
-    this.arg_description = options.arg_description || null;
+    this.arg_description = options.arg_description !== undefined ? options.arg_description : null;
     this.default_value = options.default_value !== undefined ? options.default_value : null;
-    this.metadata = options.metadata || null;
+    this.metadata = options.metadata !== undefined ? options.metadata : null;
   }
 
   /**
@@ -2154,11 +2154,15 @@ class CapArg {
       sources: this.sources.map(s => s.toJSON())
     };
     if (this.is_sequence) result.is_sequence = true;
-    if (this.arg_description) result.arg_description = this.arg_description;
+    if (this.arg_description !== null && this.arg_description !== undefined) {
+      result.arg_description = this.arg_description;
+    }
     if (this.default_value !== null && this.default_value !== undefined) {
       result.default_value = this.default_value;
     }
-    if (this.metadata) result.metadata = this.metadata;
+    if (this.metadata !== null && this.metadata !== undefined) {
+      result.metadata = this.metadata;
+    }
     return result;
   }
 
@@ -2618,10 +2622,10 @@ class CapManifest {
    * @param {CapGroup[]} capGroups - Cap groups (all caps must be in a group)
    */
   constructor(name, version, channel, registryUrl, description, capGroups = []) {
-    if (!name || typeof name !== 'string') {
+    if (typeof name !== 'string') {
       throw new Error('CapManifest name is required and must be a string');
     }
-    if (!version || typeof version !== 'string') {
+    if (typeof version !== 'string') {
       throw new Error('CapManifest version is required and must be a string');
     }
     if (channel !== 'release' && channel !== 'nightly') {
@@ -2630,7 +2634,7 @@ class CapManifest {
     if (registryUrl !== null && registryUrl !== undefined && typeof registryUrl !== 'string') {
       throw new Error("CapManifest registry_url must be null (dev build) or a string");
     }
-    if (!description || typeof description !== 'string') {
+    if (typeof description !== 'string') {
       throw new Error('CapManifest description is required and must be a string');
     }
 
@@ -2664,10 +2668,10 @@ class CapManifest {
    * @throws {Error} If required fields are missing or invalid
    */
   static fromJSON(json) {
-    if (!json.name) throw new Error('CapManifest missing required field: name');
-    if (!json.version) throw new Error('CapManifest missing required field: version');
-    if (!json.channel) throw new Error('CapManifest missing required field: channel');
-    if (!json.description) throw new Error('CapManifest missing required field: description');
+    if (!Object.prototype.hasOwnProperty.call(json, 'name')) throw new Error('CapManifest missing required field: name');
+    if (!Object.prototype.hasOwnProperty.call(json, 'version')) throw new Error('CapManifest missing required field: version');
+    if (!Object.prototype.hasOwnProperty.call(json, 'channel')) throw new Error('CapManifest missing required field: channel');
+    if (!Object.prototype.hasOwnProperty.call(json, 'description')) throw new Error('CapManifest missing required field: description');
     if (!Array.isArray(json.cap_groups)) throw new Error('CapManifest missing required field: cap_groups');
 
     // registry_url must be present as a key (may be null for dev builds)
@@ -2700,10 +2704,16 @@ class CapManifest {
       capGroups
     );
 
-    if (json.author && typeof json.author === 'string') {
+    if (Object.prototype.hasOwnProperty.call(json, 'author')) {
+      if (typeof json.author !== 'string') {
+        throw new Error('CapManifest author must be a string when present');
+      }
       manifest.author = json.author;
     }
-    if (json.page_url && typeof json.page_url === 'string') {
+    if (Object.prototype.hasOwnProperty.call(json, 'page_url')) {
+      if (typeof json.page_url !== 'string') {
+        throw new Error('CapManifest page_url must be a string when present');
+      }
       manifest.page_url = json.page_url;
     }
 
@@ -2723,8 +2733,8 @@ class CapManifest {
       description: this.description,
       cap_groups: this.cap_groups.map(g => g.toJSON())
     };
-    if (this.author) result.author = this.author;
-    if (this.page_url) result.page_url = this.page_url;
+    if (this.author !== null && this.author !== undefined) result.author = this.author;
+    if (this.page_url !== null && this.page_url !== undefined) result.page_url = this.page_url;
     return result;
   }
 }
