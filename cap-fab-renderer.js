@@ -556,6 +556,26 @@ function buildStylesheet() {
       style: { 'width': 3, 'z-index': 1000 },
     },
     {
+      selector: 'edge.strand-shape-edge',
+      style: {
+        'line-style': 'dashed',
+        'width': 2,
+        'text-background-opacity': 0.92,
+      },
+    },
+    {
+      selector: 'edge.strand-foreach-edge',
+      style: {
+        'target-arrow-shape': 'triangle',
+      },
+    },
+    {
+      selector: 'edge.strand-collect-edge',
+      style: {
+        'target-arrow-shape': 'tee',
+      },
+    },
+    {
       selector: 'edge.faded',
       style: { 'opacity': fadedEdgeOpacity },
     },
@@ -1374,7 +1394,7 @@ function collapseStrandShapeTransitions(built) {
           label: '',
           title: '',
           fullUrn: '',
-          edgeClass: 'strand-cap-edge',
+          edgeClass: 'strand-cap-edge strand-shape-edge strand-collect-edge',
           color: bodyExitCapEdge ? bodyExitCapEdge.color : inEdge.color,
           foreachEntry: false,
         });
@@ -1399,15 +1419,16 @@ function collapseStrandShapeTransitions(built) {
     e.edgeClass !== 'strand-collection');
   edges = edges.concat(synthesizedExitEdges);
 
-  // Step 2: foreach-entry cap edges keep whatever label the
-  // strand builder emitted — the cap's own cardinality marker
-  // (from input_is_sequence/output_is_sequence) is the single
-  // source of truth for which edge carries a (1→n) / (n→1) /
-  // (n→n) annotation. The ForEach/Collect shape transitions
-  // themselves are invisible in the render; the cap preceding a
-  // ForEach (with output_is_sequence=true) already produces the
-  // (1→n) marker, and the cap following a Collect (with
-  // input_is_sequence=true) produces (n→1). No relabeling.
+  // Step 2: surface shape transitions as distinct edge semantics.
+  // The cap edge that enters a foreach body keeps its original cap
+  // label; only the edge styling changes. Collect bridges are
+  // synthesized above as dedicated dashed edges.
+  edges = edges.map(edge => {
+    if (!edge.foreachEntry) return edge;
+    return Object.assign({}, edge, {
+      edgeClass: `${edge.edgeClass} strand-shape-edge strand-foreach-edge`,
+    });
+  });
 
   // Step 3: merge the trailing `step_N → output` edge when step_N
   // and output represent the same media URN. The strand builder
