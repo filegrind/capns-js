@@ -3,7 +3,7 @@
 // All implementations (Rust, Go, JS, ObjC, Python) must pass these identically.
 
 const {
-  CapUrn, CapKind, CapUrnBuilder, CapMatcher, CapUrnError, ErrorCodes,
+  CapUrn, CapKind, CapEffect, CapUrnBuilder, CapMatcher, CapUrnError, ErrorCodes,
   MediaUrn, MediaUrnError, MediaUrnErrorCodes,
   Cap, CapGroup, CapManifest, MediaSpec, MediaSpecError, MediaSpecErrorCodes,
   resolveMediaUrn, buildExtensionIndex, mediaUrnsForExtension, getExtensionMappings,
@@ -26,7 +26,8 @@ const {
   MEDIA_FILE_PATH,
   MEDIA_COLLECTION, MEDIA_COLLECTION_LIST,
   MEDIA_DECISION,
-  MEDIA_AUDIO_SPEECH
+  MEDIA_AUDIO_SPEECH,
+  CAP_IDENTITY
 } = require('./capdag.js');
 
 // ============================================================================
@@ -309,9 +310,15 @@ function test939_capUrnCanonicalFormDropsWildcardInOut() {
       `input ${JSON.stringify(v)} canonicalized to ${JSON.stringify(parsed.toString())}, expected ${JSON.stringify(canonical)} — wildcard in/out segments must be elided so the registry SHA-256 key is stable across input spellings`
     );
   }
-  // Bare-identity round-trip.
-  const identity = CapUrn.fromString('cap:in=media:;out=media:');
-  assertEqual(identity.toString(), 'cap:', 'cap with wildcard in/out and no other tags must canonicalize to bare "cap:"');
+  assertThrows(
+    () => CapUrn.fromString('cap:in=media:;out=media:'),
+    ErrorCodes.ILLEGAL_DECLARATION,
+    'declared top-to-top cap must be rejected as inadmissible'
+  );
+
+  const identity = CapUrn.fromString('cap:effect=none');
+  assertEqual(identity.toString(), 'cap:effect=none', 'true identity must preserve explicit effect=none');
+  assert(identity.toString() !== generic.toString(), 'cap: and cap:effect=none must not collapse');
 }
 
 // TEST017: Test tag matching: exact match, subset match, wildcard match, value mismatch
@@ -494,17 +501,19 @@ function test027_wildcardTag() {
   assertEqual(wildcardExt.getTag('ext'), '*', 'Should set ext to wildcard');
 
   const wildcardIn = cap.withWildcardTag('in');
-  assertEqual(wildcardIn.getInSpec(), '*', 'Should set in to wildcard');
+  assertEqual(wildcardIn.getInSpec(), 'media:', 'Should set in to canonical top media:');
 
   const wildcardOut = cap.withWildcardTag('out');
-  assertEqual(wildcardOut.getOutSpec(), '*', 'Should set out to wildcard');
+  assertEqual(wildcardOut.getOutSpec(), 'media:', 'Should set out to canonical top media:');
 }
 
-// TEST028: Test empty cap URN defaults to media: wildcard
+// TEST028: Test empty cap URN is illegal
 function test028_emptyCapUrnNotAllowed() {
-  const empty = CapUrn.fromString('cap:');
-  assertEqual(empty.getInSpec(), MEDIA_IDENTITY, 'Empty cap should default in to media:');
-  assertEqual(empty.getOutSpec(), MEDIA_IDENTITY, 'Empty cap should default out to media:');
+  assertThrows(
+    () => CapUrn.fromString('cap:'),
+    ErrorCodes.ILLEGAL_DECLARATION,
+    'Empty cap must be rejected as inadmissible'
+  );
 }
 
 // TEST029: Test minimal valid cap URN has just in and out, empty tags
@@ -683,7 +692,7 @@ function test047_matchingSemanticsThumbnailVoidInput() {
 
 // TEST048: Matching semantics - wildcard direction matches anything
 function test048_matchingSemanticsWildcardDirection() {
-  const cap = CapUrn.fromString('cap:in=*;out=*');
+  const cap = CapUrn.fromString('cap:in=*;out=*;op');
   const request = CapUrn.fromString(testUrn('generate;ext=pdf'));
   assert(cap.accepts(request), 'Wildcard cap should accept any request');
 }
@@ -2542,7 +2551,7 @@ function test1302_predicateConstantConsistency() {
 // cap_urn.rs: TEST1303-TEST1307 (CapUrn tier tests)
 // ============================================================================
 
-// TEST1303: without_tag removes tag, ignores in/out, case-insensitive for keys
+// TEST1303: without_tag removes tag, rejects structural keys, case-insensitive for keys
 function test1303_withoutTag() {
   const cap = CapUrn.fromString('cap:in="media:void";test;ext=pdf;out="media:void"');
   const removed = cap.withoutTag('ext');
@@ -2553,11 +2562,9 @@ function test1303_withoutTag() {
   const removed2 = cap.withoutTag('EXT');
   assertEqual(removed2.getTag('ext'), undefined, 'withoutTag should be case-insensitive');
 
-  // Removing in/out is silently ignored
-  const same = cap.withoutTag('in');
-  assertEqual(same.getInSpec(), 'media:void', 'withoutTag must not remove in');
-  const same2 = cap.withoutTag('out');
-  assertEqual(same2.getOutSpec(), 'media:void', 'withoutTag must not remove out');
+  assertThrows(() => cap.withoutTag('in'), 'withoutTag must reject in');
+  assertThrows(() => cap.withoutTag('out'), 'withoutTag must reject out');
+  assertThrows(() => cap.withoutTag('effect'), 'withoutTag must reject effect');
 
   // Removing non-existent tag is no-op
   const same3 = cap.withoutTag('nonexistent');
@@ -2581,6 +2588,12 @@ function test1304_withInOutSpec() {
   const changedBoth = cap.withInSpec('media:pdf').withOutSpec(MEDIA_TXT);
   assertEqual(changedBoth.getInSpec(), 'media:pdf', 'Chain should set inSpec');
   assertEqual(changedBoth.getOutSpec(), MEDIA_TXT, 'Chain should set outSpec');
+
+  const identity = CapUrn.fromString('cap:effect=none');
+  assertThrows(
+    () => identity.withOutSpec('media:pdf'),
+    'withOutSpec must revalidate admissibility'
+  );
 }
 
 // TEST561: N/A for JS (in_media_urn/out_media_urn not in JS CapUrn)
@@ -2630,15 +2643,28 @@ function test1306_areCompatible() {
 
 // TEST565: N/A for JS (tags_to_string not in JS CapUrn)
 
-// TEST1307: with_tag silently ignores in/out keys
-function test1307_withTagIgnoresInOut() {
+// TEST1307: with_tag rejects structural keys
+function test1307_withTagRejectsStructuralKeys() {
   const cap = CapUrn.fromString('cap:in="media:void";test;out="media:void"');
-  // Attempting to set in/out via withTag is silently ignored
-  const same = cap.withTag('in', 'media:');
-  assertEqual(same.getInSpec(), 'media:void', 'withTag must not change in_spec');
+  assertThrows(() => cap.withTag('in', 'media:'), 'withTag must reject in');
+  assertThrows(() => cap.withTag('out', 'media:'), 'withTag must reject out');
+  assertThrows(() => cap.withTag('effect', 'none'), 'withTag must reject effect');
+}
 
-  const same2 = cap.withTag('out', 'media:');
-  assertEqual(same2.getOutSpec(), 'media:void', 'withTag must not change out_spec');
+// TEST1308: builder rejects structural keys on tag/marker
+function test1308_builderRejectsStructuralKeys() {
+  assertThrows(
+    () => new CapUrnBuilder().tag('in', 'media:void'),
+    'builder.tag must reject structural in'
+  );
+  assertThrows(
+    () => new CapUrnBuilder().marker('effect'),
+    'builder.marker must reject structural effect'
+  );
+  assertThrows(
+    () => new CapUrnBuilder().inSpec('media:void').outSpec('media:record').tag('123', 'value').build(),
+    'builder.build must reject invalid non-structural tags'
+  );
 }
 
 // TEST1294: RULE11 - void-input cap with stdin source rejected
@@ -2697,47 +2723,58 @@ function test1297_rule11NonVoidInputWithStdin() {
 // cap_urn.rs: TEST639-TEST653 (Cap URN wildcard tests)
 // ============================================================================
 
-// TEST639: cap: (empty) defaults to in=media:;out=media:
-function test639_emptyCapDefaultsToMediaWildcard() {
-  const cap = CapUrn.fromString('cap:');
-  assertEqual(cap.getInSpec(), MEDIA_IDENTITY, 'Empty cap should default in to media:');
-  assertEqual(cap.getOutSpec(), MEDIA_IDENTITY, 'Empty cap should default out to media:');
-  assertEqual(Object.keys(cap.tags).length, 0, 'Empty cap should have no extra tags');
+// TEST639: cap: (empty) is the illegal bare top form
+function test639_emptyCapIsIllegal() {
+  assertThrows(
+    () => CapUrn.fromString('cap:'),
+    ErrorCodes.ILLEGAL_DECLARATION,
+    'Empty cap must be rejected as inadmissible'
+  );
 }
 
-// TEST640: cap:in defaults out to media:
-function test640_inOnlyDefaultsOutToMedia() {
-  const cap = CapUrn.fromString('cap:in');
-  assertEqual(cap.getInSpec(), MEDIA_IDENTITY, 'Bare in should normalize to media:');
-  assertEqual(cap.getOutSpec(), MEDIA_IDENTITY, 'Missing out should default to media:');
+// TEST640: cap:in collapses to the same illegal bare top form
+function test640_inOnlyIsIllegal() {
+  assertThrows(
+    () => CapUrn.fromString('cap:in'),
+    ErrorCodes.ILLEGAL_DECLARATION,
+    'Bare in must be rejected as inadmissible'
+  );
 }
 
-// TEST641: cap:out defaults in to media:
-function test641_outOnlyDefaultsInToMedia() {
-  const cap = CapUrn.fromString('cap:out');
-  assertEqual(cap.getInSpec(), MEDIA_IDENTITY, 'Missing in should default to media:');
-  assertEqual(cap.getOutSpec(), MEDIA_IDENTITY, 'Bare out should normalize to media:');
+// TEST641: cap:out collapses to the same illegal bare top form
+function test641_outOnlyIsIllegal() {
+  assertThrows(
+    () => CapUrn.fromString('cap:out'),
+    ErrorCodes.ILLEGAL_DECLARATION,
+    'Bare out must be rejected as inadmissible'
+  );
 }
 
-// TEST642: cap:in;out both become media:
-function test642_inOutWithoutValuesBecomeMedia() {
-  const cap = CapUrn.fromString('cap:in;out');
-  assertEqual(cap.getInSpec(), MEDIA_IDENTITY, 'Bare in should normalize to media:');
-  assertEqual(cap.getOutSpec(), MEDIA_IDENTITY, 'Bare out should normalize to media:');
+// TEST642: cap:in;out collapses to the same illegal bare top form
+function test642_inOutWithoutValuesAreIllegal() {
+  assertThrows(
+    () => CapUrn.fromString('cap:in;out'),
+    ErrorCodes.ILLEGAL_DECLARATION,
+    'Bare in/out must be rejected as inadmissible'
+  );
 }
 
-// TEST643: cap:in=*;out=* becomes media:
-function test643_explicitAsteriskIsWildcard() {
-  const cap = CapUrn.fromString('cap:in=*;out=*');
-  assertEqual(cap.getInSpec(), MEDIA_IDENTITY, 'in=* should normalize to media:');
-  assertEqual(cap.getOutSpec(), MEDIA_IDENTITY, 'out=* should normalize to media:');
+// TEST643: cap:in=*;out=* is the same illegal bare top form
+function test643_explicitAsteriskIsIllegal() {
+  assertThrows(
+    () => CapUrn.fromString('cap:in=*;out=*'),
+    ErrorCodes.ILLEGAL_DECLARATION,
+    'Explicit wildcard top-to-top must be rejected as inadmissible'
+  );
 }
 
-// TEST644: cap:in=media:;out=* has specific in, wildcard out
-function test644_specificInWildcardOut() {
-  const cap = CapUrn.fromString('cap:in=media:;out=*');
-  assertEqual(cap.getInSpec(), 'media:', 'Should have specific in');
-  assertEqual(cap.getOutSpec(), 'media:', 'Wildcard out should normalize to media:');
+// TEST644: cap:in=media:;out=* is the same illegal bare top form
+function test644_specificInWildcardOutIsIllegal() {
+  assertThrows(
+    () => CapUrn.fromString('cap:in=media:;out=*'),
+    ErrorCodes.ILLEGAL_DECLARATION,
+    'Top-to-top declared form must be rejected as inadmissible'
+  );
 }
 
 // TEST645: cap:in=*;out=media:text has wildcard in, specific out
@@ -2767,8 +2804,8 @@ function test647_invalidOutSpecFails() {
 
 // TEST648: Wildcard in/out match specific caps
 function test648_wildcardAcceptsSpecific() {
-  const wildcard = CapUrn.fromString('cap:in=*;out=*');
-  const specific = CapUrn.fromString('cap:in="media:";out="media:text"');
+  const wildcard = CapUrn.fromString('cap:in=*;out=*;raw');
+  const specific = CapUrn.fromString('cap:in="media:";out="media:text";raw');
 
   assert(wildcard.accepts(specific), 'Wildcard should accept specific');
   assert(specific.conformsTo(wildcard), 'Specific should conform to wildcard');
@@ -2776,52 +2813,105 @@ function test648_wildcardAcceptsSpecific() {
 
 // TEST649: Specificity - wildcard has 0, specific has tag count
 function test649_specificityScoring() {
-  const wildcard = CapUrn.fromString('cap:in=*;out=*');
-  const specific = CapUrn.fromString('cap:in="media:";out="media:text"');
+  const wildcard = CapUrn.fromString('cap:in=*;out=*;raw');
+  const specific = CapUrn.fromString('cap:in="media:";out="media:text";raw');
 
-  assertEqual(wildcard.specificity(), 0, 'Wildcard cap should have 0 specificity');
+  assertEqual(wildcard.specificity(), 2, 'Marker-only wildcard cap should have y-axis specificity only');
   assert(specific.specificity() > 0, 'Specific cap should have non-zero specificity');
 }
 
-// TEST650: N/A for JS (JS requires in/out, cap:in=media:;out=media:;test would fail parsing)
+// TEST650: cap:in=media:;out=media:;test preserves other tags
+function test650_wildcardPreserveOtherTags() {
+  const cap = CapUrn.fromString('cap:in=media:;out=media:;test');
+  assertEqual(cap.getInSpec(), 'media:', 'in spec should remain media:');
+  assertEqual(cap.getOutSpec(), 'media:', 'out spec should remain media:');
+  assertEqual(cap.getEffect(), CapEffect.DECLARED, 'missing effect should default to declared');
+  assert(cap.hasMarkerTag('test'), 'marker tag should be preserved');
+}
 
-// TEST651: All identity forms produce the same CapUrn
-function test651_identityFormsEquivalent() {
+// TEST651: Generic top-to-top spellings are all rejected.
+function test651_wildcardGenericFormsRejected() {
   const forms = [
+    'cap:',
+    'cap:in;out',
     'cap:in=*;out=*',
-    'cap:in="media:";out="media:"',
+    'cap:in=media:;out=media:',
+    'cap:in;out=media:',
+    'cap:in=*;out=media:',
+    'cap:in=media:;out',
+    'cap:in=media:;out=*',
   ];
-
-  const first = CapUrn.fromString(forms[0]);
-  // All forms should produce equivalent caps (wildcard behavior)
-  for (let i = 1; i < forms.length; i++) {
-    const cap = CapUrn.fromString(forms[i]);
-    // Both should accept specific caps
-    const specific = CapUrn.fromString('cap:in="media:";out="media:text"');
-    assert(first.accepts(specific), `Form 0 should accept specific`);
-    assert(cap.accepts(specific), `Form ${i} should accept specific`);
+  for (const form of forms) {
+    assertThrows(
+      () => CapUrn.fromString(form),
+      ErrorCodes.ILLEGAL_DECLARATION,
+      `${form} must be rejected as inadmissible`
+    );
   }
 }
 
-// TEST652: N/A for JS (CAP_IDENTITY constant not in JS)
+// TEST652: CAP_IDENTITY constant names the true identity cap, not bare cap:
+function test652_capIdentityConstantWorks() {
+  const identity = CapUrn.fromString(CAP_IDENTITY);
+  assertEqual(identity.toString(), 'cap:effect=none', 'CAP_IDENTITY must be explicit effect=none');
+  assertEqual(identity.kind(), CapKind.IDENTITY, 'CAP_IDENTITY must classify as identity');
 
-// TEST653: Identity (no tags) does not match specific requests via routing
-function test653_identityRoutingIsolation() {
-  const identity = CapUrn.fromString('cap:in=*;out=*');
-  const specificRequest = CapUrn.fromString('cap:in="media:void";test;out="media:void"');
+  const longForm = CapUrn.fromString('cap:in=media:;out=media:;effect=none');
+  assert(identity.accepts(longForm), 'identity should accept its long form');
+  assert(longForm.accepts(identity), 'long form should accept canonical identity');
 
-  // Identity has specificity 0 (no tags, wildcard directions)
-  assertEqual(identity.specificity(), 0, 'Identity specificity should be 0');
+  assertThrows(
+    () => CapUrn.fromString('cap:'),
+    ErrorCodes.ILLEGAL_DECLARATION,
+    'bare cap must be rejected as inadmissible'
+  );
+}
 
-  // Specific request has higher specificity
-  assert(specificRequest.specificity() > identity.specificity(),
-    'Specific request should have higher specificity than identity');
+// TEST653: invalid effect=none declarations fail at construction.
+function test653_invalidEffectNoneDeclarationRejected() {
+  assertThrows(
+    () => CapUrn.fromString('cap:in=media:pdf;out=media:textable;effect=none'),
+    ErrorCodes.ILLEGAL_DECLARATION,
+    'invalid effect=none declaration must fail at construction'
+  );
+}
 
-  // CapMatcher should prefer specific over identity
-  const specificCap = CapUrn.fromString('cap:in="media:void";test;out="media:void"');
-  const best = CapMatcher.findBestMatch([identity, specificCap], specificRequest);
-  assert(best !== null, 'Should find a match');
-  assert(best.hasMarkerTag('test'), 'CapMatcher should prefer specific cap over identity');
+// TEST654: effect=none preserves runtime media identity.
+function test654_effectNonePreservesRuntimeMedia() {
+  const decimate = CapUrn.fromString('cap:decimate-sequence;effect=none');
+  const png = MediaUrn.fromString('media:image;png');
+  const pdf = MediaUrn.fromString('media:pdf');
+  assertEqual(decimate.inferRuntimeOutputMedia(png).toString(), png.toString(), 'effect=none should preserve png');
+  assertEqual(decimate.inferRuntimeOutputMedia(pdf).toString(), pdf.toString(), 'effect=none should preserve pdf');
+}
+
+// TEST655: default effect=declared does not preserve runtime refinements.
+function test655_effectDeclaredUsesDeclaredOutput() {
+  const resize = CapUrn.fromString('cap:in=media:image;out=media:image;resize');
+  const png = MediaUrn.fromString('media:image;png;width=4000');
+  assertEqual(
+    resize.inferRuntimeOutputMedia(png).toString(),
+    'media:image',
+    'default declared effect should collapse to declared output'
+  );
+}
+
+// TEST656: invalid effect=none declarations fail hard at construction.
+function test656_invalidEffectNoneFailsHard() {
+  assertThrows(
+    () => CapUrn.fromString('cap:in=media:pdf;out=media:textable;effect=none'),
+    ErrorCodes.ILLEGAL_DECLARATION,
+    'invalid effect=none declaration must fail at construction'
+  );
+}
+
+// TEST657: omitted effect means declared; unconstrained effect must be explicit.
+function test657_effectDispatchRequiresExplicitWildcard() {
+  const noneProvider = CapUrn.fromString('cap:effect=none');
+  const declaredRequest = CapUrn.fromString('cap:raw');
+  const anyRequest = CapUrn.fromString('cap:?effect');
+  assert(!noneProvider.isDispatchable(declaredRequest), 'effect=none should not silently satisfy declared request');
+  assert(noneProvider.isDispatchable(anyRequest), 'explicit ?effect should accept any provider effect');
 }
 
 // ============================================================================
@@ -5481,24 +5571,27 @@ function testRenderer_validateResolvedMachinePayload_rejectsMissingFields() {
 // surface, not a per-port detail.
 // ============================================================================
 
-// TEST1800: Identity classifier — only the bare cap: form qualifies.
-// Adding any tag (even one that doesn't constrain in/out) demotes
-// the cap to Transform because the operation/metadata axis is no
-// longer fully generic.
+// TEST1800: Identity classifier — only explicit effect=none qualifies.
 function test1800_kindIdentityOnlyForBareCap() {
-  const identity = CapUrn.fromString('cap:');
-  assertEqual(identity.kind(), CapKind.IDENTITY, 'cap: should be Identity');
+  const identity = CapUrn.fromString('cap:effect=none');
+  assertEqual(identity.kind(), CapKind.IDENTITY, 'cap:effect=none should be Identity');
 
   for (const spelling of [
-    'cap:in=media:;out=media:',
-    'cap:in=*;out=*',
-    'cap:in=media:',
-    'cap:out=media:',
+    'cap:in=media:;out=media:;effect=none',
+    'cap:effect=none;in=*;out=*',
+    'cap:effect=none;in=media:',
+    'cap:effect=none;out=media:',
   ]) {
     const cap = CapUrn.fromString(spelling);
     assertEqual(cap.kind(), CapKind.IDENTITY,
-      `${spelling} should classify as Identity (canonical form is cap:)`);
+      `${spelling} should classify as Identity`);
   }
+
+  assertThrows(
+    () => CapUrn.fromString('cap:'),
+    ErrorCodes.ILLEGAL_DECLARATION,
+    'bare cap must be rejected as inadmissible'
+  );
 
   const withOp = CapUrn.fromString('cap:passthrough');
   assertEqual(withOp.kind(), CapKind.TRANSFORM,
@@ -5587,7 +5680,7 @@ function test1810_mediaVoidIsAtomic() {
 // once parsed.
 function test1805_kindInvariantUnderCanonicalSpellings() {
   const cases = [
-    { a: 'cap:', b: 'cap:in=media:;out=media:', expected: CapKind.IDENTITY },
+    { a: 'cap:effect=none', b: 'cap:in=media:;out=media:;effect=none', expected: CapKind.IDENTITY },
     {
       a: 'cap:extract;in=media:pdf;out=media:textable',
       b: 'cap:extract;in="media:pdf";out="media:textable"',
@@ -5627,8 +5720,8 @@ function test1805_kindInvariantUnderCanonicalSpellings() {
 
 // TEST1820: A `?`-valued cap-tag scores 0. Same as missing.
 function test1820_specificityQuestionIsZero() {
-  const bare = CapUrn.fromString('cap:');
-  assertEqual(bare.specificity(), 0, 'cap: must score 0 (top of order)');
+  const bare = CapUrn.fromString('cap:?effect');
+  assertEqual(bare.specificity(), 0, 'cap:?effect must score 0 (fully unconstrained request)');
 
   const withQ = CapUrn.fromString('cap:?target');
   assertEqual(withQ.specificity(), 0,
@@ -6023,7 +6116,8 @@ async function runTests() {
   runTest('TEST1304: with_in_out_spec', test1304_withInOutSpec);
   runTest('TEST1305: find_all_matches', test1305_findAllMatches);
   runTest('TEST1306: are_compatible', test1306_areCompatible);
-  runTest('TEST1307: with_tag_ignores_in_out', test1307_withTagIgnoresInOut);
+  runTest('TEST1307: with_tag_rejects_structural_keys', test1307_withTagRejectsStructuralKeys);
+  runTest('TEST1308: builder_rejects_structural_keys', test1308_builderRejectsStructuralKeys);
   runTest('TEST1294: rule11_void_input_with_stdin_rejected', test1294_rule11VoidInputWithStdinRejected);
   runTest('TEST1295: rule11_non_void_input_without_stdin_rejected', test1295_rule11NonVoidInputWithoutStdinRejected);
   runTest('TEST1296: rule11_void_input_cli_flag_only', test1296_rule11VoidInputCliFlagOnly);
@@ -6031,21 +6125,25 @@ async function runTests() {
 
   // cap_urn.rs: TEST639-TEST653 (Cap URN wildcard tests)
   console.log('\n--- cap_urn.rs (wildcard tests) ---');
-  runTest('TEST639: empty_cap_defaults_to_media_wildcard', test639_emptyCapDefaultsToMediaWildcard);
-  runTest('TEST640: in_only_defaults_out_to_media', test640_inOnlyDefaultsOutToMedia);
-  runTest('TEST641: out_only_defaults_in_to_media', test641_outOnlyDefaultsInToMedia);
-  runTest('TEST642: in_out_without_values_become_media', test642_inOutWithoutValuesBecomeMedia);
-  runTest('TEST643: explicit_asterisk_is_wildcard', test643_explicitAsteriskIsWildcard);
-  runTest('TEST644: specific_in_wildcard_out', test644_specificInWildcardOut);
+  runTest('TEST639: empty_cap_is_illegal', test639_emptyCapIsIllegal);
+  runTest('TEST640: in_only_is_illegal', test640_inOnlyIsIllegal);
+  runTest('TEST641: out_only_is_illegal', test641_outOnlyIsIllegal);
+  runTest('TEST642: in_out_without_values_are_illegal', test642_inOutWithoutValuesAreIllegal);
+  runTest('TEST643: explicit_asterisk_is_illegal', test643_explicitAsteriskIsIllegal);
+  runTest('TEST644: specific_in_wildcard_out_is_illegal', test644_specificInWildcardOutIsIllegal);
   runTest('TEST645: wildcard_in_specific_out', test645_wildcardInSpecificOut);
   runTest('TEST646: invalid_in_spec_fails', test646_invalidInSpecFails);
   runTest('TEST647: invalid_out_spec_fails', test647_invalidOutSpecFails);
   runTest('TEST648: wildcard_accepts_specific', test648_wildcardAcceptsSpecific);
   runTest('TEST649: specificity_scoring', test649_specificityScoring);
-  console.log('  SKIP TEST650: N/A for JS (requires in/out)');
-  runTest('TEST651: identity_forms_equivalent', test651_identityFormsEquivalent);
-  console.log('  SKIP TEST652: N/A for JS (CAP_IDENTITY constant)');
-  runTest('TEST653: identity_routing_isolation', test653_identityRoutingIsolation);
+  runTest('TEST650: wildcard_preserve_other_tags', test650_wildcardPreserveOtherTags);
+  runTest('TEST651: wildcard_generic_forms_rejected', test651_wildcardGenericFormsRejected);
+  runTest('TEST652: cap_identity_constant_works', test652_capIdentityConstantWorks);
+  runTest('TEST653: invalid_effect_none_declaration_rejected', test653_invalidEffectNoneDeclarationRejected);
+  runTest('TEST654: effect_none_preserves_runtime_media', test654_effectNonePreservesRuntimeMedia);
+  runTest('TEST655: effect_declared_uses_declared_output', test655_effectDeclaredUsesDeclaredOutput);
+  runTest('TEST656: invalid_effect_none_fails_hard', test656_invalidEffectNoneFailsHard);
+  runTest('TEST657: effect_dispatch_requires_explicit_wildcard', test657_effectDispatchRequiresExplicitWildcard);
 
   // machine module: parser tests (mirrors parser.rs)
   console.log('\n--- machine/parser.rs ---');
@@ -6219,7 +6317,7 @@ async function runTests() {
   runTest('RENDERER: validateResolvedMachine_rejectsMissingFields', testRenderer_validateResolvedMachinePayload_rejectsMissingFields);
 
   console.log('\n--- CapKind classifier (test1800–test1805) ---');
-  runTest('TEST1800: kind_identity_only_for_bare_cap',      test1800_kindIdentityOnlyForBareCap);
+  runTest('TEST1800: kind_identity_requires_effect_none',   test1800_kindIdentityOnlyForBareCap);
   runTest('TEST1801: kind_source_when_input_is_void',       test1801_kindSourceWhenInputIsVoid);
   runTest('TEST1802: kind_sink_when_output_is_void',        test1802_kindSinkWhenOutputIsVoid);
   runTest('TEST1803: kind_effect_when_both_sides_void',     test1803_kindEffectWhenBothSidesVoid);
