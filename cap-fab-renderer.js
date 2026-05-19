@@ -2590,6 +2590,22 @@ class CapFabRenderer {
   // viewport (≈15% slack at 800×600).
   static get ZOOM_OUT_FIT_SLACK() { return 0.15; }
 
+  // Fit padding must scale down in very short viewports. The compact
+  // machine-select graph pane is only ~100px tall; a fixed 50px inset
+  // leaves no vertical room, so the bootstrap fit degenerates and the
+  // graph opens at Cytoscape's fallback zoom instead of a true fit.
+  // Keep the requested desktop padding where there is room, but cap it
+  // to a small fraction of the actual visible viewport in compact
+  // hosts.
+  _resolvedFitPadding(requestedPadding, containerWidth, containerHeight, excluded) {
+    const requested = Math.max(0, requestedPadding | 0);
+    const availableHeight = Math.max(0, containerHeight - excluded);
+    const limitingDim = Math.max(0, Math.min(containerWidth, availableHeight));
+    if (limitingDim <= 0) return 0;
+    const capped = Math.floor(limitingDim * 0.12);
+    return Math.max(0, Math.min(requested, capped));
+  }
+
   // Bootstrap fit: snap (no animation) to a centered, padded fit of
   // the entire graph. Used during the first paint and the post-paint
   // resize ticks while `_initialFitDone` is false. The padding here
@@ -2612,11 +2628,11 @@ class CapFabRenderer {
     if (containerWidth <= 0 || containerHeight <= 0) return;
     const elements = cy.elements();
     if (elements.length === 0) return;
-    const bb = elements.boundingBox();
+    const bb = elements.boundingBox({ includeLabels: true, includeOverlays: false });
     if (bb.w === 0 && bb.h === 0) return;
 
-    const padding = 50;
     const excluded = Math.max(0, this.bottomExcludedRegion() | 0);
+    const padding = this._resolvedFitPadding(50, containerWidth, containerHeight, excluded);
     const visibleWidth = containerWidth - padding * 2;
     const visibleHeight = containerHeight - excluded - padding * 2;
     if (visibleWidth <= 0 || visibleHeight <= 0) return;
@@ -2642,12 +2658,9 @@ class CapFabRenderer {
     // our zoom/pan write and leave the graph drifting.
     cy.stop(true);
     this._internalPanZoom = true;
-    try {
-      cy.zoom(clampedZoom);
-      cy.pan({ x: panX, y: panY });
-    } finally {
-      this._internalPanZoom = false;
-    }
+    cy.zoom(clampedZoom);
+    cy.pan({ x: panX, y: panY });
+    this._internalPanZoom = false;
   }
 
   // Mark the bootstrap centering as complete so subsequent refits
@@ -2687,7 +2700,7 @@ class CapFabRenderer {
     // that sits comfortably above this relaxed minimum, so opening
     // the view shows the graph centred with margin rather than
     // bleeding to all four edges.
-    const bb = this.cy.elements().boundingBox();
+    const bb = this.cy.elements().boundingBox({ includeLabels: true, includeOverlays: false });
     let zoomMin;
     if (bb.w > 0 && bb.h > 0) {
       const strictFit = Math.min(w / bb.w, h / bb.h);
@@ -3392,12 +3405,13 @@ class CapFabRenderer {
     this.cy.stop(true);
     if (!eles || eles.length === 0) eles = this.cy.elements();
 
-    const bb = eles.boundingBox();
+    const bb = eles.boundingBox({ includeLabels: true, includeOverlays: false });
     if (bb.w === 0 && bb.h === 0) return;
 
     const containerWidth = this.cy.width();
     const containerHeight = this.cy.height();
     const excluded = Math.max(0, this.bottomExcludedRegion() | 0);
+    padding = this._resolvedFitPadding(padding, containerWidth, containerHeight, excluded);
 
     const visibleWidth = containerWidth - padding * 2;
     const visibleHeight = containerHeight - excluded - padding * 2;
@@ -3428,12 +3442,9 @@ class CapFabRenderer {
         stop: () => { this._internalPanZoom = false; },
       });
     } else {
-      try {
-        this.cy.zoom(clampedZoom);
-        this.cy.pan({ x: panX, y: panY });
-      } finally {
-        this._internalPanZoom = false;
-      }
+      this.cy.zoom(clampedZoom);
+      this.cy.pan({ x: panX, y: panY });
+      this._internalPanZoom = false;
     }
   }
 
