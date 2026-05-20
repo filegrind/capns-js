@@ -66,9 +66,9 @@ This catalog lists all tests in the JS codebase.
 | test048 | `test048_matchingSemanticsWildcardDirection` | TEST048: Matching semantics - wildcard direction matches anything | capdag.test.js:694 |
 | test049 | `test049_matchingSemanticsCrossDimension` | TEST049: Non-overlapping tags — neither direction accepts | capdag.test.js:701 |
 | test050 | `test050_matchingSemanticsDirectionMismatch` | TEST050: Matching semantics - direction mismatch prevents matching | capdag.test.js:709 |
-| test054 | `test054_xv5InlineSpecRedefinitionDetected` | TEST054: XV5 - Test inline media spec redefinition of existing registry spec is detected and rejected | capdag.test.js:813 |
-| test055 | `test055_xv5NewInlineSpecAllowed` | TEST055: XV5 - Test new inline media spec (not in registry) is allowed | capdag.test.js:830 |
-| test056 | `test056_xv5EmptyMediaSpecsAllowed` | TEST056: XV5 - Test empty media_specs (no inline specs) passes XV5 validation | capdag.test.js:845 |
+| test054 | `test054_xv5InlineSpecRedefinitionDetected` | TEST054: XV5 - Test inline media def redefinition of existing registry spec is detected and rejected | capdag.test.js:813 |
+| test055 | `test055_xv5NewInlineSpecAllowed` | TEST055: XV5 - Test new inline media def (not in registry) is allowed | capdag.test.js:830 |
+| test056 | `test056_xv5EmptyMediaDefsAllowed` | TEST056: XV5 - Test empty media_defs (no inline specs) passes XV5 validation | capdag.test.js:845 |
 | test060 | `test060_wrongPrefixFails` | TEST060: Test wrong prefix fails with InvalidPrefix error showing expected and actual prefix | capdag.test.js:857 |
 | test061 | `test061_isBinary` | TEST061: Test is_binary returns true when textable tag is absent (binary = not textable) | capdag.test.js:866 |
 | test062 | `test062_isRecord` | TEST062: Test is_record returns true when record marker tag is present indicating key-value structure | capdag.test.js:882 |
@@ -85,18 +85,18 @@ This catalog lists all tests in the JS codebase.
 | test076 | `test076_specificity` | TEST076: Test specificity increases with more tags for ranking conformance | capdag.test.js:1006 |
 | test077 | `test077_serdeRoundtrip` | TEST077: Test serde roundtrip serializes to JSON string and deserializes back correctly | capdag.test.js:1015 |
 | test078 | `test078_debugMatchingBehavior` | TEST078: conforms_to behavior between MEDIA_OBJECT and MEDIA_STRING | capdag.test.js:1024 |
-| test091 | `test091_resolveCustomMediaSpec` | TEST091: Test resolving custom media URN from local media_specs takes precedence over registry | capdag.test.js:1039 |
-| test092 | `test092_resolveCustomWithSchema` | TEST092: Test resolving custom record media spec with schema from local media_specs | capdag.test.js:1049 |
+| test091 | `test091_resolveCustomMediaDef` | TEST091: Test resolving custom media URN from local media_defs takes precedence over registry | capdag.test.js:1039 |
+| test092 | `test092_resolveCustomWithSchema` | TEST092: Test resolving custom record media def with schema from local media_defs | capdag.test.js:1049 |
 | test093 | `test093_resolveUnresolvableFailsHard` | TEST093: Test resolving unknown media URN fails with UnresolvableMediaUrn error | capdag.test.js:1066 |
-| test099 | `test099_resolvedIsBinary` | TEST099: Test ResolvedMediaSpec is_binary returns true when textable tag is absent | capdag.test.js:1085 |
-| test100 | `test100_resolvedIsRecord` | TEST100: Test ResolvedMediaSpec is_record returns true when record marker is present | capdag.test.js:1091 |
-| test101 | `test101_resolvedIsScalar` | TEST101: Test ResolvedMediaSpec is_scalar returns true when list marker is absent | capdag.test.js:1097 |
-| test102 | `test102_resolvedIsList` | TEST102: Test ResolvedMediaSpec is_list returns true when list marker is present | capdag.test.js:1103 |
-| test103 | `test103_resolvedIsJson` | TEST103: Test ResolvedMediaSpec is_json returns true when json tag is present | capdag.test.js:1109 |
-| test104 | `test104_resolvedIsText` | TEST104: Test ResolvedMediaSpec is_text returns true when textable tag is present | capdag.test.js:1115 |
-| test105 | `test105_metadataPropagation` | TEST105: Test metadata propagates from media spec def to resolved media spec | capdag.test.js:1121 |
-| test106 | `test106_metadataWithValidation` | TEST106: Test metadata and validation can coexist in media spec definition | capdag.test.js:1144 |
-| test107 | `test107_extensionsPropagation` | TEST107: Test extensions field propagates from media spec def to resolved | capdag.test.js:1163 |
+| test099 | `test099_resolvedIsBinary` | TEST099: Test ResolvedMediaDef is_binary returns true when textable tag is absent | capdag.test.js:1085 |
+| test100 | `test100_resolvedIsRecord` | TEST100: Test ResolvedMediaDef is_record returns true when record marker is present | capdag.test.js:1091 |
+| test101 | `test101_resolvedIsScalar` | TEST101: Test ResolvedMediaDef is_scalar returns true when list marker is absent | capdag.test.js:1097 |
+| test102 | `test102_resolvedIsList` | TEST102: Test ResolvedMediaDef is_list returns true when list marker is present | capdag.test.js:1103 |
+| test103 | `test103_resolvedIsJson` | TEST103: Test ResolvedMediaDef is_json returns true when json tag is present | capdag.test.js:1109 |
+| test104 | `test104_resolvedIsText` | TEST104: Test ResolvedMediaDef is_text returns true when textable tag is present | capdag.test.js:1115 |
+| test105 | `test105_metadataPropagation` | TEST105: Test metadata propagates from media def def to resolved media def | capdag.test.js:1121 |
+| test106 | `test106_metadataWithValidation` | TEST106: Test metadata and validation can coexist in media definition | capdag.test.js:1144 |
+| test107 | `test107_extensionsPropagation` | TEST107: Test extensions field propagates from media def def to resolved | capdag.test.js:1163 |
 | test108 | `test108_extensionsSerialization` | TEST108: Test creating new cap with URN, title, and command verifies correct initialization | capdag.test.js:1179 |
 | test109 | `test109_extensionsWithMetadataAndValidation` | TEST109: Test creating cap with metadata initializes and retrieves metadata correctly | capdag.test.js:1187 |
 | test110 | `test110_multipleExtensions` | TEST110: Test cap matching with subset semantics for request fulfillment | capdag.test.js:1206 |
@@ -117,8 +117,8 @@ This catalog lists all tests in the JS codebase.
 | test304 | `test304_mediaAvailabilityOutputConstant` | TEST304: Test MEDIA_AVAILABILITY_OUTPUT constant parses as valid media URN with correct tags | capdag.test.js:1555 |
 | test305 | `test305_mediaPathOutputConstant` | TEST305: Test MEDIA_PATH_OUTPUT constant parses as valid media URN with correct tags | capdag.test.js:1565 |
 | test306 | `test306_availabilityAndPathOutputDistinct` | TEST306: Test MEDIA_AVAILABILITY_OUTPUT and MEDIA_PATH_OUTPUT are distinct URNs | capdag.test.js:1575 |
-| test307 | `test307_modelAvailabilityUrn` | TEST307: Test model_availability_urn builds valid cap URN with correct op and media specs | capdag.test.js:1589 |
-| test308 | `test308_modelPathUrn` | TEST308: Test model_path_urn builds valid cap URN with correct op and media specs | capdag.test.js:1601 |
+| test307 | `test307_modelAvailabilityUrn` | TEST307: Test model_availability_urn builds valid cap URN with correct op and media defs | capdag.test.js:1589 |
+| test308 | `test308_modelPathUrn` | TEST308: Test model_path_urn builds valid cap URN with correct op and media defs | capdag.test.js:1601 |
 | test309 | `test309_modelAvailabilityAndPathAreDistinct` | TEST309: Test model_availability_urn and model_path_urn produce distinct URNs | capdag.test.js:1613 |
 | test310 | `test310_llmGenerateTextUrn` | TEST310: llm_generate_text_urn() produces a valid cap URN with textable in/out specs | capdag.test.js:1620 |
 | test312 | `test312_allUrnBuildersProduceValidUrns` | TEST312: Test all URN builders produce parseable cap URNs | capdag.test.js:1643 |
@@ -210,8 +210,8 @@ This catalog lists all tests in the JS codebase.
 | unnumbered | `testJS_capDocumentationRoundTrip` | JS round-trip for the documentation field on Cap. Mirrors TEST920 in capdag/src/cap/definition.rs — the body is non-trivial (newlines, backticks, embedded quotes, Unicode) so escaping mismatches between JSON.stringify on this side and the Rust serializer on the other side surface as failures here. | capdag.test.js:1752 |
 | unnumbered | `testJS_capJSONSerialization` |  | capdag.test.js:1729 |
 | unnumbered | `testJS_getExtensionMappings` |  | capdag.test.js:1707 |
-| unnumbered | `testJS_mediaSpecConstruction` |  | capdag.test.js:1840 |
-| unnumbered | `testJS_mediaSpecDocumentationPropagatesThroughResolve` | Documentation propagates from a mediaSpecs definition through resolveMediaUrn into the resolved MediaSpec. Mirrors TEST924 on the Rust side. This is the path every UI consumer uses, so a break here makes the new field invisible everywhere downstream. | capdag.test.js:1797 |
+| unnumbered | `testJS_mediaDefConstruction` |  | capdag.test.js:1840 |
+| unnumbered | `testJS_mediaDefDocumentationPropagatesThroughResolve` | Documentation propagates from a mediaDefs definition through resolveMediaUrn into the resolved MediaDef. Mirrors TEST924 on the Rust side. This is the path every UI consumer uses, so a break here makes the new field invisible everywhere downstream. | capdag.test.js:1797 |
 | unnumbered | `testJS_mediaUrnsForExtension` |  | capdag.test.js:1679 |
 | unnumbered | `testJS_resolveMediaUrnFromSpecs` |  | capdag.test.js:1717 |
 | unnumbered | `testJS_stdinSourceKindConstants` |  | capdag.test.js:1827 |
@@ -347,7 +347,7 @@ This catalog lists all tests in the JS codebase.
 | unnumbered | `testRenderer_validateBodyOutcome_rejectsNegativeIndex` | ---------------- run builder ---------------- | capdag.test.js:4770 |
 | unnumbered | `testRenderer_validateEditorGraphPayload_rejectsUnknownKind` | ---------------- editor-graph builder ---------------- | capdag.test.js:5182 |
 | unnumbered | `testRenderer_validateResolvedMachinePayload_rejectsMissingFields` |  | capdag.test.js:5533 |
-| unnumbered | `testRenderer_validateStrandPayload_missingSourceSpec` |  | capdag.test.js:4757 |
+| unnumbered | `testRenderer_validateStrandPayload_missingSourceMediaUrn` |  | capdag.test.js:4757 |
 | unnumbered | `testRenderer_validateStrandStep_rejectsUnknownVariant` |  | capdag.test.js:4200 |
 | unnumbered | `testRenderer_validateStrandStep_requiresBooleanIsSequence` |  | capdag.test.js:4217 |
 | unnumbered | `testUrn` |  | capdag.test.js:108 |
@@ -366,8 +366,8 @@ The following tests are cataloged but do not currently participate in numeric te
 - `testJS_capDocumentationRoundTrip` — capdag.test.js:1752
 - `testJS_capJSONSerialization` — capdag.test.js:1729
 - `testJS_getExtensionMappings` — capdag.test.js:1707
-- `testJS_mediaSpecConstruction` — capdag.test.js:1840
-- `testJS_mediaSpecDocumentationPropagatesThroughResolve` — capdag.test.js:1797
+- `testJS_mediaDefConstruction` — capdag.test.js:1840
+- `testJS_mediaDefDocumentationPropagatesThroughResolve` — capdag.test.js:1797
 - `testJS_mediaUrnsForExtension` — capdag.test.js:1679
 - `testJS_resolveMediaUrnFromSpecs` — capdag.test.js:1717
 - `testJS_stdinSourceKindConstants` — capdag.test.js:1827
@@ -503,7 +503,7 @@ The following tests are cataloged but do not currently participate in numeric te
 - `testRenderer_validateBodyOutcome_rejectsNegativeIndex` — capdag.test.js:4770
 - `testRenderer_validateEditorGraphPayload_rejectsUnknownKind` — capdag.test.js:5182
 - `testRenderer_validateResolvedMachinePayload_rejectsMissingFields` — capdag.test.js:5533
-- `testRenderer_validateStrandPayload_missingSourceSpec` — capdag.test.js:4757
+- `testRenderer_validateStrandPayload_missingSourceMediaUrn` — capdag.test.js:4757
 - `testRenderer_validateStrandStep_rejectsUnknownVariant` — capdag.test.js:4200
 - `testRenderer_validateStrandStep_requiresBooleanIsSequence` — capdag.test.js:4217
 - `testUrn` — capdag.test.js:108

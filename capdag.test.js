@@ -5,12 +5,12 @@
 const {
   CapUrn, CapKind, CapEffect, CapUrnBuilder, CapMatcher, CapUrnError, ErrorCodes,
   MediaUrn, MediaUrnError, MediaUrnErrorCodes,
-  Cap, CapGroup, CapManifest, MediaSpec, MediaSpecError, MediaSpecErrorCodes,
+  Cap, CapGroup, CapManifest, MediaDef, MediaDefError, MediaDefErrorCodes,
   resolveMediaUrn, buildExtensionIndex, mediaUrnsForExtension, getExtensionMappings,
   CartridgeInfo, CartridgeCapSummary, CartridgeSuggestion, CartridgeRepoClient, CartridgeRepoServer,
   CapFabEdge, CapFabStats, CapFab,
   StdinSource, StdinSourceKind,
-  validateNoMediaSpecRedefinitionSync,
+  validateNoMediaDefRedefinitionSync,
   CapArgumentValue, CapArg, ArgSource, validateCapArgs, ValidationError,
   llmGenerateTextUrn, modelAvailabilityUrn, modelPathUrn,
   MachineSyntaxError, MachineSyntaxErrorCodes, MachineEdge, Machine, MachineBuilder, parseMachine, parseMachineWithAST,
@@ -318,7 +318,7 @@ function test939_capUrnCanonicalFormDropsWildcardInOut() {
 
   const identity = CapUrn.fromString('cap:effect=none');
   assertEqual(identity.toString(), 'cap:effect=none', 'true identity must preserve explicit effect=none');
-  assert(identity.toString() !== generic.toString(), 'cap: and cap:effect=none must not collapse');
+  assert(identity.toString() !== 'cap:', 'cap:effect=none must not collapse to the illegal bare top form');
 }
 
 // TEST017: Test tag matching: exact match, subset match, wildcard match, value mismatch
@@ -692,9 +692,9 @@ function test047_matchingSemanticsThumbnailVoidInput() {
 
 // TEST048: Matching semantics - wildcard direction matches anything
 function test048_matchingSemanticsWildcardDirection() {
-  const cap = CapUrn.fromString('cap:in=*;out=*;op');
+  const cap = CapUrn.fromString('cap:generate');
   const request = CapUrn.fromString(testUrn('generate;ext=pdf'));
-  assert(cap.accepts(request), 'Wildcard cap should accept any request');
+  assert(cap.accepts(request), 'Generic declared directions should accept a more specific matching request');
 }
 
 // TEST049: Non-overlapping tags — neither direction accepts
@@ -809,10 +809,10 @@ function test891_directionSemanticSpecificity() {
 
 // TEST053: N/A for JS (Rust-only validation infrastructure)
 
-// TEST054: XV5 - Test inline media spec redefinition of existing registry spec is detected and rejected
+// TEST054: XV5 - Test inline media def redefinition of existing registry spec is detected and rejected
 function test054_xv5InlineSpecRedefinitionDetected() {
   const registryLookup = (mediaUrn) => mediaUrn === MEDIA_STRING;
-  const mediaSpecs = [
+  const mediaDefs = [
     {
       urn: MEDIA_STRING,
       media_type: 'text/plain',
@@ -820,16 +820,16 @@ function test054_xv5InlineSpecRedefinitionDetected() {
       description: 'Trying to redefine string'
     }
   ];
-  const result = validateNoMediaSpecRedefinitionSync(mediaSpecs, registryLookup);
+  const result = validateNoMediaDefRedefinitionSync(mediaDefs, registryLookup);
   assert(!result.valid, 'Should fail when redefining registry spec');
   assert(result.error && result.error.includes('XV5'), 'Error should mention XV5');
   assert(result.redefines && result.redefines.includes(MEDIA_STRING), 'Should identify MEDIA_STRING as redefined');
 }
 
-// TEST055: XV5 - Test new inline media spec (not in registry) is allowed
+// TEST055: XV5 - Test new inline media def (not in registry) is allowed
 function test055_xv5NewInlineSpecAllowed() {
   const registryLookup = (mediaUrn) => mediaUrn === MEDIA_STRING;
-  const mediaSpecs = [
+  const mediaDefs = [
     {
       urn: 'media:my-unique-custom-type-xyz123',
       media_type: 'application/json',
@@ -837,16 +837,16 @@ function test055_xv5NewInlineSpecAllowed() {
       description: 'A custom output type'
     }
   ];
-  const result = validateNoMediaSpecRedefinitionSync(mediaSpecs, registryLookup);
+  const result = validateNoMediaDefRedefinitionSync(mediaDefs, registryLookup);
   assert(result.valid, 'New spec not in registry should pass validation');
 }
 
-// TEST056: XV5 - Test empty media_specs (no inline specs) passes XV5 validation
-function test056_xv5EmptyMediaSpecsAllowed() {
+// TEST056: XV5 - Test empty media_defs (no inline specs) passes XV5 validation
+function test056_xv5EmptyMediaDefsAllowed() {
   const registryLookup = (mediaUrn) => mediaUrn === MEDIA_STRING;
-  assert(validateNoMediaSpecRedefinitionSync({}, registryLookup).valid, 'Empty object should pass');
-  assert(validateNoMediaSpecRedefinitionSync(null, registryLookup).valid, 'Null should pass');
-  assert(validateNoMediaSpecRedefinitionSync(undefined, registryLookup).valid, 'Undefined should pass');
+  assert(validateNoMediaDefRedefinitionSync({}, registryLookup).valid, 'Empty object should pass');
+  assert(validateNoMediaDefRedefinitionSync(null, registryLookup).valid, 'Null should pass');
+  assert(validateNoMediaDefRedefinitionSync(undefined, registryLookup).valid, 'Undefined should pass');
 }
 
 // ============================================================================
@@ -1028,26 +1028,26 @@ function test078_debugMatchingBehavior() {
 }
 
 // ============================================================================
-// media_spec.rs: TEST088-TEST110
+// media_def.rs: TEST088-TEST110
 // ============================================================================
 
 // TEST088: N/A for JS (async registry, Rust-only)
 // TEST089: N/A for JS
 // TEST090: N/A for JS
 
-// TEST091: Test resolving custom media URN from local media_specs takes precedence over registry
-function test091_resolveCustomMediaSpec() {
-  const mediaSpecs = [
+// TEST091: Test resolving custom media URN from local media_defs takes precedence over registry
+function test091_resolveCustomMediaDef() {
+  const mediaDefs = [
     { urn: 'media:custom-json', media_type: 'application/json', title: 'Custom JSON', profile_uri: 'https://example.com/schema/custom' }
   ];
-  const spec = resolveMediaUrn('media:custom-json', mediaSpecs);
+  const spec = resolveMediaUrn('media:custom-json', mediaDefs);
   assertEqual(spec.contentType, 'application/json', 'Should resolve custom spec');
   assertEqual(spec.profile, 'https://example.com/schema/custom', 'Should have custom profile');
 }
 
-// TEST092: Test resolving custom record media spec with schema from local media_specs
+// TEST092: Test resolving custom record media def with schema from local media_defs
 function test092_resolveCustomWithSchema() {
-  const mediaSpecs = [
+  const mediaDefs = [
     {
       urn: 'media:rich-xml',
       media_type: 'application/xml',
@@ -1056,7 +1056,7 @@ function test092_resolveCustomWithSchema() {
       schema: { type: 'object' }
     }
   ];
-  const spec = resolveMediaUrn('media:rich-xml', mediaSpecs);
+  const spec = resolveMediaUrn('media:rich-xml', mediaDefs);
   assertEqual(spec.contentType, 'application/xml', 'Should resolve rich spec');
   assert(spec.schema !== null, 'Should have schema');
   assertEqual(spec.schema.type, 'object', 'Schema should have correct type');
@@ -1068,7 +1068,7 @@ function test093_resolveUnresolvableFailsHard() {
   try {
     resolveMediaUrn('media:nonexistent', []);
   } catch (e) {
-    if (e instanceof MediaSpecError && e.code === MediaSpecErrorCodes.UNRESOLVABLE_MEDIA_URN) {
+    if (e instanceof MediaDefError && e.code === MediaDefErrorCodes.UNRESOLVABLE_MEDIA_URN) {
       caught = true;
     }
   }
@@ -1081,45 +1081,45 @@ function test093_resolveUnresolvableFailsHard() {
 // TEST097: N/A for JS (Rust validation function)
 // TEST098: N/A for JS
 
-// TEST099: Test ResolvedMediaSpec is_binary returns true when textable tag is absent
+// TEST099: Test ResolvedMediaDef is_binary returns true when textable tag is absent
 function test099_resolvedIsBinary() {
-  const spec = new MediaSpec('application/octet-stream', null, null, 'Binary', null, MEDIA_IDENTITY);
+  const spec = new MediaDef('application/octet-stream', null, null, 'Binary', null, MEDIA_IDENTITY);
   assert(spec.isBinary(), 'Resolved binary spec should be binary');
 }
 
-// TEST100: Test ResolvedMediaSpec is_record returns true when record marker is present
+// TEST100: Test ResolvedMediaDef is_record returns true when record marker is present
 function test100_resolvedIsRecord() {
-  const spec = new MediaSpec('application/json', null, null, 'Object', null, MEDIA_OBJECT);
+  const spec = new MediaDef('application/json', null, null, 'Object', null, MEDIA_OBJECT);
   assert(spec.isRecord(), 'Resolved object spec should be record');
 }
 
-// TEST101: Test ResolvedMediaSpec is_scalar returns true when list marker is absent
+// TEST101: Test ResolvedMediaDef is_scalar returns true when list marker is absent
 function test101_resolvedIsScalar() {
-  const spec = new MediaSpec('text/plain', null, null, 'String', null, MEDIA_STRING);
+  const spec = new MediaDef('text/plain', null, null, 'String', null, MEDIA_STRING);
   assert(spec.isScalar(), 'Resolved string spec should be scalar');
 }
 
-// TEST102: Test ResolvedMediaSpec is_list returns true when list marker is present
+// TEST102: Test ResolvedMediaDef is_list returns true when list marker is present
 function test102_resolvedIsList() {
-  const spec = new MediaSpec('text/plain', null, null, 'String List', null, MEDIA_STRING_LIST);
+  const spec = new MediaDef('text/plain', null, null, 'String List', null, MEDIA_STRING_LIST);
   assert(spec.isList(), 'Resolved string_list spec should be list');
 }
 
-// TEST103: Test ResolvedMediaSpec is_json returns true when json tag is present
+// TEST103: Test ResolvedMediaDef is_json returns true when json tag is present
 function test103_resolvedIsJson() {
-  const spec = new MediaSpec('application/json', null, null, 'JSON', null, MEDIA_JSON);
+  const spec = new MediaDef('application/json', null, null, 'JSON', null, MEDIA_JSON);
   assert(spec.isJSON(), 'Resolved json spec should be JSON');
 }
 
-// TEST104: Test ResolvedMediaSpec is_text returns true when textable tag is present
+// TEST104: Test ResolvedMediaDef is_text returns true when textable tag is present
 function test104_resolvedIsText() {
-  const spec = new MediaSpec('text/plain', null, null, 'String', null, MEDIA_STRING);
+  const spec = new MediaDef('text/plain', null, null, 'String', null, MEDIA_STRING);
   assert(spec.isText(), 'Resolved string spec should be text');
 }
 
-// TEST105: Test metadata propagates from media spec def to resolved media spec
+// TEST105: Test metadata propagates from media def def to resolved media def
 function test105_metadataPropagation() {
-  const mediaSpecs = [
+  const mediaDefs = [
     {
       urn: 'media:custom-setting',
       media_type: 'text/plain',
@@ -1133,16 +1133,16 @@ function test105_metadataPropagation() {
       }
     }
   ];
-  const resolved = resolveMediaUrn('media:custom-setting', mediaSpecs);
+  const resolved = resolveMediaUrn('media:custom-setting', mediaDefs);
   assert(resolved.metadata !== null, 'Should have metadata');
   assertEqual(resolved.metadata.category_key, 'interface', 'Should propagate category_key');
   assertEqual(resolved.metadata.ui_type, 'SETTING_UI_TYPE_CHECKBOX', 'Should propagate ui_type');
   assertEqual(resolved.metadata.display_index, 5, 'Should propagate display_index');
 }
 
-// TEST106: Test metadata and validation can coexist in media spec definition
+// TEST106: Test metadata and validation can coexist in media definition
 function test106_metadataWithValidation() {
-  const mediaSpecs = [
+  const mediaDefs = [
     {
       urn: 'media:bounded-number;numeric',
       media_type: 'text/plain',
@@ -1151,7 +1151,7 @@ function test106_metadataWithValidation() {
       metadata: { category_key: 'inference', ui_type: 'SETTING_UI_TYPE_SLIDER' }
     }
   ];
-  const resolved = resolveMediaUrn('media:bounded-number;numeric', mediaSpecs);
+  const resolved = resolveMediaUrn('media:bounded-number;numeric', mediaDefs);
   assert(resolved.validation !== null, 'Should have validation');
   assertEqual(resolved.validation.min, 0, 'Should have min');
   assertEqual(resolved.validation.max, 100, 'Should have max');
@@ -1159,9 +1159,9 @@ function test106_metadataWithValidation() {
   assertEqual(resolved.metadata.category_key, 'inference', 'Should have category_key');
 }
 
-// TEST107: Test extensions field propagates from media spec def to resolved
+// TEST107: Test extensions field propagates from media def def to resolved
 function test107_extensionsPropagation() {
-  const mediaSpecs = [
+  const mediaDefs = [
     {
       urn: 'media:pdf',
       media_type: 'application/pdf',
@@ -1169,7 +1169,7 @@ function test107_extensionsPropagation() {
       extensions: ['pdf']
     }
   ];
-  const resolved = resolveMediaUrn('media:pdf', mediaSpecs);
+  const resolved = resolveMediaUrn('media:pdf', mediaDefs);
   assert(Array.isArray(resolved.extensions), 'Extensions should be an array');
   assertEqual(resolved.extensions.length, 1, 'Should have one extension');
   assertEqual(resolved.extensions[0], 'pdf', 'Should have pdf extension');
@@ -1177,15 +1177,15 @@ function test107_extensionsPropagation() {
 
 // TEST108: Test creating new cap with URN, title, and command verifies correct initialization
 function test108_extensionsSerialization() {
-  // Test that MediaSpec can hold extensions correctly
-  const spec = new MediaSpec('application/pdf', null, null, 'PDF', null, 'media:pdf', null, null, ['pdf']);
+  // Test that MediaDef can hold extensions correctly
+  const spec = new MediaDef('application/pdf', null, null, 'PDF', null, 'media:pdf', null, null, ['pdf']);
   assert(Array.isArray(spec.extensions), 'Extensions should be array');
   assertEqual(spec.extensions[0], 'pdf', 'Should have pdf extension');
 }
 
 // TEST109: Test creating cap with metadata initializes and retrieves metadata correctly
 function test109_extensionsWithMetadataAndValidation() {
-  const mediaSpecs = [
+  const mediaDefs = [
     {
       urn: 'media:custom-output',
       media_type: 'application/json',
@@ -1195,7 +1195,7 @@ function test109_extensionsWithMetadataAndValidation() {
       extensions: ['json']
     }
   ];
-  const resolved = resolveMediaUrn('media:custom-output', mediaSpecs);
+  const resolved = resolveMediaUrn('media:custom-output', mediaDefs);
   assert(resolved.validation !== null, 'Should have validation');
   assert(resolved.metadata !== null, 'Should have metadata');
   assert(Array.isArray(resolved.extensions), 'Should have extensions');
@@ -1204,7 +1204,7 @@ function test109_extensionsWithMetadataAndValidation() {
 
 // TEST110: Test cap matching with subset semantics for request fulfillment
 function test110_multipleExtensions() {
-  const mediaSpecs = [
+  const mediaDefs = [
     {
       urn: 'media:image;jpeg',
       media_type: 'image/jpeg',
@@ -1212,7 +1212,7 @@ function test110_multipleExtensions() {
       extensions: ['jpg', 'jpeg']
     }
   ];
-  const resolved = resolveMediaUrn('media:image;jpeg', mediaSpecs);
+  const resolved = resolveMediaUrn('media:image;jpeg', mediaDefs);
   assertEqual(resolved.extensions.length, 2, 'Should have two extensions');
   assertEqual(resolved.extensions[0], 'jpg', 'First extension should be jpg');
   assertEqual(resolved.extensions[1], 'jpeg', 'Second extension should be jpeg');
@@ -1585,7 +1585,7 @@ function test306_availabilityAndPathOutputDistinct() {
   assert(!matchResult, 'availability must not conform to path');
 }
 
-// TEST307: Test model_availability_urn builds valid cap URN with correct op and media specs
+// TEST307: Test model_availability_urn builds valid cap URN with correct op and media defs
 function test307_modelAvailabilityUrn() {
   const urn = modelAvailabilityUrn();
   assert(urn.hasMarkerTag('model-availability'), 'Must have model-availability marker');
@@ -1597,7 +1597,7 @@ function test307_modelAvailabilityUrn() {
   assert(outSpec.conformsTo(expectedOut), 'output must conform to MEDIA_AVAILABILITY_OUTPUT');
 }
 
-// TEST308: Test model_path_urn builds valid cap URN with correct op and media specs
+// TEST308: Test model_path_urn builds valid cap URN with correct op and media defs
 function test308_modelPathUrn() {
   const urn = modelPathUrn();
   assert(urn.hasMarkerTag('model-path'), 'Must have model-path marker');
@@ -1661,12 +1661,12 @@ function test312_allUrnBuildersProduceValidUrns() {
 // but are important for capdag-js correctness.
 
 function testJS_buildExtensionIndex() {
-  const mediaSpecs = [
+  const mediaDefs = [
     { urn: 'media:pdf', media_type: 'application/pdf', extensions: ['pdf'] },
     { urn: 'media:image;jpeg', media_type: 'image/jpeg', extensions: ['jpg', 'jpeg'] },
     { urn: 'media:json;textable', media_type: 'application/json', extensions: ['json'] }
   ];
-  const index = buildExtensionIndex(mediaSpecs);
+  const index = buildExtensionIndex(mediaDefs);
   assert(index instanceof Map, 'Should return a Map');
   assertEqual(index.size, 4, 'Should have 4 extensions');
   assert(index.has('pdf'), 'Should have pdf');
@@ -1677,51 +1677,51 @@ function testJS_buildExtensionIndex() {
 }
 
 function testJS_mediaUrnsForExtension() {
-  const mediaSpecs = [
+  const mediaDefs = [
     { urn: 'media:pdf', media_type: 'application/pdf', extensions: ['pdf'] },
     { urn: 'media:json;textable;record', media_type: 'application/json', extensions: ['json'] },
     { urn: 'media:json;textable;list', media_type: 'application/json', extensions: ['json'] }
   ];
 
-  const pdfUrns = mediaUrnsForExtension('pdf', mediaSpecs);
+  const pdfUrns = mediaUrnsForExtension('pdf', mediaDefs);
   assertEqual(pdfUrns.length, 1, 'Should find 1 URN for pdf');
 
   // Case insensitivity
-  const pdfUrnsUpper = mediaUrnsForExtension('PDF', mediaSpecs);
+  const pdfUrnsUpper = mediaUrnsForExtension('PDF', mediaDefs);
   assertEqual(pdfUrnsUpper.length, 1, 'Should find URN with uppercase extension');
 
   // Multiple URNs for same extension
-  const jsonUrns = mediaUrnsForExtension('json', mediaSpecs);
+  const jsonUrns = mediaUrnsForExtension('json', mediaDefs);
   assertEqual(jsonUrns.length, 2, 'Should find 2 URNs for json');
 
   // Unknown extension throws
   let thrownError = null;
   try {
-    mediaUrnsForExtension('unknown', mediaSpecs);
+    mediaUrnsForExtension('unknown', mediaDefs);
   } catch (e) {
     thrownError = e;
   }
-  assert(thrownError instanceof MediaSpecError, 'Should throw MediaSpecError for unknown ext');
+  assert(thrownError instanceof MediaDefError, 'Should throw MediaDefError for unknown ext');
 }
 
 function testJS_getExtensionMappings() {
-  const mediaSpecs = [
+  const mediaDefs = [
     { urn: 'media:pdf', media_type: 'application/pdf', extensions: ['pdf'] },
     { urn: 'media:image;jpeg', media_type: 'image/jpeg', extensions: ['jpg', 'jpeg'] }
   ];
-  const mappings = getExtensionMappings(mediaSpecs);
+  const mappings = getExtensionMappings(mediaDefs);
   assert(Array.isArray(mappings), 'Should return an array');
   assertEqual(mappings.length, 3, 'Should have 3 mappings');
 }
 
 function testJS_resolveMediaUrnFromSpecs() {
-  const mediaSpecs = [
+  const mediaDefs = [
     { urn: MEDIA_STRING, media_type: 'text/plain', title: 'String', profile_uri: 'https://capdag.com/schema/str' },
     { urn: 'media:custom', media_type: 'application/json', title: 'Custom Output', schema: { type: 'object' } }
   ];
-  const strSpec = resolveMediaUrn(MEDIA_STRING, mediaSpecs);
+  const strSpec = resolveMediaUrn(MEDIA_STRING, mediaDefs);
   assertEqual(strSpec.contentType, 'text/plain', 'Should resolve string spec');
-  const outputSpec = resolveMediaUrn('media:custom', mediaSpecs);
+  const outputSpec = resolveMediaUrn('media:custom', mediaDefs);
   assertEqual(outputSpec.contentType, 'application/json', 'Should resolve custom spec');
   assert(outputSpec.schema !== null, 'Should have schema');
 }
@@ -1737,7 +1737,7 @@ function testJS_capJSONSerialization() {
 
   const json = cap.toJSON();
   assertEqual(typeof json.urn, 'string', 'URN should be string');
-  assert(json.media_specs === undefined, 'Cap JSON must not contain media_specs (registry-resolved)');
+  assert(json.media_defs === undefined, 'Cap JSON must not contain media_defs (registry-resolved)');
 
   const restored = Cap.fromJSON(json);
   assertEqual(restored.urn.getInSpec(), MEDIA_VOID, 'Should restore inSpec');
@@ -1790,13 +1790,13 @@ function testJS_capDocumentationOmittedWhenNull() {
   assertEqual(cap.getDocumentation(), null, 'Empty string must collapse to null');
 }
 
-// Documentation propagates from a mediaSpecs definition through
-// resolveMediaUrn into the resolved MediaSpec. Mirrors TEST924 on the Rust
+// Documentation propagates from a mediaDefs definition through
+// resolveMediaUrn into the resolved MediaDef. Mirrors TEST924 on the Rust
 // side. This is the path every UI consumer uses, so a break here makes the
 // new field invisible everywhere downstream.
-function testJS_mediaSpecDocumentationPropagatesThroughResolve() {
+function testJS_mediaDefDocumentationPropagatesThroughResolve() {
   const body = '## Markdown body\n\nWith `code` and a [link](https://example.com).';
-  const mediaSpecs = [
+  const mediaDefs = [
     {
       urn: 'media:doc-test;textable',
       media_type: 'text/plain',
@@ -1806,8 +1806,8 @@ function testJS_mediaSpecDocumentationPropagatesThroughResolve() {
     }
   ];
 
-  const resolved = resolveMediaUrn('media:doc-test;textable', mediaSpecs);
-  assertEqual(resolved.documentation, body, 'documentation must propagate into MediaSpec');
+  const resolved = resolveMediaUrn('media:doc-test;textable', mediaDefs);
+  assertEqual(resolved.documentation, body, 'documentation must propagate into MediaDef');
   // The short description must remain distinct from the long markdown
   // body — they are different fields with different semantics.
   assertEqual(resolved.description, 'short desc', 'description must remain distinct from documentation');
@@ -1837,14 +1837,14 @@ function testJS_stdinSourceNullData() {
   assertEqual(source.data, null, 'Data should be null');
 }
 
-function testJS_mediaSpecConstruction() {
-  const spec1 = new MediaSpec('text/plain', 'https://capdag.com/schema/str', null, 'String', null, 'media:string');
+function testJS_mediaDefConstruction() {
+  const spec1 = new MediaDef('text/plain', 'https://capdag.com/schema/str', null, 'String', null, 'media:string');
   assertEqual(spec1.contentType, 'text/plain', 'Should have content type');
   assertEqual(spec1.profile, 'https://capdag.com/schema/str', 'Should have profile');
   assertEqual(spec1.title, 'String', 'Should have title');
   assertEqual(spec1.mediaUrn, 'media:string', 'Should have mediaUrn');
 
-  const spec2 = new MediaSpec('application/octet-stream', null, null, 'Binary', null, 'media:binary');
+  const spec2 = new MediaDef('application/octet-stream', null, null, 'Binary', null, 'media:binary');
   assertEqual(spec2.profile, null, 'Should have null profile');
 }
 
@@ -2562,9 +2562,9 @@ function test1303_withoutTag() {
   const removed2 = cap.withoutTag('EXT');
   assertEqual(removed2.getTag('ext'), undefined, 'withoutTag should be case-insensitive');
 
-  assertThrows(() => cap.withoutTag('in'), 'withoutTag must reject in');
-  assertThrows(() => cap.withoutTag('out'), 'withoutTag must reject out');
-  assertThrows(() => cap.withoutTag('effect'), 'withoutTag must reject effect');
+  assertThrows(() => cap.withoutTag('in'), ErrorCodes.INVALID_TAG_FORMAT, 'withoutTag must reject in');
+  assertThrows(() => cap.withoutTag('out'), ErrorCodes.INVALID_TAG_FORMAT, 'withoutTag must reject out');
+  assertThrows(() => cap.withoutTag('effect'), ErrorCodes.INVALID_TAG_FORMAT, 'withoutTag must reject effect');
 
   // Removing non-existent tag is no-op
   const same3 = cap.withoutTag('nonexistent');
@@ -2587,11 +2587,12 @@ function test1304_withInOutSpec() {
   // Chain both
   const changedBoth = cap.withInSpec('media:pdf').withOutSpec(MEDIA_TXT);
   assertEqual(changedBoth.getInSpec(), 'media:pdf', 'Chain should set inSpec');
-  assertEqual(changedBoth.getOutSpec(), MEDIA_TXT, 'Chain should set outSpec');
+  assertEqual(changedBoth.getOutSpec(), 'media:textable;txt', 'Chain should set outSpec');
 
   const identity = CapUrn.fromString('cap:effect=none');
   assertThrows(
     () => identity.withOutSpec('media:pdf'),
+    ErrorCodes.ILLEGAL_DECLARATION,
     'withOutSpec must revalidate admissibility'
   );
 }
@@ -2646,23 +2647,26 @@ function test1306_areCompatible() {
 // TEST1307: with_tag rejects structural keys
 function test1307_withTagRejectsStructuralKeys() {
   const cap = CapUrn.fromString('cap:in="media:void";test;out="media:void"');
-  assertThrows(() => cap.withTag('in', 'media:'), 'withTag must reject in');
-  assertThrows(() => cap.withTag('out', 'media:'), 'withTag must reject out');
-  assertThrows(() => cap.withTag('effect', 'none'), 'withTag must reject effect');
+  assertThrows(() => cap.withTag('in', 'media:'), ErrorCodes.INVALID_TAG_FORMAT, 'withTag must reject in');
+  assertThrows(() => cap.withTag('out', 'media:'), ErrorCodes.INVALID_TAG_FORMAT, 'withTag must reject out');
+  assertThrows(() => cap.withTag('effect', 'none'), ErrorCodes.INVALID_TAG_FORMAT, 'withTag must reject effect');
 }
 
 // TEST1308: builder rejects structural keys on tag/marker
 function test1308_builderRejectsStructuralKeys() {
   assertThrows(
     () => new CapUrnBuilder().tag('in', 'media:void'),
+    ErrorCodes.INVALID_TAG_FORMAT,
     'builder.tag must reject structural in'
   );
   assertThrows(
     () => new CapUrnBuilder().marker('effect'),
+    ErrorCodes.INVALID_TAG_FORMAT,
     'builder.marker must reject structural effect'
   );
   assertThrows(
     () => new CapUrnBuilder().inSpec('media:void').outSpec('media:record').tag('123', 'value').build(),
+    ErrorCodes.NUMERIC_KEY,
     'builder.build must reject invalid non-structural tags'
   );
 }
@@ -3910,7 +3914,7 @@ function testMachine_capRegistryEntry_construction() {
     cap_description: 'Extracts text from PDF',
     args: [{ media_urn: 'media:pdf', required: true }],
     output: { media_urn: 'media:txt;textable', output_description: 'Extracted text' },
-    media_specs: [],
+    media_defs: [],
     urn_tags: { op: 'extract' },
     in_spec: 'media:pdf',
     out_spec: 'media:txt;textable',
@@ -4181,19 +4185,19 @@ function makeCapStep(capUrn, title, fromSpec, toSpec, inSeq, outSeq) {
   };
 }
 
-function makeForEachStep(mediaSpec) {
+function makeForEachStep(mediaDef) {
   return {
-    step_type: { ForEach: { media_spec: mediaSpec } },
-    from_spec: mediaSpec,
-    to_spec: mediaSpec,
+    step_type: { ForEach: { media_def: mediaDef } },
+    from_spec: mediaDef,
+    to_spec: mediaDef,
   };
 }
 
-function makeCollectStep(mediaSpec) {
+function makeCollectStep(mediaDef) {
   return {
-    step_type: { Collect: { media_spec: mediaSpec } },
-    from_spec: mediaSpec,
-    to_spec: mediaSpec,
+    step_type: { Collect: { media_def: mediaDef } },
+    from_spec: mediaDef,
+    to_spec: mediaDef,
   };
 }
 
@@ -4293,8 +4297,8 @@ function testRenderer_buildStrandGraphData_singleCapPlain() {
   // (two edges, three nodes). No cardinality marker in the cap label
   // because input_is_sequence == output_is_sequence == false.
   const payload = withMediaDisplayNames({
-    source_spec: 'media:a',
-    target_spec: 'media:b',
+    source_media_urn: 'media:a',
+    target_media_urn: 'media:b',
     steps: [
       makeCapStep('cap:in="media:a";x;out="media:b"', 'x', 'media:a', 'media:b', false, false),
     ],
@@ -4318,8 +4322,8 @@ function testRenderer_buildStrandGraphData_sequenceShowsCardinality() {
   // A cap with input_is_sequence=true MUST emit "(n→1)" on its edge
   // label.
   const payload = withMediaDisplayNames({
-    source_spec: 'media:a;list',
-    target_spec: 'media:b',
+    source_media_urn: 'media:a;list',
+    target_media_urn: 'media:b',
     steps: [
       makeCapStep('cap:in="media:a;list";x;out="media:b"', 'x', 'media:a;list', 'media:b', true, false),
     ],
@@ -4348,8 +4352,8 @@ function testRenderer_buildStrandGraphData_foreachCollectSpan() {
   // labels on cap edges — they're distinct processing units in the
   // plan. This mirrors capdag's plan_builder.rs exactly.
   const payload = withMediaDisplayNames({
-    source_spec: 'media:pdf;list',
-    target_spec: 'media:txt;list',
+    source_media_urn: 'media:pdf;list',
+    target_media_urn: 'media:txt;list',
     steps: [
       makeForEachStep('media:pdf;list'),
       makeCapStep('cap:in="media:pdf";extract;out="media:txt"', 'extract', 'media:pdf', 'media:txt', false, false),
@@ -4390,8 +4394,8 @@ function testRenderer_buildStrandGraphData_standaloneCollect() {
   // builder creates a Collect node consuming prev directly — plain
   // direct edge, no iteration/collection semantics.
   const payload = withMediaDisplayNames({
-    source_spec: 'media:a',
-    target_spec: 'media:b;list',
+    source_media_urn: 'media:a',
+    target_media_urn: 'media:b;list',
     steps: [
       makeCapStep('cap:in="media:a";x;out="media:b"', 'x', 'media:a', 'media:b', false, false),
       makeCollectStep('media:b'),
@@ -4418,8 +4422,8 @@ function testRenderer_buildStrandGraphData_unclosedForEachBody() {
   // connecting Cap_a to Cap_b via iteration, with prev becoming the
   // body exit (Cap_b).
   const payload = withMediaDisplayNames({
-    source_spec: 'media:a',
-    target_spec: 'media:c',
+    source_media_urn: 'media:a',
+    target_media_urn: 'media:c',
     steps: [
       makeCapStep('cap:in="media:a";a;out="media:b"', 'a', 'media:a', 'media:b', false, false),
       makeForEachStep('media:b'),
@@ -4455,8 +4459,8 @@ function testRenderer_buildStrandGraphData_nestedForEachThrows() {
   // must throw the same error to surface the issue rather than
   // render a malformed graph.
   const payload = withMediaDisplayNames({
-    source_spec: 'media:a;list',
-    target_spec: 'media:a',
+    source_media_urn: 'media:a;list',
+    target_media_urn: 'media:a',
     steps: [
       makeForEachStep('media:a;list'),
       makeForEachStep('media:a'),
@@ -4492,8 +4496,8 @@ function testRenderer_collapseStrand_singleCapBodyKeepsCapOwnLabel() {
   // with the entry edge labeled "extract" and an unlabeled
   // connector bridge to the output.
   const payload = withMediaDisplayNames({
-    source_spec: 'media:pdf;list',
-    target_spec: 'media:txt;list',
+    source_media_urn: 'media:pdf;list',
+    target_media_urn: 'media:txt;list',
     steps: [
       makeForEachStep('media:pdf;list'),
       makeCapStep('cap:in="media:pdf";extract;out="media:txt"', 'extract', 'media:pdf', 'media:txt', false, false),
@@ -4532,7 +4536,7 @@ function testRenderer_collapseStrand_singleCapBodyKeepsCapOwnLabel() {
 function testRenderer_collapseStrand_unclosedForEachBodyCollapses() {
   // [Cap_a(1→1), ForEach, Cap_b(1→1)] with no Collect,
   // source=media:a, target=media:c. Cap_b's to_spec is media:c
-  // which is equivalent to target_spec, so the output node is
+  // which is equivalent to target_media_urn, so the output node is
   // merged into step_2.
   //
   // Since both caps are 1→1, neither carries a cardinality
@@ -4541,8 +4545,8 @@ function testRenderer_collapseStrand_unclosedForEachBodyCollapses() {
   //
   // Final: 3 nodes (input_slot, step_0, step_2), 2 edges.
   const payload = withMediaDisplayNames({
-    source_spec: 'media:a',
-    target_spec: 'media:c',
+    source_media_urn: 'media:a',
+    target_media_urn: 'media:c',
     steps: [
       makeCapStep('cap:in="media:a";a;out="media:b"', 'a', 'media:a', 'media:b', false, false),
       makeForEachStep('media:b'),
@@ -4598,8 +4602,8 @@ function testRenderer_collapseStrand_standaloneCollectCollapses() {
   //
   // Final: 3 nodes (input_slot, step_0, output), 2 edges.
   const payload = withMediaDisplayNames({
-    source_spec: 'media:a',
-    target_spec: 'media:b;list',
+    source_media_urn: 'media:a',
+    target_media_urn: 'media:b;list',
     steps: [
       makeCapStep('cap:in="media:a";x;out="media:b"', 'x', 'media:a', 'media:b', false, false),
       makeCollectStep('media:b'),
@@ -4646,8 +4650,8 @@ function testRenderer_collapseStrand_sequenceProducingCapBeforeForeach() {
   //   No separate output node because step_2's to_spec equals the
   //       strand target.
   const payload = withMediaDisplayNames({
-    source_spec: 'media:pdf',
-    target_spec: 'media:decision',
+    source_media_urn: 'media:pdf',
+    target_media_urn: 'media:decision',
     steps: [
       makeCapStep('cap:in="media:pdf";disbind;out="media:page"', 'Disbind', 'media:pdf', 'media:page', false, true),
       makeForEachStep('media:page'),
@@ -4694,15 +4698,15 @@ function testRenderer_collapseStrand_sequenceProducingCapBeforeForeach() {
 
 function testRenderer_collapseStrand_plainCapMergesTrailingOutput() {
   // A strand with a single plain 1→1 cap whose to_spec equals
-  // target_spec. The plan-builder topology produces:
+  // target_media_urn. The plan-builder topology produces:
   //   input_slot → step_0 (cap) → output
   // The collapse pass merges the trailing output edge because
   // step_0 and output represent the same URN (media:b).
   //
   // Final: 2 nodes (input_slot, step_0), 1 edge.
   const payload = withMediaDisplayNames({
-    source_spec: 'media:a',
-    target_spec: 'media:b',
+    source_media_urn: 'media:a',
+    target_media_urn: 'media:b',
     steps: [
       makeCapStep('cap:in="media:a";x;out="media:b"', 'x', 'media:a', 'media:b', false, false),
     ],
@@ -4730,11 +4734,11 @@ function testRenderer_collapseStrand_plainCapMergesTrailingOutput() {
 
 function testRenderer_collapseStrand_plainCapDistinctTargetNoMerge() {
   // A strand with a single plain cap whose to_spec is NOT
-  // equivalent to target_spec. The output node must be retained
+  // equivalent to target_media_urn. The output node must be retained
   // and the trailing connector edge preserved.
   const payload = withMediaDisplayNames({
-    source_spec: 'media:a',
-    target_spec: 'media:b;list',
+    source_media_urn: 'media:a',
+    target_media_urn: 'media:b;list',
     steps: [
       makeCapStep('cap:in="media:a";x;out="media:b"', 'x', 'media:a', 'media:b', false, false),
     ],
@@ -4754,15 +4758,15 @@ function testRenderer_collapseStrand_plainCapDistinctTargetNoMerge() {
     'step_0 retained');
 }
 
-function testRenderer_validateStrandPayload_missingSourceSpec() {
+function testRenderer_validateStrandPayload_missingSourceMediaUrn() {
   let threw = false;
   try {
-    rendererValidateStrandPayload({ target_spec: 'media:b', steps: [] });
+    rendererValidateStrandPayload({ target_media_urn: 'media:b', steps: [] });
   } catch (e) {
     threw = true;
-    assert(e.message.includes('source_spec'), 'error must name source_spec');
+    assert(e.message.includes('source_media_urn'), 'error must name source_media_urn');
   }
-  assert(threw, 'missing source_spec must throw');
+  assert(threw, 'missing source_media_urn must throw');
 }
 
 // ---------------- run builder ----------------
@@ -4789,8 +4793,8 @@ function testRenderer_buildRunGraphData_pagesSuccessesAndFailures() {
   // Show-more nodes: one for 3 hidden successes, one for 2 hidden
   // failures.
   const strand = {
-    source_spec: 'media:pdf;list',
-    target_spec: 'media:txt',
+    source_media_urn: 'media:pdf;list',
+    target_media_urn: 'media:txt',
     steps: [
       makeForEachStep('media:pdf;list'),
       makeCapStep('cap:in="media:pdf";a;out="media:image;png"', 'a', 'media:pdf', 'media:image;png', false, false),
@@ -4855,8 +4859,8 @@ function testRenderer_buildRunGraphData_failureWithoutFailedCapRendersFullTrace(
   // Strand [ForEach, Cap, Collect] → body has 1 cap. Each body
   // replica emits 1 entry node + 1 body cap node = 2 nodes.
   const strand = {
-    source_spec: 'media:pdf;list',
-    target_spec: 'media:txt',
+    source_media_urn: 'media:pdf;list',
+    target_media_urn: 'media:txt',
     steps: [
       makeForEachStep('media:pdf;list'),
       makeCapStep('cap:in="media:pdf";a;out="media:txt"', 'a', 'media:pdf', 'media:txt', false, false),
@@ -4891,8 +4895,8 @@ function testRenderer_buildRunGraphData_usesCapUrnIsEquivalentForFailedCap() {
   // failed_cap and the step's cap_urn differ only in tag order — they
   // should still match, proving URNs are not treated as strings.
   const strand = {
-    source_spec: 'media:a',
-    target_spec: 'media:c',
+    source_media_urn: 'media:a',
+    target_media_urn: 'media:c',
     steps: [
       makeForEachStep('media:a;list'),
       // Canonical form places tags alphabetically: op after in/out.
@@ -4952,13 +4956,13 @@ function testRenderer_buildRunGraphData_backboneHasNoForeachNode() {
   // concepts don't leak into the view as boxed nodes.
   //
   // User scenario: [Disbind (1→n), ForEach, make_decision] where
-  // target_spec equals the last cap's to_spec, so the backbone
+  // target_media_urn equals the last cap's to_spec, so the backbone
   // collapses to 3 nodes: input_slot, step_0 (Text Page),
   // step_2 (Decision, merged target). No separate `for each` or
   // `collect` boxes.
   const strand = {
-    source_spec: 'media:pdf',
-    target_spec: 'media:decision',
+    source_media_urn: 'media:pdf',
+    target_media_urn: 'media:decision',
     steps: [
       makeCapStep('cap:in="media:pdf";disbind;out="media:page"', 'Disbind', 'media:pdf', 'media:page', false, true),
       makeForEachStep('media:page'),
@@ -4989,7 +4993,7 @@ function testRenderer_buildRunGraphData_backboneHasNoForeachNode() {
   // that runs from the pre-foreach node to the body cap. It must
   // survive collapse so the target stays reachable even with zero
   // successful bodies.
-  const backboneCapEdges = built.strandBuilt.edges.filter(e => e.edgeClass === 'strand-cap-edge');
+  const backboneCapEdges = built.strandBuilt.edges.filter(e => e.edgeClass.indexOf('strand-cap-edge') >= 0);
   assert(backboneCapEdges.some(e => e.source === 'step_0' && e.target === 'step_2'),
     'foreach-entry backbone edge step_0 → step_2 must be present for fallback connectivity');
 
@@ -5005,8 +5009,8 @@ function testRenderer_buildRunGraphData_allFailedDropsTargetPlaceholder() {
   // doesn't see a stale "Decision" placeholder alongside their
   // failed replicas.
   const strand = {
-    source_spec: 'media:pdf',
-    target_spec: 'media:decision',
+    source_media_urn: 'media:pdf',
+    target_media_urn: 'media:decision',
     steps: [
       makeCapStep('cap:in="media:pdf";disbind;out="media:page"', 'Disbind', 'media:pdf', 'media:page', false, true),
       makeForEachStep('media:page'),
@@ -5075,8 +5079,8 @@ function testRenderer_buildRunGraphData_unclosedForeachSuccessNoMerge() {
   //                                    → body_n_0 (per-body Decision)
   //   (no merge edge back into the backbone)
   const strand = {
-    source_spec: 'media:pdf',
-    target_spec: 'media:decision',
+    source_media_urn: 'media:pdf',
+    target_media_urn: 'media:decision',
     steps: [
       makeCapStep('cap:in="media:pdf";disbind;out="media:page"', 'Disbind', 'media:pdf', 'media:page', false, true),
       makeForEachStep('media:page'),
@@ -5134,8 +5138,8 @@ function testRenderer_buildRunGraphData_closedForeachSuccessMergesAtCollectTarge
   // Actually simpler: [ForEach, Cap_a, Collect] with source=list
   // and target=list.
   const strand = {
-    source_spec: 'media:pdf;list',
-    target_spec: 'media:txt;list',
+    source_media_urn: 'media:pdf;list',
+    target_media_urn: 'media:txt;list',
     steps: [
       makeForEachStep('media:pdf;list'),
       makeCapStep('cap:in="media:pdf";extract;out="media:txt"', 'extract', 'media:pdf', 'media:txt', false, false),
@@ -5859,8 +5863,8 @@ function test1842_truthTableFullCrossProduct() {
     for (let j = 0; j < forms.length; j++) {
       const instForm = forms[i];
       const pattForm = forms[j];
-      const instStr = instForm === '' ? 'cap:' : 'cap:' + instForm;
-      const pattStr = pattForm === '' ? 'cap:' : 'cap:' + pattForm;
+      const instStr = instForm === '' ? 'cap:base' : 'cap:base;' + instForm;
+      const pattStr = pattForm === '' ? 'cap:base' : 'cap:base;' + pattForm;
       const inst = CapUrn.fromString(instStr);
       const patt = CapUrn.fromString(pattStr);
       const actual = patt.accepts(inst);
@@ -5981,7 +5985,7 @@ async function runTests() {
   console.log('  SKIP TEST053: N/A for JS (Rust-only validation infrastructure)');
   runTest('TEST054: xv5_inline_spec_redefinition_detected', test054_xv5InlineSpecRedefinitionDetected);
   runTest('TEST055: xv5_new_inline_spec_allowed', test055_xv5NewInlineSpecAllowed);
-  runTest('TEST056: xv5_empty_media_specs_allowed', test056_xv5EmptyMediaSpecsAllowed);
+  runTest('TEST056: xv5_empty_media_defs_allowed', test056_xv5EmptyMediaDefsAllowed);
 
   // media_urn.rs: TEST060-TEST078
   console.log('\n--- media_urn.rs ---');
@@ -6004,10 +6008,10 @@ async function runTests() {
   runTest('TEST077: serde_roundtrip (JSON.stringify)', test077_serdeRoundtrip);
   runTest('TEST078: debug_matching_behavior', test078_debugMatchingBehavior);
 
-  // media_spec.rs: TEST088-TEST110
-  console.log('\n--- media_spec.rs ---');
+  // media_def.rs: TEST088-TEST110
+  console.log('\n--- media_def.rs ---');
   console.log('  SKIP TEST088-090: N/A for JS (async registry, Rust-only)');
-  runTest('TEST091: resolve_custom_media_spec', test091_resolveCustomMediaSpec);
+  runTest('TEST091: resolve_custom_media_def', test091_resolveCustomMediaDef);
   runTest('TEST092: resolve_custom_with_schema', test092_resolveCustomWithSchema);
   runTest('TEST093: resolve_unresolvable_fails_hard', test093_resolveUnresolvableFailsHard);
   console.log('  SKIP TEST094: N/A for JS (no registry concept)');
@@ -6076,10 +6080,10 @@ async function runTests() {
   runTest('JS: cap_json_serialization', testJS_capJSONSerialization);
   runTest('JS: cap_documentation_round_trip', testJS_capDocumentationRoundTrip);
   runTest('JS: cap_documentation_omitted_when_null', testJS_capDocumentationOmittedWhenNull);
-  runTest('JS: media_spec_documentation_propagates_through_resolve', testJS_mediaSpecDocumentationPropagatesThroughResolve);
+  runTest('JS: media_def_documentation_propagates_through_resolve', testJS_mediaDefDocumentationPropagatesThroughResolve);
   runTest('JS: stdin_source_kind_constants', testJS_stdinSourceKindConstants);
   runTest('JS: stdin_source_null_data', testJS_stdinSourceNullData);
-  runTest('JS: media_spec_construction', testJS_mediaSpecConstruction);
+  runTest('JS: media_def_construction', testJS_mediaDefConstruction);
 
   // cartridge_repo: CartridgeRepoServer and CartridgeRepoClient tests
   console.log('\n--- cartridge_repo ---');
@@ -6288,7 +6292,7 @@ async function runTests() {
   runTest('RENDERER: collapseStrand_seqCapBeforeForeach',     testRenderer_collapseStrand_sequenceProducingCapBeforeForeach);
   runTest('RENDERER: collapseStrand_plainCapMergesOutput',    testRenderer_collapseStrand_plainCapMergesTrailingOutput);
   runTest('RENDERER: collapseStrand_plainCapDistinctTarget',  testRenderer_collapseStrand_plainCapDistinctTargetNoMerge);
-  runTest('RENDERER: validateStrand_missingSourceSpec',       testRenderer_validateStrandPayload_missingSourceSpec);
+  runTest('RENDERER: validateStrand_missingSourceMediaUrn',   testRenderer_validateStrandPayload_missingSourceMediaUrn);
 
   console.log('\n--- cap-fab-renderer run builder ---');
   runTest('RENDERER: validateBodyOutcome_negativeIndex',      testRenderer_validateBodyOutcome_rejectsNegativeIndex);

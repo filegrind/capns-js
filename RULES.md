@@ -72,33 +72,33 @@ Examples:
 
 ## Validation Rules
 
-### XV5: No Redefinition of Registry Media Specs
+### XV5: No Redefinition of Registry Media Defs
 
-Inline media specs in a capability's `media_specs` table must not redefine media specs that already exist in the global registry or built-in specs.
+Inline media defs in a capability's `media_defs` table must not redefine media defs that already exist in the global registry or built-in specs.
 
 ```javascript
-const { validateNoMediaSpecRedefinitionSync, MEDIA_STRING } = require('capdag');
+const { validateNoMediaDefRedefinitionSync, MEDIA_STRING } = require('capdag');
 
 // This will fail - MEDIA_STRING is a built-in spec
-const mediaSpecs = {
+const mediaDefs = {
   [MEDIA_STRING]: { media_type: 'text/plain', title: 'My String' }
 };
-const result = validateNoMediaSpecRedefinitionSync(mediaSpecs);
+const result = validateNoMediaDefRedefinitionSync(mediaDefs);
 // result: { valid: false, error: 'XV5: ...', redefines: ['media:textable'] }
 
 // This is allowed - custom spec that doesn't exist
 const customSpecs = {
   'media:my-custom-type': { media_type: 'application/json', title: 'My Type' }
 };
-const customResult = validateNoMediaSpecRedefinitionSync(customSpecs);
+const customResult = validateNoMediaDefRedefinitionSync(customSpecs);
 // result: { valid: true }
 ```
 
 For server-side validation with registry access, use the async version:
 ```javascript
-const { validateNoMediaSpecRedefinition } = require('capdag');
+const { validateNoMediaDefRedefinition } = require('capdag');
 
-const result = await validateNoMediaSpecRedefinition(mediaSpecs, {
+const result = await validateNoMediaDefRedefinition(mediaDefs, {
   registryLookup: async (urn) => await mediaStore.get(urn) !== null
 });
 ```

@@ -174,7 +174,8 @@ function normalizeEffectValue(rawValue) {
 
 function validateNonStructuralTags(tags) {
   try {
-    new TaggedUrn('cap', tags, true);
+    const serialized = new TaggedUrn('cap', tags).toString();
+    TaggedUrn.fromString(serialized);
   } catch (error) {
     const msg = error && error.message ? error.message : String(error);
     const msgLower = msg.toLowerCase();
@@ -1038,6 +1039,8 @@ class CapUrnBuilder {
         `Reserved structural key '${keyLower}' must be set via inSpec(), outSpec(), or effect()`
       );
     }
+    const nextTags = { ...this._tags, [keyLower]: value };
+    validateNonStructuralTags(nextTags);
     this._tags[keyLower] = value;
     return this;
   }
@@ -1058,6 +1061,8 @@ class CapUrnBuilder {
         `Reserved structural key '${keyLower}' cannot be used as a marker`
       );
     }
+    const nextTags = { ...this._tags, [keyLower]: '*' };
+    validateNonStructuralTags(nextTags);
     this._tags[keyLower] = '*';
     return this;
   }
@@ -1143,21 +1148,21 @@ class CapMatcher {
 }
 
 // ============================================================================
-// MEDIA SPEC PARSING
+// MEDIA DEFINITION PARSING
 // ============================================================================
 
 /**
- * MediaSpec error types
+ * MediaDef error types
  */
-class MediaSpecError extends Error {
+class MediaDefError extends Error {
   constructor(code, message) {
     super(message);
-    this.name = 'MediaSpecError';
+    this.name = 'MediaDefError';
     this.code = code;
   }
 }
 
-const MediaSpecErrorCodes = {
+const MediaDefErrorCodes = {
   UNRESOLVABLE_MEDIA_URN: 1,
   DUPLICATE_MEDIA_URN: 2
 };
@@ -1168,7 +1173,7 @@ const MediaSpecErrorCodes = {
 
 /**
  * Well-known built-in media URN constants
- * These media URNs are implicitly available and do not need to be declared in mediaSpecs
+ * These media URNs are implicitly available and do not need to be declared in mediaDefs
  *
  * Cardinality and Structure use orthogonal marker tags:
  * - `list` marker: presence = list/array, absence = scalar (default)
@@ -1361,11 +1366,11 @@ const MEDIA_COLLECTION_LIST = 'media:collection;list;record';
 // Media URN for adapter selection output - JSON record
 const MEDIA_ADAPTER_SELECTION = 'media:adapter-selection;json;record';
 // Fabric registry lookup wire types (consumed/produced by cap:lookup-cap;fabric
-// and cap:lookup-media-spec;fabric, both implemented by fetchcartridge).
+// and cap:lookup-media-def;fabric, both implemented by fetchcartridge).
 const MEDIA_CAP_URN = 'media:cap-urn;textable';
 const MEDIA_MEDIA_URN = 'media:media-urn;textable';
 const MEDIA_CAP_DEFINITION = 'media:cap-definition;json;record;textable';
-const MEDIA_MEDIA_SPEC_DEFINITION = 'media:media-spec-definition;json;record;textable';
+const MEDIA_MEDIA_DEFINITION = 'media:media-definition;json;record;textable';
 
 // =============================================================================
 // STANDARD CAP URN CONSTANTS
@@ -1381,9 +1386,9 @@ const CAP_ADAPTER_SELECTION = 'cap:in="media:";out="media:adapter-selection;json
 
 // Fabric registry lookup caps. Implemented by fetchcartridge.
 // CAP_LOOKUP_CAP_FABRIC resolves a canonical cap URN to its full flattened
-// cap definition; CAP_LOOKUP_MEDIA_SPEC_FABRIC does the same for media specs.
+// cap definition; CAP_LOOKUP_MEDIA_DEF_FABRIC does the same for media defs.
 const CAP_LOOKUP_CAP_FABRIC = 'cap:in="media:cap-urn;textable";fabric;lookup-cap;out="media:cap-definition;json;record;textable"';
-const CAP_LOOKUP_MEDIA_SPEC_FABRIC = 'cap:in="media:media-urn;textable";fabric;lookup-media-spec;out="media:media-spec-definition;json;record;textable"';
+const CAP_LOOKUP_MEDIA_DEF_FABRIC = 'cap:in="media:media-urn;textable";fabric;lookup-media-def;out="media:media-definition;json;record;textable"';
 
 // =============================================================================
 // MEDIA URN CLASS
@@ -1786,21 +1791,21 @@ function getProfileURL(profileName) {
 // MEDIA URN TAG UTILITIES
 // =============================================================================
 // NOTE: The MEDIA_X constants above are convenience values for referencing
-// common media URNs in code. Resolution must go through mediaSpecs tables -
+// common media URNs in code. Resolution must go through mediaDefs tables -
 // there is NO built-in resolution.
 
 /**
- * Resolved MediaSpec structure
+ * Resolved MediaDef structure
  *
- * A MediaSpec is a resolved media specification containing information about
- * a value type in the CAPDAG system. MediaSpecs are identified by unique media URNs
+ * A MediaDef is a resolved media definition containing information about
+ * a value type in the CAPDAG system. MediaDefs are identified by unique media URNs
  * and contain fields like media_type, profile_uri, schema, etc.
  *
- * MediaSpecs are defined in JSON files in the registry or inline in cap definitions.
+ * MediaDefs are defined in JSON files in the registry or inline in cap definitions.
  */
-class MediaSpec {
+class MediaDef {
   /**
-   * Create a new MediaSpec
+   * Create a new MediaDef
    * @param {string} contentType - The MIME content type
    * @param {string|null} profile - Optional profile URL
    * @param {Object|null} schema - Optional JSON Schema for local validation
@@ -1810,7 +1815,7 @@ class MediaSpec {
    * @param {Object|null} validation - Optional validation rules (min, max, min_length, max_length, pattern, allowed_values)
    * @param {Object|null} metadata - Optional metadata (arbitrary key-value pairs for display/categorization)
    * @param {string[]} extensions - File extensions for storing this media type (e.g., ['pdf'], ['jpg', 'jpeg'])
-   * @param {string|null} documentation - Optional long-form markdown documentation. Rendered in media info panels, the cap navigator, capdag-dot-com, and anywhere else a rich-text explanation of the media spec is useful.
+   * @param {string|null} documentation - Optional long-form markdown documentation. Rendered in media info panels, the cap navigator, capdag-dot-com, and anywhere else a rich-text explanation of the media def is useful.
    */
   constructor(contentType, profile = null, schema = null, title = null, description = null, mediaUrn = null, validation = null, metadata = null, extensions = [], documentation = null) {
     this.contentType = contentType;
@@ -1929,7 +1934,7 @@ class MediaSpec {
   /**
    * Get the canonical string representation
    * Format: <media-type>; profile="<url>" (no content-type: prefix)
-   * @returns {string} The media_spec as a string
+   * @returns {string} The media_def as a string
    */
   toString() {
     if (this.profile) {
@@ -1939,37 +1944,37 @@ class MediaSpec {
   }
 
   /**
-   * Get MediaSpec from a CapUrn using the output media URN
+   * Get MediaDef from a CapUrn using the output media URN
    * NOTE: outSpec is now a required first-class field on CapUrn
    * @param {CapUrn} capUrn - The cap URN
-   * @param {Object} mediaSpecs - Optional mediaSpecs lookup table for resolution
-   * @returns {MediaSpec} The resolved MediaSpec
-   * @throws {MediaSpecError} If media URN cannot be resolved
+   * @param {Object} mediaDefs - Optional mediaDefs lookup table for resolution
+   * @returns {MediaDef} The resolved MediaDef
+   * @throws {MediaDefError} If media URN cannot be resolved
    */
-  static fromCapUrn(capUrn, mediaSpecs = []) {
+  static fromCapUrn(capUrn, mediaDefs = []) {
     // outSpec is now a required field, so it's always present
     const mediaUrn = capUrn.getOutSpec();
 
-    // Resolve the media URN to a MediaSpec - no fallbacks, fail hard
-    return resolveMediaUrn(mediaUrn, mediaSpecs);
+    // Resolve the media URN to a MediaDef - no fallbacks, fail hard
+    return resolveMediaUrn(mediaUrn, mediaDefs);
   }
 }
 
 /**
- * Resolve a media URN to a MediaSpec
+ * Resolve a media URN to a MediaDef
  *
- * Resolution: Look up mediaUrn in mediaSpecs array (by urn field), FAIL HARD if not found.
- * There is no built-in resolution - all media URNs must be in mediaSpecs.
+ * Resolution: Look up mediaUrn in mediaDefs array (by urn field), FAIL HARD if not found.
+ * There is no built-in resolution - all media URNs must be in mediaDefs.
  *
  * @param {string} mediaUrn - The media URN (e.g., "media:textable")
- * @param {Array} mediaSpecs - The mediaSpecs array (each item has urn, media_type, title, etc.)
- * @returns {MediaSpec} The resolved MediaSpec
- * @throws {MediaSpecError} If media URN cannot be resolved
+ * @param {Array} mediaDefs - The mediaDefs array (each item has urn, media_type, title, etc.)
+ * @returns {MediaDef} The resolved MediaDef
+ * @throws {MediaDefError} If media URN cannot be resolved
  */
-function resolveMediaUrn(mediaUrn, mediaSpecs = []) {
-  // Look up in mediaSpecs array by urn field
-  if (mediaSpecs && Array.isArray(mediaSpecs)) {
-    const def = mediaSpecs.find(spec => spec.urn === mediaUrn);
+function resolveMediaUrn(mediaUrn, mediaDefs = []) {
+  // Look up in mediaDefs array by urn field
+  if (mediaDefs && Array.isArray(mediaDefs)) {
+    const def = mediaDefs.find(spec => spec.urn === mediaUrn);
 
     if (def) {
       // Object form: { urn, media_type, title, profile_uri?, schema?, description?, documentation?, validation?, metadata?, extensions? }
@@ -1990,37 +1995,37 @@ function resolveMediaUrn(mediaUrn, mediaSpecs = []) {
       const extensions = Array.isArray(def.extensions) ? def.extensions : [];
 
       if (!mediaType) {
-        throw new MediaSpecError(
-          MediaSpecErrorCodes.UNRESOLVABLE_MEDIA_URN,
+        throw new MediaDefError(
+          MediaDefErrorCodes.UNRESOLVABLE_MEDIA_URN,
           `Media URN '${mediaUrn}' has invalid definition: missing media_type`
         );
       }
 
-      return new MediaSpec(mediaType, profileUri, schema, title, description, mediaUrn, validation, metadata, extensions, documentation);
+      return new MediaDef(mediaType, profileUri, schema, title, description, mediaUrn, validation, metadata, extensions, documentation);
     }
   }
 
-  // FAIL HARD - media URN must be in mediaSpecs array
-  throw new MediaSpecError(
-    MediaSpecErrorCodes.UNRESOLVABLE_MEDIA_URN,
-    `Cannot resolve media URN: '${mediaUrn}'. Not found in mediaSpecs array.`
+  // FAIL HARD - media URN must be in mediaDefs array
+  throw new MediaDefError(
+    MediaDefErrorCodes.UNRESOLVABLE_MEDIA_URN,
+    `Cannot resolve media URN: '${mediaUrn}'. Not found in mediaDefs array.`
   );
 }
 
 /**
- * Build an extension index from a mediaSpecs array.
+ * Build an extension index from a mediaDefs array.
  * Maps lowercase extension strings to arrays of media URNs that use that extension.
  *
- * @param {Array} mediaSpecs - The mediaSpecs array
+ * @param {Array} mediaDefs - The mediaDefs array
  * @returns {Map<string, string[]>} Map from extension to list of URNs
  */
-function buildExtensionIndex(mediaSpecs) {
+function buildExtensionIndex(mediaDefs) {
   const index = new Map();
-  if (!mediaSpecs || !Array.isArray(mediaSpecs)) {
+  if (!mediaDefs || !Array.isArray(mediaDefs)) {
     return index;
   }
 
-  for (const spec of mediaSpecs) {
+  for (const spec of mediaDefs) {
     if (!spec.urn || !Array.isArray(spec.extensions)) continue;
     for (const ext of spec.extensions) {
       const extLower = ext.toLowerCase();
@@ -2046,24 +2051,24 @@ function buildExtensionIndex(mediaSpecs) {
  * Lookup is case-insensitive.
  *
  * @param {string} extension - The file extension to look up (without leading dot)
- * @param {Array} mediaSpecs - The mediaSpecs array
+ * @param {Array} mediaDefs - The mediaDefs array
  * @returns {string[]} Array of media URNs for the extension
- * @throws {MediaSpecError} If no media spec is registered for the given extension
+ * @throws {MediaDefError} If no media def is registered for the given extension
  *
  * @example
- * const urns = mediaUrnsForExtension('pdf', mediaSpecs);
+ * const urns = mediaUrnsForExtension('pdf', mediaDefs);
  * // May return ['media:pdf']
  */
-function mediaUrnsForExtension(extension, mediaSpecs) {
-  const index = buildExtensionIndex(mediaSpecs);
+function mediaUrnsForExtension(extension, mediaDefs) {
+  const index = buildExtensionIndex(mediaDefs);
   const extLower = extension.toLowerCase();
   const urns = index.get(extLower);
 
   if (!urns || urns.length === 0) {
-    throw new MediaSpecError(
-      MediaSpecErrorCodes.UNRESOLVABLE_MEDIA_URN,
-      `No media spec registered for extension '${extension}'. ` +
-      `Ensure the media spec is defined with an 'extensions' array containing '${extension}'.`
+    throw new MediaDefError(
+      MediaDefErrorCodes.UNRESOLVABLE_MEDIA_URN,
+      `No media def registered for extension '${extension}'. ` +
+      `Ensure the media def is defined with an 'extensions' array containing '${extension}'.`
     );
   }
 
@@ -2075,29 +2080,29 @@ function mediaUrnsForExtension(extension, mediaSpecs) {
  *
  * Returns an array of [extension, urns] pairs for debugging and introspection.
  *
- * @param {Array} mediaSpecs - The mediaSpecs array
+ * @param {Array} mediaDefs - The mediaDefs array
  * @returns {Array<[string, string[]]>} Array of [extension, urns] pairs
  */
-function getExtensionMappings(mediaSpecs) {
-  const index = buildExtensionIndex(mediaSpecs);
+function getExtensionMappings(mediaDefs) {
+  const index = buildExtensionIndex(mediaDefs);
   return Array.from(index.entries());
 }
 
 /**
- * Validate that media_specs array has no duplicate URNs.
+ * Validate that media_defs array has no duplicate URNs.
  *
- * @param {Array} mediaSpecs - The mediaSpecs array to validate
+ * @param {Array} mediaDefs - The mediaDefs array to validate
  * @returns {{valid: boolean, error?: string, duplicates?: string[]}}
  */
-function validateNoMediaSpecDuplicates(mediaSpecs) {
-  if (!mediaSpecs || !Array.isArray(mediaSpecs) || mediaSpecs.length === 0) {
+function validateNoMediaDefDuplicates(mediaDefs) {
+  if (!mediaDefs || !Array.isArray(mediaDefs) || mediaDefs.length === 0) {
     return { valid: true };
   }
 
   const seen = new Set();
   const duplicates = [];
 
-  for (const spec of mediaSpecs) {
+  for (const spec of mediaDefs) {
     if (!spec.urn) continue;
     if (seen.has(spec.urn)) {
       duplicates.push(spec.urn);
@@ -2109,7 +2114,7 @@ function validateNoMediaSpecDuplicates(mediaSpecs) {
   if (duplicates.length > 0) {
     return {
       valid: false,
-      error: `Duplicate media URNs in media_specs: ${duplicates.join(', ')}`,
+      error: `Duplicate media URNs in media_defs: ${duplicates.join(', ')}`,
       duplicates
     };
   }
@@ -2118,20 +2123,20 @@ function validateNoMediaSpecDuplicates(mediaSpecs) {
 }
 
 /**
- * XV5: Validate that inline media_specs don't redefine existing registry specs.
+ * XV5: Validate that inline media_defs don't redefine existing registry specs.
  *
  * Validation requires a registryLookup function to check if media URNs exist.
  * If no registryLookup is provided, validation passes (graceful degradation).
  *
- * @param {Array} mediaSpecs - The inline media_specs array from a capability
+ * @param {Array} mediaDefs - The inline media_defs array from a capability
  * @param {Object} [options] - Validation options
  * @param {Function} [options.registryLookup] - Function to check if media URN exists in registry
  *                                              Returns true if exists, false otherwise
  *                                              Should handle errors gracefully (return false)
  * @returns {Promise<{valid: boolean, error?: string, redefines?: string[]}>}
  */
-async function validateNoMediaSpecRedefinition(mediaSpecs, options = {}) {
-  if (!mediaSpecs || !Array.isArray(mediaSpecs) || mediaSpecs.length === 0) {
+async function validateNoMediaDefRedefinition(mediaDefs, options = {}) {
+  if (!mediaDefs || !Array.isArray(mediaDefs) || mediaDefs.length === 0) {
     return { valid: true };
   }
 
@@ -2144,7 +2149,7 @@ async function validateNoMediaSpecRedefinition(mediaSpecs, options = {}) {
 
   const redefines = [];
 
-  for (const spec of mediaSpecs) {
+  for (const spec of mediaDefs) {
     const mediaUrn = spec.urn;
     if (!mediaUrn) continue;
     try {
@@ -2161,7 +2166,7 @@ async function validateNoMediaSpecRedefinition(mediaSpecs, options = {}) {
   if (redefines.length > 0) {
     return {
       valid: false,
-      error: `XV5: Inline media specs redefine existing registry specs: ${redefines.join(', ')}`,
+      error: `XV5: Inline media defs redefine existing registry specs: ${redefines.join(', ')}`,
       redefines
     };
   }
@@ -2173,13 +2178,13 @@ async function validateNoMediaSpecRedefinition(mediaSpecs, options = {}) {
  * XV5: Synchronous version that checks against a provided lookup function.
  * If no registryLookup is provided, validation passes (graceful degradation).
  *
- * @param {Array} mediaSpecs - The inline media_specs array from a capability
+ * @param {Array} mediaDefs - The inline media_defs array from a capability
  * @param {Function} [registryLookup] - Synchronous function to check if media URN exists
  *                                       Returns true if exists, false otherwise
  * @returns {{valid: boolean, error?: string, redefines?: string[]}}
  */
-function validateNoMediaSpecRedefinitionSync(mediaSpecs, registryLookup = null) {
-  if (!mediaSpecs || !Array.isArray(mediaSpecs) || mediaSpecs.length === 0) {
+function validateNoMediaDefRedefinitionSync(mediaDefs, registryLookup = null) {
+  if (!mediaDefs || !Array.isArray(mediaDefs) || mediaDefs.length === 0) {
     return { valid: true };
   }
 
@@ -2190,7 +2195,7 @@ function validateNoMediaSpecRedefinitionSync(mediaSpecs, registryLookup = null) 
 
   const redefines = [];
 
-  for (const spec of mediaSpecs) {
+  for (const spec of mediaDefs) {
     const mediaUrn = spec.urn;
     if (!mediaUrn) continue;
     if (registryLookup(mediaUrn)) {
@@ -2201,7 +2206,7 @@ function validateNoMediaSpecRedefinitionSync(mediaSpecs, registryLookup = null) 
   if (redefines.length > 0) {
     return {
       valid: false,
-      error: `XV5: Inline media specs redefine existing registry specs: ${redefines.join(', ')}`,
+      error: `XV5: Inline media defs redefine existing registry specs: ${redefines.join(', ')}`,
       redefines
     };
   }
@@ -2213,13 +2218,13 @@ function validateNoMediaSpecRedefinitionSync(mediaSpecs, registryLookup = null) 
  * Check if a CapUrn represents binary output.
  * Throws error if the output spec cannot be resolved - no fallbacks.
  * @param {CapUrn} capUrn - The cap URN
- * @param {Array} mediaSpecs - Optional mediaSpecs array
+ * @param {Array} mediaDefs - Optional mediaDefs array
  * @returns {boolean} True if binary
- * @throws {MediaSpecError} If 'out' tag is missing or spec ID cannot be resolved
+ * @throws {MediaDefError} If 'out' tag is missing or spec ID cannot be resolved
  */
-function isBinaryCapUrn(capUrn, mediaSpecs = []) {
-  const mediaSpec = MediaSpec.fromCapUrn(capUrn, mediaSpecs);
-  return mediaSpec.isBinary();
+function isBinaryCapUrn(capUrn, mediaDefs = []) {
+  const mediaDef = MediaDef.fromCapUrn(capUrn, mediaDefs);
+  return mediaDef.isBinary();
 }
 
 /**
@@ -2227,13 +2232,13 @@ function isBinaryCapUrn(capUrn, mediaSpecs = []) {
  * Note: This checks for explicit JSON format marker only.
  * Throws error if the output spec cannot be resolved - no fallbacks.
  * @param {CapUrn} capUrn - The cap URN
- * @param {Array} mediaSpecs - Optional mediaSpecs array
+ * @param {Array} mediaDefs - Optional mediaDefs array
  * @returns {boolean} True if explicit JSON tag present
- * @throws {MediaSpecError} If 'out' tag is missing or spec ID cannot be resolved
+ * @throws {MediaDefError} If 'out' tag is missing or spec ID cannot be resolved
  */
-function isJSONCapUrn(capUrn, mediaSpecs = []) {
-  const mediaSpec = MediaSpec.fromCapUrn(capUrn, mediaSpecs);
-  return mediaSpec.isJSON();
+function isJSONCapUrn(capUrn, mediaDefs = []) {
+  const mediaDef = MediaDef.fromCapUrn(capUrn, mediaDefs);
+  return mediaDef.isJSON();
 }
 
 /**
@@ -2241,13 +2246,13 @@ function isJSONCapUrn(capUrn, mediaSpecs = []) {
  * Structured data can be serialized as JSON when transmitted as text.
  * Throws error if the output spec cannot be resolved - no fallbacks.
  * @param {CapUrn} capUrn - The cap URN
- * @param {Array} mediaSpecs - Optional mediaSpecs array
+ * @param {Array} mediaDefs - Optional mediaDefs array
  * @returns {boolean} True if structured (map or list)
- * @throws {MediaSpecError} If 'out' tag is missing or spec ID cannot be resolved
+ * @throws {MediaDefError} If 'out' tag is missing or spec ID cannot be resolved
  */
-function isStructuredCapUrn(capUrn, mediaSpecs = []) {
-  const mediaSpec = MediaSpec.fromCapUrn(capUrn, mediaSpecs);
-  return mediaSpec.isStructured();
+function isStructuredCapUrn(capUrn, mediaDefs = []) {
+  const mediaDef = MediaDef.fromCapUrn(capUrn, mediaDefs);
+  return mediaDef.isStructured();
 }
 
 /**
@@ -2309,10 +2314,15 @@ const RESERVED_CLI_FLAGS = ['manifest', '--help', '--version', '-v', '-h'];
  * Argument source - specifies how an argument can be provided
  */
 class ArgSource {
-  constructor() {
+  constructor(obj = null) {
     this.stdin = null;    // string (media URN) or null
     this.position = null; // number or null
     this.cli_flag = null; // string or null
+    if (obj !== null) {
+      if (obj.stdin !== undefined) this.stdin = obj.stdin;
+      if (obj.position !== undefined) this.position = obj.position;
+      if (obj.cli_flag !== undefined) this.cli_flag = obj.cli_flag;
+    }
   }
 
   /**
@@ -3041,25 +3051,25 @@ class ValidationError extends Error {
       case 'UnknownArgument':
         return `Cap '${capUrn}' does not accept argument '${details.argumentName}' - check capability definition for valid arguments`;
       case 'InvalidArgumentType':
-        if (details.expectedMediaSpec) {
+        if (details.expectedMediaDef) {
           const errors = details.schemaErrors ? details.schemaErrors.join(', ') : 'validation failed';
-          return `Cap '${capUrn}' argument '${details.argumentName}' expects media_spec '${details.expectedMediaSpec}' but ${errors} for value: ${JSON.stringify(details.actualValue)}`;
+          return `Cap '${capUrn}' argument '${details.argumentName}' expects media_def '${details.expectedMediaDef}' but ${errors} for value: ${JSON.stringify(details.actualValue)}`;
         }
         return `Cap '${capUrn}' argument '${details.argumentName}' expects type '${details.expectedType}' but received '${details.actualType}' with value: ${JSON.stringify(details.actualValue)}`;
       case 'MediaValidationFailed':
         return `Cap '${capUrn}' argument '${details.argumentName}' failed validation rule '${details.validationRule}' with value: ${JSON.stringify(details.actualValue)}`;
-      case 'MediaSpecValidationFailed':
-        return `Cap '${capUrn}' argument '${details.argumentName}' failed media spec '${details.mediaUrn}' validation rule '${details.validationRule}' with value: ${JSON.stringify(details.actualValue)}`;
+      case 'MediaDefValidationFailed':
+        return `Cap '${capUrn}' argument '${details.argumentName}' failed media def '${details.mediaUrn}' validation rule '${details.validationRule}' with value: ${JSON.stringify(details.actualValue)}`;
       case 'InvalidOutputType':
-        if (details.expectedMediaSpec) {
+        if (details.expectedMediaDef) {
           const errors = details.schemaErrors ? details.schemaErrors.join(', ') : 'validation failed';
-          return `Cap '${capUrn}' output expects media_spec '${details.expectedMediaSpec}' but ${errors} for value: ${JSON.stringify(details.actualValue)}`;
+          return `Cap '${capUrn}' output expects media_def '${details.expectedMediaDef}' but ${errors} for value: ${JSON.stringify(details.actualValue)}`;
         }
         return `Cap '${capUrn}' output expects type '${details.expectedType}' but received '${details.actualType}' with value: ${JSON.stringify(details.actualValue)}`;
       case 'OutputValidationFailed':
         return `Cap '${capUrn}' output failed validation rule '${details.validationRule}' with value: ${JSON.stringify(details.actualValue)}`;
-      case 'OutputMediaSpecValidationFailed':
-        return `Cap '${capUrn}' output failed media spec '${details.mediaUrn}' validation rule '${details.validationRule}' with value: ${JSON.stringify(details.actualValue)}`;
+      case 'OutputMediaDefValidationFailed':
+        return `Cap '${capUrn}' output failed media def '${details.mediaUrn}' validation rule '${details.validationRule}' with value: ${JSON.stringify(details.actualValue)}`;
       case 'InvalidCapSchema':
         return `Cap '${capUrn}' has invalid schema: ${details.issue}`;
       case 'TooManyArguments':
@@ -3226,12 +3236,12 @@ class InputValidator {
    *
    * @param {Cap} cap
    * @param {Array} argValues
-   * @param {Array} mediaSpecs - Media specs the cap's args reference;
+   * @param {Array} mediaDefs - Media defs the cap's args reference;
    *   threaded through to `resolveMediaUrn` for schema resolution.
    *   Required for any cap whose args reference media URNs that
    *   resolve through the registry.
    */
-  static validatePositionalArguments(cap, argValues, mediaSpecs = []) {
+  static validatePositionalArguments(cap, argValues, mediaDefs = []) {
     const capUrn = cap.urnString();
     const args = cap.arguments;
 
@@ -3252,7 +3262,7 @@ class InputValidator {
         });
       }
 
-      InputValidator.validateSingleArgument(cap, args.required[i], argValues[i], mediaSpecs);
+      InputValidator.validateSingleArgument(cap, args.required[i], argValues[i], mediaDefs);
     }
 
     // Validate optional arguments if provided
@@ -3260,7 +3270,7 @@ class InputValidator {
     for (let i = 0; i < args.optional.length; i++) {
       const argIndex = requiredCount + i;
       if (argIndex < argValues.length) {
-        InputValidator.validateSingleArgument(cap, args.optional[i], argValues[argIndex], mediaSpecs);
+        InputValidator.validateSingleArgument(cap, args.optional[i], argValues[argIndex], mediaDefs);
       }
     }
   }
@@ -3270,10 +3280,10 @@ class InputValidator {
    *
    * @param {Cap} cap
    * @param {Array} namedArgs
-   * @param {Array} mediaSpecs - Media specs the cap's args reference;
+   * @param {Array} mediaDefs - Media defs the cap's args reference;
    *   threaded through to `resolveMediaUrn` for schema resolution.
    */
-  static validateNamedArguments(cap, namedArgs, mediaSpecs = []) {
+  static validateNamedArguments(cap, namedArgs, mediaDefs = []) {
     const capUrn = cap.urnString();
     const args = cap.arguments;
 
@@ -3295,14 +3305,14 @@ class InputValidator {
 
       // Validate the provided argument value
       const providedValue = providedArgs.get(reqArg.name);
-      InputValidator.validateSingleArgument(cap, reqArg, providedValue, mediaSpecs);
+      InputValidator.validateSingleArgument(cap, reqArg, providedValue, mediaDefs);
     }
 
     // Validate optional arguments if provided
     for (const optArg of args.optional) {
       if (providedArgs.has(optArg.name)) {
         const providedValue = providedArgs.get(optArg.name);
-        InputValidator.validateSingleArgument(cap, optArg, providedValue, mediaSpecs);
+        InputValidator.validateSingleArgument(cap, optArg, providedValue, mediaDefs);
       }
     }
 
@@ -3324,24 +3334,24 @@ class InputValidator {
   /**
    * Validate a single argument against its definition
    * Two-pass validation:
-   * 1. Type validation + media spec validation rules (inherent to semantic type)
+   * 1. Type validation + media def validation rules (inherent to semantic type)
    */
-  static validateSingleArgument(cap, argDef, value, mediaSpecs = []) {
-    // Type validation - returns the resolved MediaSpec
-    const mediaSpec = InputValidator.validateArgumentType(cap, argDef, value, mediaSpecs);
+  static validateSingleArgument(cap, argDef, value, mediaDefs = []) {
+    // Type validation - returns the resolved MediaDef
+    const mediaDef = InputValidator.validateArgumentType(cap, argDef, value, mediaDefs);
 
-    // Media spec validation rules (inherent to the semantic type)
-    if (mediaSpec && mediaSpec.validation) {
-      InputValidator.validateMediaSpecRules(cap, argDef, mediaSpec, value);
+    // Media def validation rules (inherent to the semantic type)
+    if (mediaDef && mediaDef.validation) {
+      InputValidator.validateMediaDefRules(cap, argDef, mediaDef, value);
     }
   }
 
   /**
-   * Validate argument type using MediaSpec
-   * Resolves spec ID to MediaSpec before validation
-   * @returns {MediaSpec|null} The resolved MediaSpec
+   * Validate argument type using MediaDef
+   * Resolves spec ID to MediaDef before validation
+   * @returns {MediaDef|null} The resolved MediaDef
    */
-  static validateArgumentType(cap, argDef, value, mediaSpecs = []) {
+  static validateArgumentType(cap, argDef, value, mediaDefs = []) {
     const capUrn = cap.urnString();
 
     // Get mediaUrn field (now contains a media URN)
@@ -3351,10 +3361,10 @@ class InputValidator {
       return null;
     }
 
-    // Resolve media URN to MediaSpec - FAIL HARD if unresolvable
-    let mediaSpec;
+    // Resolve media URN to MediaDef - FAIL HARD if unresolvable
+    let mediaDef;
     try {
-      mediaSpec = resolveMediaUrn(mediaUrn, mediaSpecs);
+      mediaDef = resolveMediaUrn(mediaUrn, mediaDefs);
     } catch (e) {
       throw new ValidationError('InvalidCapSchema', capUrn, {
         issue: `Cannot resolve media URN '${mediaUrn}' for argument '${argDef.name}': ${e.message}`
@@ -3362,56 +3372,56 @@ class InputValidator {
     }
 
     // For binary media types, expect base64-encoded string
-    if (mediaSpec.isBinary()) {
+    if (mediaDef.isBinary()) {
       if (typeof value !== 'string') {
         throw new ValidationError('InvalidArgumentType', capUrn, {
           argumentName: argDef.name,
-          expectedMediaSpec: mediaUrn,
+          expectedMediaDef: mediaUrn,
           actualValue: value,
           schemaErrors: ['Expected base64-encoded string for binary type']
         });
       }
-      return mediaSpec;
+      return mediaDef;
     }
 
-    // If the resolved media spec has a local schema, validate against it
-    if (mediaSpec.schema) {
+    // If the resolved media def has a local schema, validate against it
+    if (mediaDef.schema) {
       // TODO: Full JSON Schema validation would require a JSON Schema library
       // For now, skip local schema validation
     }
 
     // For types with profile, validate against profile
-    if (mediaSpec.profile) {
-      const valid = InputValidator.validateAgainstProfile(mediaSpec.profile, value);
+    if (mediaDef.profile) {
+      const valid = InputValidator.validateAgainstProfile(mediaDef.profile, value);
       if (!valid) {
         throw new ValidationError('InvalidArgumentType', capUrn, {
           argumentName: argDef.name,
-          expectedMediaSpec: mediaUrn,
+          expectedMediaDef: mediaUrn,
           actualValue: value,
           schemaErrors: [`Value does not match profile schema`]
         });
       }
     }
 
-    return mediaSpec;
+    return mediaDef;
   }
 
   /**
-   * Validate value against media spec's inherent validation rules (first pass)
+   * Validate value against media def's inherent validation rules (first pass)
    * @param {Cap} cap - The capability
    * @param {Object} argDef - The argument definition
-   * @param {MediaSpec} mediaSpec - The resolved media spec
+   * @param {MediaDef} mediaDef - The resolved media def
    * @param {*} value - The value to validate
    */
-  static validateMediaSpecRules(cap, argDef, mediaSpec, value) {
+  static validateMediaDefRules(cap, argDef, mediaDef, value) {
     const capUrn = cap.urnString();
-    const validation = mediaSpec.validation;
-    const mediaUrn = mediaSpec.mediaUrn;
+    const validation = mediaDef.validation;
+    const mediaUrn = mediaDef.mediaUrn;
 
     // Min/max validation for numbers
     if (typeof value === 'number') {
       if (validation.min !== undefined && value < validation.min) {
-        throw new ValidationError('MediaSpecValidationFailed', capUrn, {
+        throw new ValidationError('MediaDefValidationFailed', capUrn, {
           argumentName: argDef.name,
           mediaUrn: mediaUrn,
           validationRule: `min value ${validation.min}`,
@@ -3419,7 +3429,7 @@ class InputValidator {
         });
       }
       if (validation.max !== undefined && value > validation.max) {
-        throw new ValidationError('MediaSpecValidationFailed', capUrn, {
+        throw new ValidationError('MediaDefValidationFailed', capUrn, {
           argumentName: argDef.name,
           mediaUrn: mediaUrn,
           validationRule: `max value ${validation.max}`,
@@ -3432,7 +3442,7 @@ class InputValidator {
     if (typeof value === 'string' || Array.isArray(value)) {
       const length = value.length;
       if (validation.min_length !== undefined && length < validation.min_length) {
-        throw new ValidationError('MediaSpecValidationFailed', capUrn, {
+        throw new ValidationError('MediaDefValidationFailed', capUrn, {
           argumentName: argDef.name,
           mediaUrn: mediaUrn,
           validationRule: `min length ${validation.min_length}`,
@@ -3440,7 +3450,7 @@ class InputValidator {
         });
       }
       if (validation.max_length !== undefined && length > validation.max_length) {
-        throw new ValidationError('MediaSpecValidationFailed', capUrn, {
+        throw new ValidationError('MediaDefValidationFailed', capUrn, {
           argumentName: argDef.name,
           mediaUrn: mediaUrn,
           validationRule: `max length ${validation.max_length}`,
@@ -3453,7 +3463,7 @@ class InputValidator {
     if (typeof value === 'string' && validation.pattern) {
       const regex = new RegExp(validation.pattern);
       if (!regex.test(value)) {
-        throw new ValidationError('MediaSpecValidationFailed', capUrn, {
+        throw new ValidationError('MediaDefValidationFailed', capUrn, {
           argumentName: argDef.name,
           mediaUrn: mediaUrn,
           validationRule: `pattern ${validation.pattern}`,
@@ -3465,7 +3475,7 @@ class InputValidator {
     // Allowed values validation
     if (validation.allowed_values && Array.isArray(validation.allowed_values)) {
       if (!validation.allowed_values.includes(value)) {
-        throw new ValidationError('MediaSpecValidationFailed', capUrn, {
+        throw new ValidationError('MediaDefValidationFailed', capUrn, {
           argumentName: argDef.name,
           mediaUrn: mediaUrn,
           validationRule: `allowed values [${validation.allowed_values.join(', ')}]`,
@@ -3536,32 +3546,32 @@ class InputValidator {
  */
 class OutputValidator {
   /**
-   * Validate output against cap output schema using MediaSpec.
+   * Validate output against cap output schema using MediaDef.
    *
    * @param {Cap} cap
    * @param {*} output
-   * @param {Array} mediaSpecs - Media specs the cap output references;
+   * @param {Array} mediaDefs - Media defs the cap output references;
    *   threaded through to `resolveMediaUrn` for schema resolution.
    */
-  static validateOutput(cap, output, mediaSpecs = []) {
+  static validateOutput(cap, output, mediaDefs = []) {
     const outputDef = cap.output;
 
     if (!outputDef) return; // No output definition to validate against
 
-    // Type validation - returns the resolved MediaSpec
-    const mediaSpec = OutputValidator.validateOutputType(cap, outputDef, output, mediaSpecs);
+    // Type validation - returns the resolved MediaDef
+    const mediaDef = OutputValidator.validateOutputType(cap, outputDef, output, mediaDefs);
 
-    // Media spec validation rules (inherent to the semantic type)
-    if (mediaSpec && mediaSpec.validation) {
-      OutputValidator.validateOutputMediaSpecRules(cap, mediaSpec, output);
+    // Media def validation rules (inherent to the semantic type)
+    if (mediaDef && mediaDef.validation) {
+      OutputValidator.validateOutputMediaDefRules(cap, mediaDef, output);
     }
   }
 
   /**
-   * Validate output type using MediaSpec
-   * @returns {MediaSpec|null} The resolved MediaSpec
+   * Validate output type using MediaDef
+   * @returns {MediaDef|null} The resolved MediaDef
    */
-  static validateOutputType(cap, outputDef, value, mediaSpecs = []) {
+  static validateOutputType(cap, outputDef, value, mediaDefs = []) {
     const capUrn = cap.urnString();
 
     // Get mediaUrn field (now contains a media URN)
@@ -3571,10 +3581,10 @@ class OutputValidator {
       return null;
     }
 
-    // Resolve media URN to MediaSpec - FAIL HARD if unresolvable
-    let mediaSpec;
+    // Resolve media URN to MediaDef - FAIL HARD if unresolvable
+    let mediaDef;
     try {
-      mediaSpec = resolveMediaUrn(mediaUrn, mediaSpecs);
+      mediaDef = resolveMediaUrn(mediaUrn, mediaDefs);
     } catch (e) {
       throw new ValidationError('InvalidCapSchema', capUrn, {
         issue: `Cannot resolve media URN '${mediaUrn}' for output: ${e.message}`
@@ -3582,57 +3592,57 @@ class OutputValidator {
     }
 
     // For binary media types, expect base64-encoded string
-    if (mediaSpec.isBinary()) {
+    if (mediaDef.isBinary()) {
       if (typeof value !== 'string') {
         throw new ValidationError('InvalidOutputType', capUrn, {
-          expectedMediaSpec: mediaUrn,
+          expectedMediaDef: mediaUrn,
           actualValue: value,
           schemaErrors: ['Expected base64-encoded string for binary type']
         });
       }
-      return mediaSpec;
+      return mediaDef;
     }
 
-    // If the resolved media spec has a local schema, validate against it
-    if (mediaSpec.schema) {
+    // If the resolved media def has a local schema, validate against it
+    if (mediaDef.schema) {
       // TODO: Full JSON Schema validation would require a JSON Schema library
       // For now, skip local schema validation
     }
 
     // For types with profile, validate against profile
-    if (mediaSpec.profile) {
-      const valid = InputValidator.validateAgainstProfile(mediaSpec.profile, value);
+    if (mediaDef.profile) {
+      const valid = InputValidator.validateAgainstProfile(mediaDef.profile, value);
       if (!valid) {
         throw new ValidationError('InvalidOutputType', capUrn, {
-          expectedMediaSpec: mediaUrn,
+          expectedMediaDef: mediaUrn,
           actualValue: value,
           schemaErrors: [`Value does not match profile schema`]
         });
       }
     }
 
-    return mediaSpec;
+    return mediaDef;
   }
 
   /**
-   * Validate output against media spec's inherent validation rules (first pass)
+   * Validate output against media def's inherent validation rules (first pass)
    */
-  static validateOutputMediaSpecRules(cap, mediaSpec, value) {
+  static validateOutputMediaDefRules(cap, mediaDef, value) {
     const capUrn = cap.urnString();
-    const validation = mediaSpec.validation;
-    const mediaUrn = mediaSpec.mediaUrn;
+    const validation = mediaDef.validation;
+    const mediaUrn = mediaDef.mediaUrn;
 
     // Min/max validation for numbers
     if (typeof value === 'number') {
       if (validation.min !== undefined && value < validation.min) {
-        throw new ValidationError('OutputMediaSpecValidationFailed', capUrn, {
+        throw new ValidationError('OutputMediaDefValidationFailed', capUrn, {
           mediaUrn: mediaUrn,
           validationRule: `min value ${validation.min}`,
           actualValue: value
         });
       }
       if (validation.max !== undefined && value > validation.max) {
-        throw new ValidationError('OutputMediaSpecValidationFailed', capUrn, {
+        throw new ValidationError('OutputMediaDefValidationFailed', capUrn, {
           mediaUrn: mediaUrn,
           validationRule: `max value ${validation.max}`,
           actualValue: value
@@ -3643,14 +3653,14 @@ class OutputValidator {
     // Length validation for strings
     if (typeof value === 'string') {
       if (validation.min_length !== undefined && value.length < validation.min_length) {
-        throw new ValidationError('OutputMediaSpecValidationFailed', capUrn, {
+        throw new ValidationError('OutputMediaDefValidationFailed', capUrn, {
           mediaUrn: mediaUrn,
           validationRule: `min length ${validation.min_length}`,
           actualValue: value
         });
       }
       if (validation.max_length !== undefined && value.length > validation.max_length) {
-        throw new ValidationError('OutputMediaSpecValidationFailed', capUrn, {
+        throw new ValidationError('OutputMediaDefValidationFailed', capUrn, {
           mediaUrn: mediaUrn,
           validationRule: `max length ${validation.max_length}`,
           actualValue: value
@@ -3662,7 +3672,7 @@ class OutputValidator {
     if (typeof value === 'string' && validation.pattern) {
       const regex = new RegExp(validation.pattern);
       if (!regex.test(value)) {
-        throw new ValidationError('OutputMediaSpecValidationFailed', capUrn, {
+        throw new ValidationError('OutputMediaDefValidationFailed', capUrn, {
           mediaUrn: mediaUrn,
           validationRule: `pattern ${validation.pattern}`,
           actualValue: value
@@ -3673,7 +3683,7 @@ class OutputValidator {
     // Allowed values validation
     if (validation.allowed_values && Array.isArray(validation.allowed_values)) {
       if (!validation.allowed_values.includes(value)) {
-        throw new ValidationError('OutputMediaSpecValidationFailed', capUrn, {
+        throw new ValidationError('OutputMediaDefValidationFailed', capUrn, {
           mediaUrn: mediaUrn,
           validationRule: `allowed values [${validation.allowed_values.join(', ')}]`,
           actualValue: value
@@ -6140,7 +6150,7 @@ class FabricRegistryEntry {
 }
 
 /**
- * A media spec entry from the registry.
+ * A media def entry from the registry.
  *
  * Wire shape mirrors the per-URN objects published at
  *   <base>/media/<sha256(canonical-urn)>
@@ -6182,7 +6192,7 @@ async function sha256Hex(s) {
 }
 
 /**
- * Client for fetching and caching capabilities and media specs.
+ * Client for fetching and caching capabilities and media defs.
  *
  * Reads from `<baseUrl>/api/capabilities` (the flat catalogue) and
  * `<baseUrl>/{caps,media}/<sha256>` (per-URN).
@@ -6274,7 +6284,7 @@ class FabricRegistryClient {
   }
 
   /**
-   * Lookup a single media spec by URN.
+   * Lookup a single media def by URN.
    *
    * Canonicalises through MediaUrn and looks up by SHA-256 hash.
    *
@@ -6377,9 +6387,9 @@ module.exports = {
   CapValidator,
   validateCapArgs,
   RESERVED_CLI_FLAGS,
-  MediaSpec,
-  MediaSpecError,
-  MediaSpecErrorCodes,
+  MediaDef,
+  MediaDefError,
+  MediaDefErrorCodes,
   isBinaryCapUrn,
   isJSONCapUrn,
   isStructuredCapUrn,
@@ -6387,9 +6397,9 @@ module.exports = {
   buildExtensionIndex,
   mediaUrnsForExtension,
   getExtensionMappings,
-  validateNoMediaSpecRedefinition,
-  validateNoMediaSpecRedefinitionSync,
-  validateNoMediaSpecDuplicates,
+  validateNoMediaDefRedefinition,
+  validateNoMediaDefRedefinitionSync,
+  validateNoMediaDefDuplicates,
   getSchemaBaseURL,
   getProfileURL,
   MEDIA_STRING,
@@ -6486,12 +6496,12 @@ module.exports = {
   MEDIA_CAP_URN,
   MEDIA_MEDIA_URN,
   MEDIA_CAP_DEFINITION,
-  MEDIA_MEDIA_SPEC_DEFINITION,
+  MEDIA_MEDIA_DEFINITION,
   // Standard cap URN constants
   CAP_IDENTITY,
   CAP_ADAPTER_SELECTION,
   CAP_LOOKUP_CAP_FABRIC,
-  CAP_LOOKUP_MEDIA_SPEC_FABRIC,
+  CAP_LOOKUP_MEDIA_DEF_FABRIC,
   // Cap execution result
   CapResult,
   // Unified argument type

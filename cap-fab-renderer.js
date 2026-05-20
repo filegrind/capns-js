@@ -742,7 +742,7 @@ function validateStrandStep(step, path) {
       throw new Error(`CapFabRenderer: ${path}.step_type.Cap.output_is_sequence must be a boolean`);
     }
   } else {
-    assertString(body.media_spec, `${path}.step_type.${variant}.media_spec`);
+    assertString(body.media_def, `${path}.step_type.${variant}.media_def`);
   }
 }
 
@@ -750,8 +750,8 @@ function validateStrandPayload(data) {
   if (!data || typeof data !== 'object') {
     throw new Error('CapFabRenderer strand mode: data must be an object');
   }
-  assertString(data.source_spec, 'strand mode data.source_spec');
-  assertString(data.target_spec, 'strand mode data.target_spec');
+  assertString(data.source_media_urn, 'strand mode data.source_media_urn');
+  assertString(data.target_media_urn, 'strand mode data.target_media_urn');
   assertArray(data.steps, 'strand mode data.steps');
   data.steps.forEach((step, idx) => {
     validateStrandStep(step, `strand mode data.steps[${idx}]`);
@@ -1087,7 +1087,7 @@ function classifyStrandCapSteps(steps) {
 //     edge to body_entry, and prev_node_id becomes body_exit.
 //
 // Node labels come from the `media_display_names` map keyed by the
-// step's canonical URN (or source_spec/target_spec for the boundary
+// step's canonical URN (or source_media_urn/target_media_urn for the boundary
 // nodes). ForEach and Collect nodes display "for each" / "collect".
 // Cap edges carry the cap title plus cardinality marker when either
 // input or output is a sequence.
@@ -1095,8 +1095,8 @@ function buildStrandGraphData(data) {
   validateStrandPayload(data);
 
   const mediaDisplayNames = data.media_display_names || {};
-  const sourceSpec = canonicalMediaUrn(data.source_spec);
-  const targetSpec = canonicalMediaUrn(data.target_spec);
+  const sourceMediaUrn = canonicalMediaUrn(data.source_media_urn);
+  const targetMediaUrn = canonicalMediaUrn(data.target_media_urn);
 
   // Look up a display name for a media URN via the host-supplied map.
   // Uses `MediaUrn.isEquivalent` so tag-order variation doesn't defeat
@@ -1151,9 +1151,9 @@ function buildStrandGraphData(data) {
     edgeCounter++;
   }
 
-  // Entry node — the strand's source media spec.
+  // Entry node — the strand's source media def.
   const inputSlotId = 'input_slot';
-  addNode(inputSlotId, displayNameFor(sourceSpec), sourceSpec, 'strand-source');
+  addNode(inputSlotId, displayNameFor(sourceMediaUrn), sourceMediaUrn, 'strand-source');
 
   let prevNodeId = inputSlotId;
 
@@ -1311,7 +1311,7 @@ function buildStrandGraphData(data) {
 
   // Final output node. Mirrors plan_builder.rs:430-432.
   const outputId = 'output';
-  addNode(outputId, displayNameFor(targetSpec), targetSpec, 'strand-target');
+  addNode(outputId, displayNameFor(targetMediaUrn), targetMediaUrn, 'strand-target');
   addEdge(prevNodeId, outputId, '', '', '', 'strand-cap-edge');
 
   // Return the raw plan-builder topology. Strand mode collapses
@@ -1319,7 +1319,7 @@ function buildStrandGraphData(data) {
   // `strandCytoscapeElements`); run mode keeps them as explicit
   // nodes because body replicas anchor at the ForEach/Collect
   // junctions.
-  return { nodes, edges, sourceSpec, targetSpec };
+  return { nodes, edges, sourceMediaUrn, targetMediaUrn };
 }
 
 // Transform the plan-builder strand topology into the render shape
@@ -1349,7 +1349,7 @@ function buildStrandGraphData(data) {
 //      post-collect cap's `input_is_sequence=true` flag.
 //
 //   4. If the last cap step's `to_spec` is semantically equivalent
-//      to the strand's `target_spec` (via MediaUrn.isEquivalent),
+//      to the strand's `target_media_urn` (via MediaUrn.isEquivalent),
 //      the separate `output` target node is dropped and the last
 //      cap edge lands on that merged endpoint. Removes the visible
 //      duplicate node.
@@ -1548,8 +1548,8 @@ function stripRunBackboneReplicaNodes(built, dropStepIds) {
   return {
     nodes: keptNodes,
     edges: keptEdges,
-    sourceSpec: built.sourceSpec,
-    targetSpec: built.targetSpec,
+    sourceMediaUrn: built.sourceMediaUrn,
+    targetMediaUrn: built.targetMediaUrn,
   };
 }
 
@@ -1569,14 +1569,14 @@ function buildRunGraphData(data) {
   // Run mode overrides the input_slot node's label with the
   // host-supplied `source_display` (runtime input filename).
   // Strand mode ignores this field so the abstract graph shows
-  // the media spec's title from `media_display_names`.
+  // the media def's title from `media_display_names`.
   if (typeof data.source_display === 'string' && data.source_display.length > 0) {
     strandBuiltCollapsed = {
       nodes: strandBuiltCollapsed.nodes.map(n =>
         n.id === 'input_slot' ? Object.assign({}, n, { label: data.source_display }) : n),
       edges: strandBuiltCollapsed.edges,
-      sourceSpec: strandBuiltCollapsed.sourceSpec,
-      targetSpec: strandBuiltCollapsed.targetSpec,
+      sourceMediaUrn: strandBuiltCollapsed.sourceMediaUrn,
+      targetMediaUrn: strandBuiltCollapsed.targetMediaUrn,
     };
   }
 
@@ -1664,7 +1664,7 @@ function buildRunGraphData(data) {
   // labels the anchor→entry edge on the first body.
   //
   // Without such a preceding sequence cap, the source itself is
-  // already a list (e.g. `media:pdf;list` source_spec) and the
+  // already a list (e.g. `media:pdf;list` source_media_urn) and the
   // ForEach iterates it directly.
   let seqProducerStepIdx = -1;
   let seqProducerStep = null;
