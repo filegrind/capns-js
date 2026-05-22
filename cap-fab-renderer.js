@@ -690,6 +690,12 @@ function assertArray(value, path) {
   }
 }
 
+function assertObject(value, path) {
+  if (value === null || typeof value !== 'object' || Array.isArray(value)) {
+    throw new Error(`CapFabRenderer: ${path} must be an object`);
+  }
+}
+
 function validateBrowseData(data) {
   assertArray(data, 'browse mode data');
   data.forEach((cap, idx) => {
