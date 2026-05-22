@@ -789,6 +789,18 @@ function validateBodyOutcome(outcome, path) {
   }
 }
 
+function validateRunIOItem(item, path) {
+  assertObject(item, path);
+  assertString(item.label, `${path}.label`);
+  assertString(item.path, `${path}.path`);
+  if (typeof item.is_directory !== 'boolean') {
+    throw new Error(`CapFabRenderer run mode: ${path}.is_directory must be a boolean`);
+  }
+  if (typeof item.file_count !== 'number' || item.file_count < 0) {
+    throw new Error(`CapFabRenderer run mode: ${path}.file_count must be a non-negative number`);
+  }
+}
+
 function validateRunPayload(data) {
   if (!data || typeof data !== 'object') {
     throw new Error('CapFabRenderer run mode: data must be an object');
@@ -811,6 +823,23 @@ function validateRunPayload(data) {
   }
   if (typeof data.total_body_count !== 'number' || data.total_body_count < 0) {
     throw new Error('CapFabRenderer run mode: data.total_body_count must be a non-negative number');
+  }
+  if (data.input_items !== undefined) {
+    assertArray(data.input_items, 'run mode data.input_items');
+    data.input_items.forEach((item, idx) => {
+      validateRunIOItem(item, `run mode data.input_items[${idx}]`);
+    });
+  }
+  if (data.input_runs !== undefined) {
+    assertArray(data.input_runs, 'run mode data.input_runs');
+    data.input_runs.forEach((run, idx) => {
+      assertObject(run, `run mode data.input_runs[${idx}]`);
+      validateRunIOItem(run.input, `run mode data.input_runs[${idx}].input`);
+      assertArray(run.outputs, `run mode data.input_runs[${idx}].outputs`);
+      run.outputs.forEach((output, outIdx) => {
+        validateRunIOItem(output, `run mode data.input_runs[${idx}].outputs[${outIdx}]`);
+      });
+    });
   }
 }
 
@@ -1553,6 +1582,253 @@ function stripRunBackboneReplicaNodes(built, dropStepIds) {
   };
 }
 
+function emptyRunBackbone() {
+  return {
+    nodes: [],
+    edges: [],
+    sourceMediaUrn: '',
+    targetMediaUrn: '',
+  };
+}
+
+function buildExternalInputRunGraphData(
+  data,
+  inputRuns,
+  allOutcomes,
+  visibleSuccess,
+  visibleFailure,
+  hiddenSuccessCount,
+  hiddenFailureCount,
+  displayNameFor
+) {
+  if (inputRuns.length <= 1 || allOutcomes.length === 0) return null;
+
+  const capSteps = data.resolved_strand.steps
+    .filter(step => Object.keys(step.step_type)[0] === 'Cap')
+    .map(step => step.step_type.Cap);
+  if (capSteps.length === 0) {
+    throw new Error('CapFabRenderer run mode: external multi-input runs require at least one Cap step in resolved_strand.');
+  }
+
+  const visibleOutcomes = visibleSuccess.concat(visibleFailure);
+  const CapUrn = requireHostDependency('CapUrn');
+  const sourceCanonical = canonicalMediaUrn(data.resolved_strand.source_media_urn);
+  const targetCanonical = canonicalMediaUrn(data.resolved_strand.target_media_urn);
+  const anchorNodeId = 'external-input-anchor';
+  const replicaNodes = [{
+    group: 'nodes',
+    data: {
+      id: anchorNodeId,
+      label: displayNameFor(sourceCanonical),
+      fullUrn: sourceCanonical,
+    },
+    classes: 'strand-source',
+  }];
+  const replicaEdges = [];
+  const showMoreNodes = [];
+
+  for (const outcome of allOutcomes) {
+    if (outcome.body_index >= inputRuns.length) {
+      throw new Error(
+        `CapFabRenderer run mode: body_outcomes[body_index=${outcome.body_index}] exceeds input_runs length ${inputRuns.length}`
+      );
+    }
+  }
+
+  function buildReplica(outcome) {
+    const runDef = inputRuns[outcome.body_index];
+    const success = outcome.success;
+    const nodeClass = success ? 'body-success' : 'body-failure';
+    const edgeClass = success ? 'body-success' : 'body-failure';
+    const edgeColor = success ? 'var(--graph-body-edge-success)' : 'var(--graph-body-edge-failure)';
+    const bodyKey = `external-body-${outcome.body_index}`;
+    const sourceNodeId = `${bodyKey}-input`;
+    const sourceLabel = typeof outcome.title === 'string' && outcome.title.length > 0
+      ? outcome.title
+      : runDef.input.label;
+
+    replicaNodes.push({
+      group: 'nodes',
+      data: {
+        id: sourceNodeId,
+        label: sourceLabel,
+        fullUrn: runDef.input.path,
+        bodyIndex: outcome.body_index,
+        bodyTitle: sourceLabel,
+      },
+      classes: `${nodeClass} run-input-item`,
+    });
+    replicaEdges.push({
+      group: 'edges',
+      data: {
+        id: `${bodyKey}-entry`,
+        source: anchorNodeId,
+        target: sourceNodeId,
+        label: '',
+        title: runDef.input.path,
+        fullUrn: '',
+        color: getCssVar('--graph-edge-color'),
+        bodyIndex: outcome.body_index,
+      },
+      classes: edgeClass,
+    });
+
+    let traceEnd = capSteps.length;
+    if (!success) {
+      if (typeof outcome.failed_cap === 'string' && outcome.failed_cap.length > 0) {
+        const failedCap = CapUrn.fromString(outcome.failed_cap);
+        traceEnd = 0;
+        for (let i = 0; i < capSteps.length; i++) {
+          const candidate = CapUrn.fromString(capSteps[i].cap_urn);
+          if (candidate.isEquivalent(failedCap)) {
+            traceEnd = i + 1;
+            break;
+          }
+        }
+      } else {
+        traceEnd = 0;
+      }
+    }
+
+    let prevNodeId = sourceNodeId;
+    for (let i = 0; i < traceEnd; i++) {
+      const cap = capSteps[i];
+      const targetMedia = canonicalMediaUrn(i === capSteps.length - 1 ? data.resolved_strand.target_media_urn : data.resolved_strand.steps.filter(step => Object.keys(step.step_type)[0] === 'Cap')[i].to_spec);
+      const isLastExecutedStep = i === traceEnd - 1;
+      const outputs = success ? runDef.outputs : [];
+
+      if (success && isLastExecutedStep && outputs.length > 0) {
+        outputs.forEach((output, outputIdx) => {
+          const outputNodeId = `${bodyKey}-output-${outputIdx}`;
+          replicaNodes.push({
+            group: 'nodes',
+            data: {
+              id: outputNodeId,
+              label: output.label,
+              fullUrn: output.path,
+              bodyIndex: outcome.body_index,
+              bodyTitle: sourceLabel,
+            },
+            classes: nodeClass,
+          });
+          replicaEdges.push({
+            group: 'edges',
+            data: {
+              id: `${bodyKey}-output-edge-${i}-${outputIdx}`,
+              source: prevNodeId,
+              target: outputNodeId,
+              label: outputIdx === 0 ? cap.title : '',
+              title: cap.title,
+              fullUrn: cap.cap_urn,
+              color: edgeColor,
+              bodyIndex: outcome.body_index,
+            },
+            classes: edgeClass,
+          });
+        });
+        return;
+      }
+
+      const stepNodeId = `${bodyKey}-step-${i}`;
+      replicaNodes.push({
+        group: 'nodes',
+        data: {
+          id: stepNodeId,
+          label: displayNameFor(isLastExecutedStep ? targetCanonical : targetMedia),
+          fullUrn: isLastExecutedStep ? targetCanonical : targetMedia,
+          bodyIndex: outcome.body_index,
+          bodyTitle: sourceLabel,
+        },
+        classes: nodeClass,
+      });
+      replicaEdges.push({
+        group: 'edges',
+        data: {
+          id: `${bodyKey}-step-edge-${i}`,
+          source: prevNodeId,
+          target: stepNodeId,
+          label: cap.title,
+          title: cap.title,
+          fullUrn: cap.cap_urn,
+          color: edgeColor,
+          bodyIndex: outcome.body_index,
+        },
+        classes: edgeClass,
+      });
+      prevNodeId = stepNodeId;
+    }
+  }
+
+  visibleOutcomes.forEach(buildReplica);
+
+  if (hiddenSuccessCount > 0) {
+    showMoreNodes.push({
+      group: 'nodes',
+      data: {
+        id: 'show-more-success',
+        label: `+${hiddenSuccessCount} more succeeded`,
+        fullUrn: '',
+        showMoreGroup: 'success',
+        hiddenCount: hiddenSuccessCount,
+      },
+      classes: 'show-more body-success',
+    });
+    replicaEdges.push({
+      group: 'edges',
+      data: {
+        id: 'show-more-success-edge',
+        source: anchorNodeId,
+        target: 'show-more-success',
+        label: '',
+        title: '',
+        fullUrn: '',
+        color: 'var(--graph-body-edge-success)',
+      },
+      classes: 'body-success',
+    });
+  }
+  if (hiddenFailureCount > 0) {
+    showMoreNodes.push({
+      group: 'nodes',
+      data: {
+        id: 'show-more-failure',
+        label: `+${hiddenFailureCount} failed`,
+        fullUrn: '',
+        showMoreGroup: 'failure',
+        hiddenCount: hiddenFailureCount,
+      },
+      classes: 'show-more body-failure',
+    });
+    replicaEdges.push({
+      group: 'edges',
+      data: {
+        id: 'show-more-failure-edge',
+        source: anchorNodeId,
+        target: 'show-more-failure',
+        label: '',
+        title: '',
+        fullUrn: '',
+        color: 'var(--graph-body-edge-failure)',
+      },
+      classes: 'body-failure',
+    });
+  }
+
+  return {
+    strandBuilt: emptyRunBackbone(),
+    replicaNodes,
+    replicaEdges,
+    showMoreNodes,
+    totals: {
+      hiddenSuccessCount,
+      hiddenFailureCount,
+      totalBodyCount: data.total_body_count,
+      visibleSuccessCount: visibleSuccess.length,
+      visibleFailureCount: visibleFailure.length,
+    },
+  };
+}
+
 function buildRunGraphData(data) {
   validateRunPayload(data);
 
@@ -1566,19 +1842,36 @@ function buildRunGraphData(data) {
   const strandBuiltRaw = buildStrandGraphData(strandInput);
   let strandBuiltCollapsed = collapseStrandShapeTransitions(strandBuiltRaw);
 
-  // Run mode overrides the input_slot node's label with the
-  // host-supplied `source_display` (runtime input filename).
-  // Strand mode ignores this field so the abstract graph shows
-  // the media def's title from `media_display_names`.
-  if (typeof data.source_display === 'string' && data.source_display.length > 0) {
-    strandBuiltCollapsed = {
-      nodes: strandBuiltCollapsed.nodes.map(n =>
-        n.id === 'input_slot' ? Object.assign({}, n, { label: data.source_display }) : n),
-      edges: strandBuiltCollapsed.edges,
-      sourceMediaUrn: strandBuiltCollapsed.sourceMediaUrn,
-      targetMediaUrn: strandBuiltCollapsed.targetMediaUrn,
-    };
-  }
+  const inputItems = Array.isArray(data.input_items) ? data.input_items : [];
+  const inputRuns = Array.isArray(data.input_runs) ? data.input_runs : [];
+  const inputReplicaNodes = [];
+  const inputReplicaEdges = [];
+  inputItems.forEach((item, idx) => {
+    const nodeId = `input-item-${idx}`;
+    inputReplicaNodes.push({
+      group: 'nodes',
+      data: {
+        id: nodeId,
+        label: item.label,
+        fullUrn: item.path,
+        inputIndex: idx,
+        inputPath: item.path,
+      },
+      classes: 'run-input-item',
+    });
+    inputReplicaEdges.push({
+      group: 'edges',
+      data: {
+        id: `input-item-edge-${idx}`,
+        source: nodeId,
+        target: 'input_slot',
+        label: '',
+        title: item.path,
+        fullUrn: '',
+        color: getCssVar('--graph-edge-color'),
+      },
+    });
+  });
 
   // Locate the ForEach/Collect span in the raw steps. Positional
   // IDs survive the collapse (node IDs are `step_${i}` from the
@@ -1605,6 +1898,36 @@ function buildRunGraphData(data) {
   const hiddenFailureCount = failures.length - visibleFailure.length;
   const visibleOutcomes = visibleSuccess.concat(visibleFailure);
 
+  // Look up a display name for a media URN via the host-supplied
+  // `media_display_names` map. Uses `MediaUrn.isEquivalent` for
+  // semantic URN equality.
+  const MediaUrn = requireHostDependency('MediaUrn');
+  const mediaDisplayNames = data.media_display_names || {};
+  const displayEntries = [];
+  for (const [urn, display] of Object.entries(mediaDisplayNames)) {
+    if (typeof display !== 'string' || display.length === 0) continue;
+    try {
+      displayEntries.push({ media: MediaUrn.fromString(urn), display });
+    } catch (_) { /* ignore malformed keys */ }
+  }
+  function displayNameFor(canonicalUrn) {
+    return requireExplicitDisplayName(canonicalUrn, displayEntries, 'run node');
+  }
+
+  const externalInputRunBuilt = buildExternalInputRunGraphData(
+    data,
+    inputRuns,
+    allOutcomes,
+    visibleSuccess,
+    visibleFailure,
+    hiddenSuccessCount,
+    hiddenFailureCount,
+    displayNameFor
+  );
+  if (externalInputRunBuilt !== null) {
+    return externalInputRunBuilt;
+  }
+
   // Per-body replicas only fire when there's a ForEach AND at
   // least one visible outcome. Without outcomes, the strand
   // backbone renders the "plan preview" unchanged.
@@ -1628,8 +1951,8 @@ function buildRunGraphData(data) {
   if (!shouldExpand) {
     return {
       strandBuilt: strandBuiltCollapsed,
-      replicaNodes: [],
-      replicaEdges: [],
+      replicaNodes: inputReplicaNodes,
+      replicaEdges: inputReplicaEdges,
       showMoreNodes: [],
       totals: {
         hiddenSuccessCount,
@@ -1729,23 +2052,9 @@ function buildRunGraphData(data) {
 
   const replicaNodes = [];
   const replicaEdges = [];
+  replicaNodes.push(...inputReplicaNodes);
+  replicaEdges.push(...inputReplicaEdges);
   let replicasBuiltCount = 0;
-
-  // Look up a display name for a media URN via the host-supplied
-  // `media_display_names` map. Uses `MediaUrn.isEquivalent` for
-  // semantic URN equality.
-  const MediaUrn = requireHostDependency('MediaUrn');
-  const mediaDisplayNames = data.media_display_names || {};
-  const displayEntries = [];
-  for (const [urn, display] of Object.entries(mediaDisplayNames)) {
-    if (typeof display !== 'string' || display.length === 0) continue;
-    try {
-      displayEntries.push({ media: MediaUrn.fromString(urn), display });
-    } catch (_) { /* ignore malformed keys */ }
-  }
-  function displayNameFor(canonicalUrn) {
-    return requireExplicitDisplayName(canonicalUrn, displayEntries, 'run node');
-  }
 
   // The per-body "entry" node represents one item of the
   // sequence being iterated. Its URN is:
