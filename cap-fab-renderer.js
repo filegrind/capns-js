@@ -382,9 +382,11 @@ function layoutForMode(mode) {
       'elk.layered.spacing.nodeNodeBetweenLayers': 220,
       'elk.layered.spacing.edgeEdgeBetweenLayers': 44,
       'elk.layered.spacing.edgeNodeBetweenLayers': 52,
+      'elk.layered.spacing.baseValue': 40,
+      'elk.layered.nodePlacement.favorStraightEdges': true,
       'elk.spacing.edgeEdge': 34,
       'elk.spacing.edgeNode': 42,
-      'elk.spacing.nodeNode': 118,
+      'elk.spacing.nodeNode': 168,
     });
   }
   if (mode === 'strand') {
