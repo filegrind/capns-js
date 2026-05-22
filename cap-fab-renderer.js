@@ -379,8 +379,12 @@ function layoutForMode(mode) {
   };
   if (mode === 'browse') {
     return Object.assign({}, base, {
-      'elk.layered.spacing.nodeNodeBetweenLayers': 180,
-      'elk.spacing.nodeNode': 90,
+      'elk.layered.spacing.nodeNodeBetweenLayers': 220,
+      'elk.layered.spacing.edgeEdgeBetweenLayers': 44,
+      'elk.layered.spacing.edgeNodeBetweenLayers': 52,
+      'elk.spacing.edgeEdge': 34,
+      'elk.spacing.edgeNode': 42,
+      'elk.spacing.nodeNode': 118,
     });
   }
   if (mode === 'strand') {
@@ -545,6 +549,15 @@ function buildStylesheet() {
         'arrow-scale': 0.8,
         'transition-property': 'opacity, width',
         'transition-duration': '0.2s',
+      },
+    },
+    {
+      selector: 'edge.crowded-edge',
+      style: {
+        'curve-style': 'unbundled-bezier',
+        'control-point-step-size': 'data(controlPointStepSize)',
+        'control-point-distances': 'data(controlPointDistances)',
+        'control-point-weights': 'data(controlPointWeights)',
       },
     },
     {
@@ -967,6 +980,80 @@ function edgeHueColor(edgeIdx) {
   return `hsl(${hue}, 60%, 55%)`;
 }
 
+function centeredOrdinal(index, total) {
+  if (!Number.isInteger(index) || !Number.isInteger(total) || total <= 0) {
+    throw new Error('CapFabRenderer: centeredOrdinal requires integer index/total');
+  }
+  return index - ((total - 1) / 2);
+}
+
+function crowdOffsets(index, total, step, maxAbs) {
+  if (total <= 1) return 0;
+  const raw = centeredOrdinal(index, total) * step;
+  if (maxAbs === undefined) return raw;
+  return Math.max(-maxAbs, Math.min(maxAbs, raw));
+}
+
+function annotateCrowdedBrowseEdges(edges) {
+  const bySource = new Map();
+  const byTarget = new Map();
+
+  for (const edge of edges) {
+    if (!bySource.has(edge.source)) bySource.set(edge.source, []);
+    bySource.get(edge.source).push(edge);
+    if (!byTarget.has(edge.target)) byTarget.set(edge.target, []);
+    byTarget.get(edge.target).push(edge);
+  }
+
+  const stableSort = (a, b) => {
+    const targetCmp = a.target.localeCompare(b.target);
+    if (targetCmp !== 0) return targetCmp;
+    const titleCmp = a.title.localeCompare(b.title);
+    if (titleCmp !== 0) return titleCmp;
+    return a.id.localeCompare(b.id);
+  };
+  const reverseStableSort = (a, b) => {
+    const sourceCmp = a.source.localeCompare(b.source);
+    if (sourceCmp !== 0) return sourceCmp;
+    const titleCmp = a.title.localeCompare(b.title);
+    if (titleCmp !== 0) return titleCmp;
+    return a.id.localeCompare(b.id);
+  };
+
+  for (const group of bySource.values()) group.sort(stableSort);
+  for (const group of byTarget.values()) group.sort(reverseStableSort);
+
+  const sourceIndex = new Map();
+  const targetIndex = new Map();
+  for (const group of bySource.values()) {
+    group.forEach((edge, idx) => sourceIndex.set(edge.id, idx));
+  }
+  for (const group of byTarget.values()) {
+    group.forEach((edge, idx) => targetIndex.set(edge.id, idx));
+  }
+
+  for (const edge of edges) {
+    const sourceGroup = bySource.get(edge.source) || [edge];
+    const targetGroup = byTarget.get(edge.target) || [edge];
+    const sourceCount = sourceGroup.length;
+    const targetCount = targetGroup.length;
+    const crowdCount = Math.max(sourceCount, targetCount);
+
+    if (crowdCount <= 2) {
+      edge.crowdedClass = '';
+      continue;
+    }
+
+    const sourceOffset = crowdOffsets(sourceIndex.get(edge.id), sourceCount, 18, 64);
+    const targetOffset = crowdOffsets(targetIndex.get(edge.id), targetCount, 18, 64);
+
+    edge.crowdedClass = 'crowded-edge';
+    edge.controlPointDistances = `${sourceOffset} ${targetOffset}`;
+    edge.controlPointWeights = '0.22 0.78';
+    edge.controlPointStepSize = 56;
+  }
+}
+
 // --------- Browse mode builder ----------------------------------------------
 
 function buildBrowseGraphData(capabilities) {
@@ -1020,6 +1107,7 @@ function buildBrowseGraphData(capabilities) {
   edges.forEach((edge, i) => {
     edge.color = edgeHueColor(i);
   });
+  annotateCrowdedBrowseEdges(edges);
 
   const nodes = Array.from(nodesMap.values());
   for (const node of nodes) {
@@ -1067,7 +1155,11 @@ function browseCytoscapeElements(built) {
         fullUrn: edge.capability.urn,
         capFabEdgeIndex: edge.capFabEdgeIndex,
         color: edge.color,
+        controlPointStepSize: edge.controlPointStepSize || 56,
+        controlPointDistances: edge.controlPointDistances || '0 0',
+        controlPointWeights: edge.controlPointWeights || '0.22 0.78',
       },
+      classes: edge.crowdedClass || '',
     };
   });
   return nodeElements.concat(edgeElements);
