@@ -1759,19 +1759,19 @@ const DEFAULT_SCHEMA_BASE = 'https://capdag.com/schema';
  * Get the schema base URL from environment variables or default
  *
  * Checks in order:
- * 1. CAPDAG_SCHEMA_BASE_URL environment variable
- * 2. CAPDAG_REGISTRY_URL environment variable + "/schema"
+ * 1. CDG_SCHEMA_BASE_URL environment variable
+ * 2. CDG_FABRIC_REGISTRY_URL environment variable + "/schema"
  * 3. Default: "https://capdag.com/schema"
  *
  * @returns {string} The schema base URL
  */
 function getSchemaBaseURL() {
   if (typeof process !== 'undefined' && process.env) {
-    if (process.env.CAPDAG_SCHEMA_BASE_URL) {
-      return process.env.CAPDAG_SCHEMA_BASE_URL;
+    if (process.env.CDG_SCHEMA_BASE_URL) {
+      return process.env.CDG_SCHEMA_BASE_URL;
     }
-    if (process.env.CAPDAG_REGISTRY_URL) {
-      return process.env.CAPDAG_REGISTRY_URL + '/schema';
+    if (process.env.CDG_FABRIC_REGISTRY_URL) {
+      return process.env.CDG_FABRIC_REGISTRY_URL + '/schema';
     }
   }
   return DEFAULT_SCHEMA_BASE;
