@@ -1,8 +1,8 @@
 # JS Test Catalog
 
-**Total Tests:** 335
+**Total Tests:** 337
 
-**Numbered Tests:** 185
+**Numbered Tests:** 187
 
 **Unnumbered Tests:** 150
 
@@ -201,6 +201,8 @@ This catalog lists all tests in the JS codebase.
 | test1844 | `test1844_axisWeightingOutDominates` | TEST1844: out-axis difference dominates combined in+y differences. | capdag.test.js:5893 |
 | test1845 | `test1845_axisWeightingInDominatesY` | TEST1845: With equal out, in-axis dominates over y-axis. | capdag.test.js:5903 |
 | test1846 | `test1846_axisWeightingDecodedLayout` | TEST1846: Decoded layout — 10000*out + 100*in + y. | capdag.test.js:5913 |
+| test1847 | `test1847_capVersionZeroOmittedOnWire` | TEST1847: Cap with version=0 round-trips with no `version` key on wire | capdag.test.js:5925 |
+| test1848 | `test1848_capVersionNonZeroOnWire` | TEST1848: Cap with version=N round-trips with `version: N` on wire | capdag.test.js:5937 |
 | | | | |
 | unnumbered | `testCapFabAddCapPopulatesEdgesAndNodes` | Add a cap and check it becomes an edge with from/to nodes and carries the registry name we passed. This is exactly the shape the renderer depends on. | capdag.test.js:1382 |
 | unnumbered | `testCapFabDistinctRegistryNames` | Each edge must carry the registry name it was added with. This is how the renderer colours/groups edges by provenance in browse mode. | capdag.test.js:1421 |
@@ -512,8 +514,8 @@ The following tests are cataloged but do not currently participate in numeric te
 ---
 
 *Generated from JS source tree*
-*Total tests: 335*
-*Total numbered tests: 185*
+*Total tests: 337*
+*Total numbered tests: 187*
 *Total unnumbered tests: 150*
 *Total numbered tests missing descriptions: 0*
 *Total numbering mismatches: 0*
