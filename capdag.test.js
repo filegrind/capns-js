@@ -980,12 +980,12 @@ function test072_constantsParse() {
 // TEST074: Test media URN conforms_to using tagged URN semantics with specific and generic requirements
 function test074_mediaUrnMatching() {
   const pdfUrn = MediaUrn.fromString(MEDIA_PDF);
-  const pdfPattern = MediaUrn.fromString('media:pdf');
-  assert(pdfUrn.conformsTo(pdfPattern), 'MEDIA_PDF should conform to media:pdf');
+  const pdfPattern = MediaUrn.fromString('media:ext=pdf');
+  assert(pdfUrn.conformsTo(pdfPattern), 'MEDIA_PDF should conform to media:ext=pdf');
 
   const mdUrn = MediaUrn.fromString(MEDIA_MD);
-  const mdPattern = MediaUrn.fromString('media:md');
-  assert(mdUrn.conformsTo(mdPattern), 'MEDIA_MD should conform to media:md');
+  const mdPattern = MediaUrn.fromString('media:ext=md');
+  assert(mdUrn.conformsTo(mdPattern), 'MEDIA_MD should conform to media:ext=md');
 
   // Same URN conforms to itself
   assert(pdfUrn.conformsTo(pdfUrn), 'Same URN should conform to itself');
@@ -2587,7 +2587,7 @@ function test1304_withInOutSpec() {
   // Chain both
   const changedBoth = cap.withInSpec('media:pdf').withOutSpec(MEDIA_TXT);
   assertEqual(changedBoth.getInSpec(), 'media:pdf', 'Chain should set inSpec');
-  assertEqual(changedBoth.getOutSpec(), 'media:textable;txt', 'Chain should set outSpec');
+  assertEqual(changedBoth.getOutSpec(), 'media:ext=txt;textable', 'Chain should set outSpec');
 
   const identity = CapUrn.fromString('cap:effect=none');
   assertThrows(
@@ -5918,6 +5918,34 @@ function test1846_axisWeightingDecodedLayout() {
 }
 
 // ============================================================================
+// Cap.version round-trip tests: TEST1847-TEST1848
+// ============================================================================
+
+// TEST1847: Cap with version=0 round-trips with no `version` key on wire
+function test1847_capVersionZeroOmittedOnWire() {
+  const urn = CapUrn.fromString('cap:in="media:void";test-op;out="media:record;textable"');
+  const cap = new Cap(urn, 'Test Cap', 'test-op');
+  // version defaults to 0
+  assertEqual(cap.version, 0, 'Default version should be 0');
+  const json = cap.toJSON();
+  assert(!('version' in json), 'version=0 must not appear on wire');
+  const restored = Cap.fromJSON(json);
+  assertEqual(restored.version, 0, 'Restored version must be 0');
+}
+
+// TEST1848: Cap with version=N round-trips with `version: N` on wire
+function test1848_capVersionNonZeroOnWire() {
+  const urn = CapUrn.fromString('cap:in="media:void";versioned-op;out="media:record;textable"');
+  const cap = new Cap(urn, 'Versioned Cap', 'versioned-op');
+  cap.version = 42;
+  const json = cap.toJSON();
+  assert('version' in json, 'version!=0 must appear on wire');
+  assertEqual(json.version, 42, 'Wire version must equal 42');
+  const restored = Cap.fromJSON(json);
+  assertEqual(restored.version, 42, 'Restored version must equal 42');
+}
+
+// ============================================================================
 // Test runner
 // ============================================================================
 
@@ -6352,6 +6380,10 @@ async function runTests() {
   runTest('TEST1844: axis_weighting_out_dominates',         test1844_axisWeightingOutDominates);
   runTest('TEST1845: axis_weighting_in_dominates_y',        test1845_axisWeightingInDominatesY);
   runTest('TEST1846: axis_weighting_decoded_layout',        test1846_axisWeightingDecodedLayout);
+
+  // Cap.version round-trip tests
+  runTest('TEST1847: cap_version_zero_omitted_on_wire',     test1847_capVersionZeroOmittedOnWire);
+  runTest('TEST1848: cap_version_nonzero_on_wire',          test1848_capVersionNonZeroOnWire);
 
   // Summary
   console.log(`\n${passCount + failCount} tests: ${passCount} passed, ${failCount} failed`);

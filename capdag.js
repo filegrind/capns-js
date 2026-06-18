@@ -1222,69 +1222,69 @@ const MEDIA_OBJECT_LIST = 'media:list;record';
 
 // Semantic media types for specialized content
 // Media URN for PNG image data
-const MEDIA_PNG = 'media:image;png';
+const MEDIA_PNG = 'media:ext=png;image';
 // Media URN for JPEG image data
-const MEDIA_JPEG = 'media:jpeg;image';
+const MEDIA_JPEG = 'media:ext=jpeg;image';
 // Media URN for GIF image data
-const MEDIA_GIF = 'media:gif;image';
+const MEDIA_GIF = 'media:ext=gif;image';
 // Media URN for BMP image data
-const MEDIA_BMP = 'media:bmp;image';
+const MEDIA_BMP = 'media:ext=bmp;image';
 // Media URN for TIFF image data
-const MEDIA_TIFF = 'media:tiff;image';
+const MEDIA_TIFF = 'media:ext=tiff;image';
 // Media URN for WebP image data
-const MEDIA_WEBP = 'media:webp;image';
+const MEDIA_WEBP = 'media:ext=webp;image';
 // Media URN for audio data (wav, mp3, flac, etc.)
-const MEDIA_AUDIO = 'media:wav;audio';
+const MEDIA_AUDIO = 'media:audio;ext=wav';
 // Media URN for MP3 audio data
-const MEDIA_MP3 = 'media:mp3;audio';
+const MEDIA_MP3 = 'media:audio;ext=mp3';
 // Media URN for WAV audio data
-const MEDIA_WAV = 'media:wav;audio';
+const MEDIA_WAV = 'media:audio;ext=wav';
 // Media URN for FLAC audio data
-const MEDIA_FLAC = 'media:flac;audio';
+const MEDIA_FLAC = 'media:audio;ext=flac';
 // Media URN for OGG audio data
-const MEDIA_OGG = 'media:ogg;audio';
+const MEDIA_OGG = 'media:audio;ext=ogg';
 // Media URN for AAC audio data
-const MEDIA_AAC = 'media:aac;audio';
+const MEDIA_AAC = 'media:audio;ext=aac';
 // Media URN for M4A audio data
-const MEDIA_M4A = 'media:m4a;audio';
+const MEDIA_M4A = 'media:audio;ext=m4a';
 // Media URN for AIFF audio data
-const MEDIA_AIFF = 'media:aiff;audio';
+const MEDIA_AIFF = 'media:audio;ext=aiff';
 // Media URN for Opus audio data
-const MEDIA_OPUS = 'media:opus;audio';
+const MEDIA_OPUS = 'media:audio;ext=opus';
 // Media URN for video data (mp4, webm, mov, etc.)
 const MEDIA_VIDEO = 'media:video';
 // Media URN for MP4 video data
-const MEDIA_MP4 = 'media:mp4;video';
+const MEDIA_MP4 = 'media:ext=mp4;video';
 // Media URN for MOV video data
-const MEDIA_MOV = 'media:mov;video';
+const MEDIA_MOV = 'media:ext=mov;video';
 // Media URN for WebM video data
-const MEDIA_WEBM = 'media:webm;video';
+const MEDIA_WEBM = 'media:ext=webm;video';
 // Media URN for MKV video data
-const MEDIA_MKV = 'media:mkv;video';
+const MEDIA_MKV = 'media:ext=mkv;video';
 
 // Semantic AI input types - distinguished by their purpose/context
 // Media URN for audio input containing speech for transcription (Whisper)
-const MEDIA_AUDIO_SPEECH = 'media:audio;wav;speech';
+const MEDIA_AUDIO_SPEECH = 'media:audio;ext=wav;speech';
 
 // Document types (PRIMARY naming - type IS the format)
 // Media URN for PDF documents
-const MEDIA_PDF = 'media:pdf';
+const MEDIA_PDF = 'media:ext=pdf';
 // Media URN for EPUB documents
-const MEDIA_EPUB = 'media:epub';
+const MEDIA_EPUB = 'media:ext=epub';
 
 // Text format types (PRIMARY naming - type IS the format)
 // Media URN for Markdown text
-const MEDIA_MD = 'media:md;textable';
+const MEDIA_MD = 'media:ext=md;textable';
 // Media URN for plain text
-const MEDIA_TXT = 'media:txt;textable';
+const MEDIA_TXT = 'media:ext=txt;textable';
 // Media URN for reStructuredText
-const MEDIA_RST = 'media:rst;textable';
+const MEDIA_RST = 'media:ext=rst;textable';
 // Media URN for log files
-const MEDIA_LOG = 'media:log;textable';
+const MEDIA_LOG = 'media:ext=log;textable';
 // Media URN for HTML documents
-const MEDIA_HTML = 'media:html;textable';
+const MEDIA_HTML = 'media:ext=html;textable';
 // Media URN for XML documents
-const MEDIA_XML = 'media:xml;textable';
+const MEDIA_XML = 'media:ext=xml;textable';
 // Media URN for JSON data - has record marker (structured key-value)
 const MEDIA_JSON = 'media:json;record;textable';
 // Media URN for JSON with schema constraint (input for structured queries)
@@ -1301,8 +1301,8 @@ const MEDIA_YAML_VALUE = 'media:textable;yaml';
 const MEDIA_YAML_RECORD = 'media:record;textable;yaml';
 const MEDIA_YAML_LIST = 'media:list;textable;yaml';
 const MEDIA_YAML_LIST_RECORD = 'media:list;record;textable;yaml';
-const MEDIA_CSV = 'media:csv;list;record;textable';
-const MEDIA_CSV_LIST = 'media:csv;list;record;textable';
+const MEDIA_CSV = 'media:ext=csv;list;record;textable';
+const MEDIA_CSV_LIST = 'media:ext=csv;list;record;textable';
 
 // File path type — for arguments that represent filesystem paths.
 // There is a single media URN; cardinality (single file vs many files)
@@ -1338,18 +1338,18 @@ const MEDIA_EMBEDDING_VECTOR = 'media:embedding-vector;record;textable';
 // Carries `image-description` (the vision-specific marker), `plain-text` (the
 // finalised-text marker that opts into cap:save-as-txt's persistence path),
 // and `file-type=txt` (binds the URN to the `.txt` extension).
-const MEDIA_IMAGE_DESCRIPTION = 'media:image-description;plain-text;textable;txt';
+const MEDIA_IMAGE_DESCRIPTION = 'media:ext=txt;image-description;plain-text;textable';
 // Media URN for finalised plain text — the canonical input/output of cap:save-as-txt.
 // Producers of user-facing prose (LLM text-generation, OCR's extracted text,
 // summarisation) declare this URN as their `out` so the planner restricts the .txt
 // persistence path to those caps. See fabric/media/plain-text.toml.
-const MEDIA_PLAIN_TEXT = 'media:plain-text;textable;txt';
+const MEDIA_PLAIN_TEXT = 'media:ext=txt;plain-text;textable';
 // Media URN for transcription output - has record marker
 const MEDIA_TRANSCRIPTION_OUTPUT = 'media:record;textable;transcription';
 // Media URN for decision output - JSON record with textable
 const MEDIA_DECISION = 'media:decision;json;record;textable';
 // Media URN for textable page output
-const MEDIA_TEXTABLE_PAGE = 'media:page;plain-text;textable;txt';
+const MEDIA_TEXTABLE_PAGE = 'media:ext=txt;page;plain-text;textable';
 // Media URN for Hugging Face API token (secret, textable)
 const MEDIA_HF_TOKEN = 'media:hf-token;secret;textable';
 // Media URN for a list of model architectures — JSON record
@@ -1369,6 +1369,7 @@ const MEDIA_ADAPTER_SELECTION = 'media:adapter-selection;json;record';
 // and cap:lookup-media-def;fabric, both implemented by fetchcartridge).
 const MEDIA_CAP_URN = 'media:cap-urn;textable';
 const MEDIA_MEDIA_URN = 'media:media-urn;textable';
+const MEDIA_FABRIC_DEFVER = 'media:defver;textable';
 const MEDIA_CAP_DEFINITION = 'media:cap-definition;json;record;textable';
 const MEDIA_MEDIA_DEFINITION = 'media:media-definition;json;record;textable';
 
@@ -2511,6 +2512,7 @@ class Cap {
     }
 
     this.urn = urn;
+    this.version = 0;
     this.title = title;
     this.command = command;
     this.cap_description = capDescription;
@@ -2747,6 +2749,10 @@ class Cap {
       output: this.output
     };
 
+    if (this.version !== 0) {
+      result.version = this.version;
+    }
+
     // Long-form markdown documentation. Only emitted when set, to match
     // the Rust serializer which skips this field when None.
     if (typeof this.documentation === 'string' && this.documentation.length > 0) {
@@ -2786,6 +2792,7 @@ class Cap {
       ? json.documentation
       : null;
     const cap = new Cap(urn, json.title, json.command, json.cap_description, json.metadata, json.metadata_json, documentation);
+    cap.version = (typeof json.version === 'number' && json.version !== 0) ? json.version : 0;
     // Parse args (new format)
     if (json.args && Array.isArray(json.args)) {
       cap.args = json.args.map(a => CapArg.fromJSON(a));
@@ -6495,6 +6502,7 @@ module.exports = {
   // Fabric registry lookup wire types
   MEDIA_CAP_URN,
   MEDIA_MEDIA_URN,
+  MEDIA_FABRIC_DEFVER,
   MEDIA_CAP_DEFINITION,
   MEDIA_MEDIA_DEFINITION,
   // Standard cap URN constants
