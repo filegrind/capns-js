@@ -105,7 +105,8 @@ function runTest(name, fn) {
  * Uses MEDIA_VOID for in and MEDIA_OBJECT for out, matching the
  * Rust reference test_urn helper: test_urn(tags) => cap:in="media:void";{tags};out="media:record;textable"
  */
-function testUrn(tags) {
+// TEST0051: Urn
+function test0051_Urn(tags) {
   if (!tags || tags === '') {
     return `cap:in="${MEDIA_VOID}";out="${MEDIA_OBJECT}"`;
   }
@@ -131,7 +132,7 @@ function makeGraphCap(inUrn, outUrn, title) {
 
 // TEST001: Test that cap URN is created with tags parsed correctly and direction specs accessible
 function test001_capUrnCreation() {
-  const cap = CapUrn.fromString(testUrn('generate;ext=pdf;target=thumbnail'));
+  const cap = CapUrn.fromString(test0051_Urn('generate;ext=pdf;target=thumbnail'));
   assert(cap.hasMarkerTag('generate'), 'Should get op tag');
   assertEqual(cap.getTag('target'), 'thumbnail', 'Should get target tag');
   assertEqual(cap.getTag('ext'), 'pdf', 'Should get ext tag');
@@ -152,8 +153,8 @@ function test002_directionSpecsRequired() {
 
 // TEST003: Test that direction specs must match exactly, different in/out types don't match, wildcard matches any
 function test003_directionMatching() {
-  const cap = CapUrn.fromString(testUrn('generate'));
-  const request = CapUrn.fromString(testUrn('generate'));
+  const cap = CapUrn.fromString(test0051_Urn('generate'));
+  const request = CapUrn.fromString(test0051_Urn('generate'));
   assert(cap.accepts(request), 'Same direction specs should match');
 
   // Different direction should not match
@@ -239,7 +240,7 @@ function test011_serializationSmartQuoting() {
 
 // TEST012: Test that simple cap URN round-trips (parse -> serialize -> parse equals original)
 function test012_roundTripSimple() {
-  const original = CapUrn.fromString(testUrn('generate;ext=pdf'));
+  const original = CapUrn.fromString(test0051_Urn('generate;ext=pdf'));
   const serialized = original.toString();
   const reparsed = CapUrn.fromString(serialized);
   assert(original.equals(reparsed), 'Simple round-trip should produce equal URN');
@@ -272,14 +273,14 @@ function test015_capPrefixRequired() {
     'Should require cap: prefix'
   );
   // Valid cap: prefix should work
-  const cap = CapUrn.fromString(testUrn('generate'));
+  const cap = CapUrn.fromString(test0051_Urn('generate'));
   assert(cap.hasMarkerTag('generate'), 'Should parse with valid cap: prefix');
 }
 
 // TEST016: Test that trailing semicolon is equivalent (same hash, same string, matches)
 function test016_trailingSemicolonEquivalence() {
-  const cap1 = CapUrn.fromString(testUrn('generate;ext=pdf'));
-  const cap2 = CapUrn.fromString(testUrn('generate;ext=pdf') + ';');
+  const cap1 = CapUrn.fromString(test0051_Urn('generate;ext=pdf'));
+  const cap2 = CapUrn.fromString(test0051_Urn('generate;ext=pdf') + ';');
   assert(cap1.equals(cap2), 'With/without trailing semicolon should be equal');
   assertEqual(cap1.toString(), cap2.toString(), 'Canonical forms should match');
 }
@@ -323,24 +324,24 @@ function test939_capUrnCanonicalFormDropsWildcardInOut() {
 
 // TEST017: Test tag matching: exact match, subset match, wildcard match, value mismatch
 function test017_tagMatching() {
-  const cap = CapUrn.fromString(testUrn('generate;ext=pdf;target=thumbnail'));
+  const cap = CapUrn.fromString(test0051_Urn('generate;ext=pdf;target=thumbnail'));
 
   // Exact match — both directions accept
-  const exact = CapUrn.fromString(testUrn('generate;ext=pdf;target=thumbnail'));
+  const exact = CapUrn.fromString(test0051_Urn('generate;ext=pdf;target=thumbnail'));
   assert(cap.accepts(exact), 'Should accept exact match');
   assert(exact.accepts(cap), 'Exact match should accept in reverse too');
 
   // Routing direction: request(generate) accepts cap(op,ext,target)
-  const subset = CapUrn.fromString(testUrn('generate'));
+  const subset = CapUrn.fromString(test0051_Urn('generate'));
   assert(subset.accepts(cap), 'General request should accept more specific instance');
   assert(!cap.accepts(subset), 'Specific pattern should reject subset instance');
 
   // Routing direction: request(ext=*) accepts cap(ext=pdf)
-  const wildcard = CapUrn.fromString(testUrn('ext=*'));
+  const wildcard = CapUrn.fromString(test0051_Urn('ext=*'));
   assert(wildcard.accepts(cap), 'Wildcard request should accept specific instance');
 
   // Conflicting value — neither direction accepts
-  const mismatch = CapUrn.fromString(testUrn('extract'));
+  const mismatch = CapUrn.fromString(test0051_Urn('extract'));
   assert(!cap.accepts(mismatch), 'Should not accept value mismatch');
   assert(!mismatch.accepts(cap), 'Reverse mismatch should also reject');
 }
@@ -354,13 +355,13 @@ function test018_matchingCaseSensitiveValues() {
 
 // TEST019: Missing tag in instance causes rejection — pattern's tags are constraints
 function test019_missingTagHandling() {
-  const cap = CapUrn.fromString(testUrn('generate'));
-  const request = CapUrn.fromString(testUrn('ext=pdf'));
+  const cap = CapUrn.fromString(test0051_Urn('generate'));
+  const request = CapUrn.fromString(test0051_Urn('ext=pdf'));
   assert(!cap.accepts(request), 'Pattern requiring op should reject instance missing op');
   assert(!request.accepts(cap), 'Pattern requiring ext should reject instance missing ext');
 
-  const cap2 = CapUrn.fromString(testUrn('generate;ext=pdf'));
-  const request2 = CapUrn.fromString(testUrn('generate'));
+  const cap2 = CapUrn.fromString(test0051_Urn('generate;ext=pdf'));
+  const request2 = CapUrn.fromString(test0051_Urn('generate'));
   assert(!cap2.accepts(request2), 'Specific pattern should reject instance missing ext');
   assert(request2.accepts(cap2), 'General request should accept more specific instance');
 }
@@ -370,27 +371,27 @@ function test019_missingTagHandling() {
 // (must-have-any), exact `key=value` tags score 3, missing/`?` score
 // 0, `!` scores 1.
 //
-// testUrn() builds "cap:in=media:void;out=media:record;<tags>" so
+// test0051_Urn() builds "cap:in=media:void;out=media:record;<tags>" so
 // the directional baseline is:
 //   in:  media:void   -> {void=*}    -> 2
 //   out: media:record -> {record=*}  -> 2
 // Total directional baseline: 4.
 function test020_specificity() {
-  // testUrn() prepends in="media:void" (1 marker, score 2) and
+  // test0051_Urn() prepends in="media:void" (1 marker, score 2) and
   // out="media:record" (1 marker, score 2). Cap-URN spec is
   // 10000*spec_U(out) + 100*spec_U(in) + spec_U(y).
 
-  const cap1 = CapUrn.fromString(testUrn('type=general'));
+  const cap1 = CapUrn.fromString(test0051_Urn('type=general'));
   // out=2, in=2, y=4 (type=general exact)
   assertEqual(cap1.specificity(), 10000*2 + 100*2 + 4,
     'out=2, in=2, y=type=general exact=4 -> 20204');
 
-  const cap2 = CapUrn.fromString(testUrn('generate'));
+  const cap2 = CapUrn.fromString(test0051_Urn('generate'));
   // out=2, in=2, y=2 (generate marker = must-have-any)
   assertEqual(cap2.specificity(), 10000*2 + 100*2 + 2,
     'out=2, in=2, y=generate marker=2 -> 20202');
 
-  const cap3 = CapUrn.fromString(testUrn('op;ext=pdf'));
+  const cap3 = CapUrn.fromString(test0051_Urn('op;ext=pdf'));
   // out=2, in=2, y=2+4 (op marker, ext=pdf exact)
   assertEqual(cap3.specificity(), 10000*2 + 100*2 + 6,
     'out=2, in=2, y=op marker(2)+ext=pdf exact(4) -> 20206');
@@ -444,16 +445,16 @@ function test023_builderPreservesCase() {
 
 // TEST024: Directional accepts — pattern's tags are constraints, instance must satisfy
 function test024_compatibility() {
-  const cap1 = CapUrn.fromString(testUrn('generate;ext=pdf'));
-  const cap2 = CapUrn.fromString(testUrn('generate;format=*'));
-  const cap3 = CapUrn.fromString(testUrn('type=image;extract'));
+  const cap1 = CapUrn.fromString(test0051_Urn('generate;ext=pdf'));
+  const cap2 = CapUrn.fromString(test0051_Urn('generate;format=*'));
+  const cap3 = CapUrn.fromString(test0051_Urn('type=image;extract'));
 
   assert(!cap1.accepts(cap2), 'Pattern requiring ext should reject instance missing ext');
   assert(!cap2.accepts(cap1), 'Pattern requiring format should reject instance missing format');
   assert(!cap1.accepts(cap3), 'Different op should not accept');
   assert(!cap3.accepts(cap1), 'Different op should not accept in reverse');
 
-  const general = CapUrn.fromString(testUrn('generate'));
+  const general = CapUrn.fromString(test0051_Urn('generate'));
   assert(general.accepts(cap1), 'General request should accept more specific instance');
   assert(!cap1.accepts(general), 'Specific pattern should reject general instance');
 
@@ -466,10 +467,10 @@ function test024_compatibility() {
 function test025_bestMatch() {
   const caps = [
     CapUrn.fromString('cap:in=*;out=*;op'),
-    CapUrn.fromString(testUrn('generate')),
-    CapUrn.fromString(testUrn('generate;ext=pdf'))
+    CapUrn.fromString(test0051_Urn('generate')),
+    CapUrn.fromString(test0051_Urn('generate;ext=pdf'))
   ];
-  const request = CapUrn.fromString(testUrn('generate'));
+  const request = CapUrn.fromString(test0051_Urn('generate'));
   const best = CapMatcher.findBestMatch(caps, request);
   assert(best !== null, 'Should find a best match');
   assertEqual(best.getTag('ext'), 'pdf', 'Best match should be the most specific (ext=pdf)');
@@ -477,7 +478,7 @@ function test025_bestMatch() {
 
 // TEST026: Test merge combines tags from both caps, subset keeps only specified tags
 function test026_mergeAndSubset() {
-  const cap1 = CapUrn.fromString(testUrn('generate'));
+  const cap1 = CapUrn.fromString(test0051_Urn('generate'));
   const cap2 = CapUrn.fromString('cap:in="media:textable";ext=pdf;format=binary;out="media:"');
 
   // Merge (other takes precedence)
@@ -496,7 +497,7 @@ function test026_mergeAndSubset() {
 
 // TEST027: Test with_wildcard_tag sets tag to wildcard, including in/out
 function test027_wildcardTag() {
-  const cap = CapUrn.fromString(testUrn('ext=pdf'));
+  const cap = CapUrn.fromString(test0051_Urn('ext=pdf'));
   const wildcardExt = cap.withWildcardTag('ext');
   assertEqual(wildcardExt.getTag('ext'), '*', 'Should set ext to wildcard');
 
@@ -526,7 +527,7 @@ function test029_minimalCapUrn() {
 
 // TEST030: Test extended characters (forward slashes, colons) in tag values
 function test030_extendedCharacterSupport() {
-  const cap = CapUrn.fromString(testUrn('url=https://example_org/api;path=/some/file'));
+  const cap = CapUrn.fromString(test0051_Urn('url=https://example_org/api;path=/some/file'));
   assertEqual(cap.getTag('url'), 'https://example_org/api', 'Should support colons and slashes');
   assertEqual(cap.getTag('path'), '/some/file', 'Should support forward slashes');
 }
@@ -534,13 +535,13 @@ function test030_extendedCharacterSupport() {
 // TEST031: Test wildcard rejected in keys but accepted in values
 function test031_wildcardRestrictions() {
   assertThrows(
-    () => CapUrn.fromString(testUrn('*=value')),
+    () => CapUrn.fromString(test0051_Urn('*=value')),
     ErrorCodes.INVALID_CHARACTER,
     'Should reject wildcard in key'
   );
 
   // Wildcard accepted in values
-  const cap = CapUrn.fromString(testUrn('key=*'));
+  const cap = CapUrn.fromString(test0051_Urn('key=*'));
   assertEqual(cap.getTag('key'), '*', 'Should accept wildcard in value');
 
   // Wildcard in in/out normalizes to media:
@@ -552,7 +553,7 @@ function test031_wildcardRestrictions() {
 // TEST032: Test duplicate keys are rejected with DuplicateKey error
 function test032_duplicateKeyRejection() {
   assertThrows(
-    () => CapUrn.fromString(testUrn('key=value1;key=value2')),
+    () => CapUrn.fromString(test0051_Urn('key=value1;key=value2')),
     ErrorCodes.DUPLICATE_KEY,
     'Should reject duplicate keys'
   );
@@ -561,14 +562,14 @@ function test032_duplicateKeyRejection() {
 // TEST033: Test pure numeric keys rejected, mixed alphanumeric allowed, numeric values allowed
 function test033_numericKeyRestriction() {
   assertThrows(
-    () => CapUrn.fromString(testUrn('123=value')),
+    () => CapUrn.fromString(test0051_Urn('123=value')),
     ErrorCodes.NUMERIC_KEY,
     'Should reject pure numeric keys'
   );
   // Mixed alphanumeric allowed
-  const cap1 = CapUrn.fromString(testUrn('key123=value'));
+  const cap1 = CapUrn.fromString(test0051_Urn('key123=value'));
   assertEqual(cap1.getTag('key123'), 'value', 'Mixed alphanumeric key should be allowed');
-  const cap2 = CapUrn.fromString(testUrn('x123key=value'));
+  const cap2 = CapUrn.fromString(test0051_Urn('x123key=value'));
   assertEqual(cap2.getTag('x123key'), 'value', 'Mixed alphanumeric key should be allowed');
 }
 
@@ -633,45 +634,45 @@ function test039_getTagReturnsDirectionSpecs() {
 
 // TEST040: Matching semantics - exact match succeeds
 function test040_matchingSemanticsExactMatch() {
-  const cap = CapUrn.fromString(testUrn('generate;ext=pdf'));
-  const request = CapUrn.fromString(testUrn('generate;ext=pdf'));
+  const cap = CapUrn.fromString(test0051_Urn('generate;ext=pdf'));
+  const request = CapUrn.fromString(test0051_Urn('generate;ext=pdf'));
   assert(cap.accepts(request), 'Exact match should accept');
 }
 
 // TEST041: Matching semantics - cap missing tag matches (implicit wildcard)
 function test041_matchingSemanticsCapMissingTag() {
-  const cap = CapUrn.fromString(testUrn('generate'));
-  const request = CapUrn.fromString(testUrn('generate;ext=pdf'));
+  const cap = CapUrn.fromString(test0051_Urn('generate'));
+  const request = CapUrn.fromString(test0051_Urn('generate;ext=pdf'));
   assert(cap.accepts(request), 'General pattern with only op should accept specific instance');
   assert(!request.accepts(cap), 'Pattern requiring ext should reject instance missing ext');
 }
 
 // TEST042: Pattern rejects instance missing required tags
 function test042_matchingSemanticsCapHasExtraTag() {
-  const cap = CapUrn.fromString(testUrn('generate;ext=pdf;version=2'));
-  const request = CapUrn.fromString(testUrn('generate;ext=pdf'));
+  const cap = CapUrn.fromString(test0051_Urn('generate;ext=pdf;version=2'));
+  const request = CapUrn.fromString(test0051_Urn('generate;ext=pdf'));
   assert(!cap.accepts(request), 'Pattern requiring version should reject instance missing version');
   assert(request.accepts(cap), 'General request should accept refined instance');
 }
 
 // TEST043: Matching semantics - request wildcard matches specific cap value
 function test043_matchingSemanticsRequestHasWildcard() {
-  const cap = CapUrn.fromString(testUrn('generate;ext=pdf'));
-  const request = CapUrn.fromString(testUrn('generate;ext=*'));
+  const cap = CapUrn.fromString(test0051_Urn('generate;ext=pdf'));
+  const request = CapUrn.fromString(test0051_Urn('generate;ext=*'));
   assert(cap.accepts(request), 'Request wildcard should match specific cap value');
 }
 
 // TEST044: Matching semantics - cap wildcard matches specific request value
 function test044_matchingSemanticsCapHasWildcard() {
-  const cap = CapUrn.fromString(testUrn('generate;ext=*'));
-  const request = CapUrn.fromString(testUrn('generate;ext=pdf'));
+  const cap = CapUrn.fromString(test0051_Urn('generate;ext=*'));
+  const request = CapUrn.fromString(test0051_Urn('generate;ext=pdf'));
   assert(cap.accepts(request), 'Cap wildcard should match specific request value');
 }
 
 // TEST045: Matching semantics - value mismatch does not match
 function test045_matchingSemanticsValueMismatch() {
-  const cap = CapUrn.fromString(testUrn('generate;ext=pdf'));
-  const request = CapUrn.fromString(testUrn('generate;ext=docx'));
+  const cap = CapUrn.fromString(test0051_Urn('generate;ext=pdf'));
+  const request = CapUrn.fromString(test0051_Urn('generate;ext=docx'));
   assert(!cap.accepts(request), 'Value mismatch should not accept');
 }
 
@@ -693,14 +694,14 @@ function test047_matchingSemanticsThumbnailVoidInput() {
 // TEST048: Matching semantics - wildcard direction matches anything
 function test048_matchingSemanticsWildcardDirection() {
   const cap = CapUrn.fromString('cap:generate');
-  const request = CapUrn.fromString(testUrn('generate;ext=pdf'));
+  const request = CapUrn.fromString(test0051_Urn('generate;ext=pdf'));
   assert(cap.accepts(request), 'Generic declared directions should accept a more specific matching request');
 }
 
 // TEST049: Non-overlapping tags — neither direction accepts
 function test049_matchingSemanticsCrossDimension() {
-  const cap = CapUrn.fromString(testUrn('generate'));
-  const request = CapUrn.fromString(testUrn('ext=pdf'));
+  const cap = CapUrn.fromString(test0051_Urn('generate'));
+  const request = CapUrn.fromString(test0051_Urn('ext=pdf'));
   assert(!cap.accepts(request), 'Pattern requiring op should reject instance missing op');
   assert(!request.accepts(cap), 'Pattern requiring ext should reject instance missing ext');
 }
@@ -1281,7 +1282,7 @@ function test116_capArgConstructors() {
 
 // TEST150: JSON roundtrip
 function test150_capManifestJsonSerialization() {
-  const capUrn = CapUrn.fromString(testUrn('extract;target=metadata'));
+  const capUrn = CapUrn.fromString(test0051_Urn('extract;target=metadata'));
   const cap = new Cap(capUrn, 'Extract Metadata', 'extract-metadata');
   cap.addArg(new CapArg('media:pdf', true, [new ArgSource({ stdin: 'media:pdf' })]));
   cap.addArg(new CapArg(
@@ -1379,7 +1380,7 @@ function test597_capArgWithFullDefinition() {
 
 // Add a cap and check it becomes an edge with from/to nodes and carries the
 // registry name we passed. This is exactly the shape the renderer depends on.
-function testCapFabAddCapPopulatesEdgesAndNodes() {
+function test0052_CapFabAddCapPopulatesEdgesAndNodes() {
   const graph = new CapFab();
   const cap = makeGraphCap('media:pdf', 'media:textable', 'PDF to Text');
   graph.addCap(cap, 'registry');
@@ -1397,7 +1398,7 @@ function testCapFabAddCapPopulatesEdgesAndNodes() {
 
 // getOutgoing takes a concrete source URN and returns edges whose from_spec
 // the source conforms to. It must NOT be a plain string lookup.
-function testCapFabGetOutgoingConformsToMatching() {
+function test0053_CapFabGetOutgoingConformsToMatching() {
   const graph = new CapFab();
   graph.addCap(makeGraphCap('media:textable', 'media:embedding-vector', 'Embed text'), 'registry');
 
@@ -1418,7 +1419,7 @@ function testCapFabGetOutgoingConformsToMatching() {
 
 // Each edge must carry the registry name it was added with. This is how
 // the renderer colours/groups edges by provenance in browse mode.
-function testCapFabDistinctRegistryNames() {
+function test0057_CapFabDistinctRegistryNames() {
   const graph = new CapFab();
   graph.addCap(makeGraphCap('media:pdf', 'media:textable', 'PDF to Text'), 'providers');
   graph.addCap(makeGraphCap('media:textable', 'media:embedding-vector', 'Embed'), 'cartridges');
@@ -1629,7 +1630,7 @@ function test310_llmGenerateTextUrn() {
 }
 
 // Mirror-specific coverage: llm_generate_text_urn input/output specs conform to MEDIA_STRING
-function testLlmGenerateTextUrnSpecs() {
+function test0058_LlmGenerateTextUrnSpecs() {
   const urn = llmGenerateTextUrn();
   const inSpec = TaggedUrn.fromString(urn.getInSpec());
   const expectedIn = TaggedUrn.fromString(MEDIA_STRING);
@@ -1660,7 +1661,7 @@ function test312_allUrnBuildersProduceValidUrns() {
 // These tests cover JS-specific functionality not in the Rust numbering scheme
 // but are important for capdag-js correctness.
 
-function testJS_buildExtensionIndex() {
+function test0059_JS_buildExtensionIndex() {
   const mediaDefs = [
     { urn: 'media:pdf', media_type: 'application/pdf', extensions: ['pdf'] },
     { urn: 'media:image;jpeg', media_type: 'image/jpeg', extensions: ['jpg', 'jpeg'] },
@@ -1676,7 +1677,8 @@ function testJS_buildExtensionIndex() {
   assertEqual(index.get('pdf')[0], 'media:pdf', 'pdf should map correctly');
 }
 
-function testJS_mediaUrnsForExtension() {
+// TEST0069: J s media urns for extension
+function test0069_JS_mediaUrnsForExtension() {
   const mediaDefs = [
     { urn: 'media:pdf', media_type: 'application/pdf', extensions: ['pdf'] },
     { urn: 'media:json;textable;record', media_type: 'application/json', extensions: ['json'] },
@@ -1704,7 +1706,8 @@ function testJS_mediaUrnsForExtension() {
   assert(thrownError instanceof MediaDefError, 'Should throw MediaDefError for unknown ext');
 }
 
-function testJS_getExtensionMappings() {
+// TEST0070: J s get extension mappings
+function test0070_JS_getExtensionMappings() {
   const mediaDefs = [
     { urn: 'media:pdf', media_type: 'application/pdf', extensions: ['pdf'] },
     { urn: 'media:image;jpeg', media_type: 'image/jpeg', extensions: ['jpg', 'jpeg'] }
@@ -1714,7 +1717,8 @@ function testJS_getExtensionMappings() {
   assertEqual(mappings.length, 3, 'Should have 3 mappings');
 }
 
-function testJS_resolveMediaUrnFromSpecs() {
+// TEST0073: J s resolve media urn from specs
+function test0073_JS_resolveMediaUrnFromSpecs() {
   const mediaDefs = [
     { urn: MEDIA_STRING, media_type: 'text/plain', title: 'String', profile_uri: 'https://capdag.com/schema/str' },
     { urn: 'media:custom', media_type: 'application/json', title: 'Custom Output', schema: { type: 'object' } }
@@ -1726,8 +1730,9 @@ function testJS_resolveMediaUrnFromSpecs() {
   assert(outputSpec.schema !== null, 'Should have schema');
 }
 
-function testJS_capJSONSerialization() {
-  const urn = CapUrn.fromString(testUrn('test'));
+// TEST0079: J s cap j s o n serialization
+function test0079_JS_capJSONSerialization() {
+  const urn = CapUrn.fromString(test0051_Urn('test'));
   const cap = new Cap(urn, 'Test Cap', 'test_command');
   cap.arguments = {
     required: [{ name: 'input', media_urn: MEDIA_STRING }],
@@ -1749,8 +1754,8 @@ function testJS_capJSONSerialization() {
 // backticks, embedded quotes, Unicode) so escaping mismatches between
 // JSON.stringify on this side and the Rust serializer on the other side
 // surface as failures here.
-function testJS_capDocumentationRoundTrip() {
-  const urn = CapUrn.fromString(testUrn('documented'));
+function test0080_JS_capDocumentationRoundTrip() {
+  const urn = CapUrn.fromString(test0051_Urn('documented'));
   const cap = new Cap(urn, 'Documented Cap', 'documented');
   const body = '# Documented Cap\r\n\nDoes the thing.\n\n```bash\necho "hi"\n```\n\nSee also: \u2605\n';
   cap.setDocumentation(body);
@@ -1771,8 +1776,8 @@ function testJS_capDocumentationRoundTrip() {
 // toDictionary behaviour. A regression where null is emitted as
 // `documentation: null` would break the symmetric round-trip with Rust
 // (which has no null sentinel) and pollute generated JSON.
-function testJS_capDocumentationOmittedWhenNull() {
-  const urn = CapUrn.fromString(testUrn('undocumented'));
+function test0081_JS_capDocumentationOmittedWhenNull() {
+  const urn = CapUrn.fromString(test0051_Urn('undocumented'));
   const cap = new Cap(urn, 'Undocumented Cap', 'undocumented');
   assertEqual(cap.getDocumentation(), null, 'Default documentation must be null');
 
@@ -1794,7 +1799,7 @@ function testJS_capDocumentationOmittedWhenNull() {
 // resolveMediaUrn into the resolved MediaDef. Mirrors TEST924 on the Rust
 // side. This is the path every UI consumer uses, so a break here makes the
 // new field invisible everywhere downstream.
-function testJS_mediaDefDocumentationPropagatesThroughResolve() {
+function test0082_JS_mediaDefDocumentationPropagatesThroughResolve() {
   const body = '## Markdown body\n\nWith `code` and a [link](https://example.com).';
   const mediaDefs = [
     {
@@ -1824,20 +1829,23 @@ function testJS_mediaDefDocumentationPropagatesThroughResolve() {
   assertEqual(emptyDoc.documentation, null, 'Empty documentation string must collapse to null');
 }
 
-function testJS_stdinSourceKindConstants() {
+// TEST0083: J s stdin source kind constants
+function test0083_JS_stdinSourceKindConstants() {
   assert(StdinSourceKind.DATA !== undefined, 'DATA kind should be defined');
   assert(StdinSourceKind.FILE_REFERENCE !== undefined, 'FILE_REFERENCE kind should be defined');
   assert(StdinSourceKind.DATA !== StdinSourceKind.FILE_REFERENCE, 'Kind values should be distinct');
 }
 
-function testJS_stdinSourceNullData() {
+// TEST0084: J s stdin source null data
+function test0084_JS_stdinSourceNullData() {
   const source = StdinSource.fromData(null);
   assert(source !== null, 'Should create source');
   assert(source.isData(), 'Should be data source');
   assertEqual(source.data, null, 'Data should be null');
 }
 
-function testJS_mediaDefConstruction() {
+// TEST0085: J s media def construction
+function test0085_JS_mediaDefConstruction() {
   const spec1 = new MediaDef('text/plain', 'https://capdag.com/schema/str', null, 'String', null, 'media:string');
   assertEqual(spec1.contentType, 'text/plain', 'Should have content type');
   assertEqual(spec1.profile, 'https://capdag.com/schema/str', 'Should have profile');
@@ -2501,7 +2509,7 @@ function test1299_isFilePath() {
 
 // Mirror-specific coverage: isCollection returns true when collection marker tag is present
 // Mirror-specific coverage: N/A for JS (MEDIA_COLLECTION constants removed - no longer exists)
-function testisCollection() {
+function test0086_isCollection() {
   // Skip - collection types removed from capdag
 }
 
@@ -2924,22 +2932,25 @@ function test657_effectDispatchRequiresExplicitWildcard() {
 
 // --- Machine parser tests (mirrors parser.rs tests) ---
 
-function testMachine_emptyInput() {
+function test0087_Machine_emptyInput() {
   assertThrowsWithCode(() => parseMachine(''), MachineSyntaxErrorCodes.EMPTY);
 }
 
-function testMachine_whitespaceOnly() {
+// TEST0088: Machine whitespace only
+function test0088_Machine_whitespaceOnly() {
   assertThrowsWithCode(() => parseMachine('   \n  \t  '), MachineSyntaxErrorCodes.EMPTY);
 }
 
-function testMachine_headerOnlyNoWirings() {
+// TEST0089: Machine header only no wirings
+function test0089_Machine_headerOnlyNoWirings() {
   assertThrowsWithCode(
     () => Machine.fromString('[extract cap:in="media:pdf";extract;out="media:txt;textable"]'),
     MachineSyntaxErrorCodes.NO_EDGES
   );
 }
 
-function testMachine_duplicateAlias() {
+// TEST0090: Machine duplicate alias
+function test0090_Machine_duplicateAlias() {
   assertThrowsWithCode(
     () => Machine.fromString(
       '[ex cap:in="media:pdf";extract;out="media:txt;textable"]' +
@@ -2950,7 +2961,8 @@ function testMachine_duplicateAlias() {
   );
 }
 
-function testMachine_simpleLinearChain() {
+// TEST0094: Machine simple linear chain
+function test0094_Machine_simpleLinearChain() {
   const g = Machine.fromString(
     '[extract cap:in="media:pdf";extract;out="media:txt;textable"]' +
     '[doc -> extract -> text]'
@@ -2965,7 +2977,8 @@ function testMachine_simpleLinearChain() {
   assertEqual(edge.isLoop, false);
 }
 
-function testMachine_twoStepChain() {
+// TEST0095: Machine two step chain
+function test0095_Machine_twoStepChain() {
   const g = Machine.fromString(
     '[extract cap:in="media:pdf";extract;out="media:txt;textable"]' +
     '[embed cap:in="media:txt;textable";embed;out="media:embedding-vector;record;textable"]' +
@@ -2979,7 +2992,8 @@ function testMachine_twoStepChain() {
     'Second edge target should be media:embedding-vector;record;textable');
 }
 
-function testMachine_fanOut() {
+// TEST0096: Machine fan out
+function test0096_Machine_fanOut() {
   const g = Machine.fromString(
     '[meta cap:in="media:pdf";extract-metadata;out="media:file-metadata;record;textable"]' +
     '[outline cap:in="media:pdf";extract-outline;out="media:document-outline;record;textable"]' +
@@ -2996,7 +3010,8 @@ function testMachine_fanOut() {
   }
 }
 
-function testMachine_fanInSecondaryAssignedByPriorWiring() {
+// TEST0097: Machine fan in secondary assigned by prior wiring
+function test0097_Machine_fanInSecondaryAssignedByPriorWiring() {
   const g = Machine.fromString(
     '[thumb cap:in="media:pdf";generate-thumbnail;out="media:image;png;thumbnail"]' +
     '[model_dl cap:in="media:model-spec;textable";download;out="media:model-spec;textable"]' +
@@ -3009,7 +3024,8 @@ function testMachine_fanInSecondaryAssignedByPriorWiring() {
   assertEqual(g.edges()[2].sources.length, 2);
 }
 
-function testMachine_fanInSecondaryUnassignedGetsWildcard() {
+// TEST0098: Machine fan in secondary unassigned gets wildcard
+function test0098_Machine_fanInSecondaryUnassignedGetsWildcard() {
   const g = Machine.fromString(
     '[describe cap:in="media:image;png";describe-image;out="media:image-description;textable"]\n' +
     '[(thumbnail, model_spec) -> describe -> description]'
@@ -3020,7 +3036,8 @@ function testMachine_fanInSecondaryUnassignedGetsWildcard() {
   assertEqual(g.edges()[0].sources[1].toString(), 'media:');
 }
 
-function testMachine_loopEdge() {
+// TEST0111: Machine loop edge
+function test0111_Machine_loopEdge() {
   const g = Machine.fromString(
     '[p2t cap:in="media:disbound-page;textable";page-to-text;out="media:txt;textable"]' +
     '[pages -> LOOP p2t -> texts]'
@@ -3029,14 +3046,16 @@ function testMachine_loopEdge() {
   assertEqual(g.edges()[0].isLoop, true);
 }
 
-function testMachine_undefinedAliasFails() {
+// TEST0112: Machine undefined alias fails
+function test0112_Machine_undefinedAliasFails() {
   assertThrowsWithCode(
     () => Machine.fromString('[doc -> nonexistent -> text]'),
     MachineSyntaxErrorCodes.UNDEFINED_ALIAS
   );
 }
 
-function testMachine_nodeAliasCollision() {
+// TEST0113: Machine node alias collision
+function test0113_Machine_nodeAliasCollision() {
   assertThrowsWithCode(
     () => Machine.fromString(
       '[extract cap:in="media:pdf";extract;out="media:txt;textable"]' +
@@ -3046,7 +3065,8 @@ function testMachine_nodeAliasCollision() {
   );
 }
 
-function testMachine_conflictingMediaTypesFail() {
+// TEST0114: Machine conflicting media types fail
+function test0114_Machine_conflictingMediaTypesFail() {
   assertThrowsWithCode(
     () => Machine.fromString(
       '[cap1 cap:in="media:txt;textable";a;out="media:pdf"]' +
@@ -3058,7 +3078,8 @@ function testMachine_conflictingMediaTypesFail() {
   );
 }
 
-function testMachine_multilineFormat() {
+// TEST0117: Machine multiline format
+function test0117_Machine_multilineFormat() {
   const g = Machine.fromString(
     '[extract cap:in="media:pdf";extract;out="media:txt;textable"]\n' +
     '[embed cap:in="media:txt;textable";embed;out="media:embedding-vector;record;textable"]\n' +
@@ -3068,7 +3089,8 @@ function testMachine_multilineFormat() {
   assertEqual(g.edgeCount(), 2);
 }
 
-function testMachine_differentAliasesSameGraph() {
+// TEST0118: Machine different aliases same graph
+function test0118_Machine_differentAliasesSameGraph() {
   const g1 = Machine.fromString(
     '[ex cap:in="media:pdf";extract;out="media:txt;textable"]' +
     '[a -> ex -> b]'
@@ -3080,14 +3102,16 @@ function testMachine_differentAliasesSameGraph() {
   assert(g1.isEquivalent(g2), 'Different aliases should produce equivalent graphs');
 }
 
-function testMachine_malformedInputFails() {
+// TEST0119: Machine malformed input fails
+function test0119_Machine_malformedInputFails() {
   assertThrowsWithCode(
     () => parseMachine('not valid machine notation'),
     MachineSyntaxErrorCodes.PARSE_ERROR
   );
 }
 
-function testMachine_unterminatedBracketFails() {
+// TEST0120: Machine unterminated bracket fails
+function test0120_Machine_unterminatedBracketFails() {
   assertThrowsWithCode(
     () => parseMachine('[extract cap:in=media:pdf'),
     MachineSyntaxErrorCodes.PARSE_ERROR
@@ -3096,7 +3120,7 @@ function testMachine_unterminatedBracketFails() {
 
 // --- Machine parser line-based mode tests ---
 
-function testMachine_lineBasedSimpleChain() {
+function test0121_Machine_lineBasedSimpleChain() {
   const g = Machine.fromString(
     'extract cap:in="media:pdf";extract;out="media:txt;textable"\n' +
     'doc -> extract -> text'
@@ -3109,7 +3133,8 @@ function testMachine_lineBasedSimpleChain() {
     'Target should be media:txt;textable');
 }
 
-function testMachine_lineBasedTwoStepChain() {
+// TEST0122: Machine line based two step chain
+function test0122_Machine_lineBasedTwoStepChain() {
   const g = Machine.fromString(
     'extract cap:in="media:pdf";extract;out="media:txt;textable"\n' +
     'embed cap:in="media:txt;textable";embed;out="media:embedding-vector;record;textable"\n' +
@@ -3119,7 +3144,8 @@ function testMachine_lineBasedTwoStepChain() {
   assertEqual(g.edgeCount(), 2);
 }
 
-function testMachine_lineBasedLoop() {
+// TEST0123: Machine line based loop
+function test0123_Machine_lineBasedLoop() {
   const g = Machine.fromString(
     'p2t cap:in="media:disbound-page;textable";page-to-text;out="media:txt;textable"\n' +
     'pages -> LOOP p2t -> texts'
@@ -3128,7 +3154,8 @@ function testMachine_lineBasedLoop() {
   assertEqual(g.edges()[0].isLoop, true);
 }
 
-function testMachine_lineBasedFanIn() {
+// TEST0124: Machine line based fan in
+function test0124_Machine_lineBasedFanIn() {
   const g = Machine.fromString(
     'thumb cap:in="media:pdf";generate-thumbnail;out="media:image;png;thumbnail"\n' +
     'model_dl cap:in="media:model-spec;textable";download;out="media:model-spec;textable"\n' +
@@ -3141,7 +3168,8 @@ function testMachine_lineBasedFanIn() {
   assertEqual(g.edges()[2].sources.length, 2);
 }
 
-function testMachine_mixedBracketedAndLineBased() {
+// TEST0125: Machine mixed bracketed and line based
+function test0125_Machine_mixedBracketedAndLineBased() {
   const g = Machine.fromString(
     '[extract cap:in="media:pdf";extract;out="media:txt;textable"]\n' +
     'doc -> extract -> text'
@@ -3149,7 +3177,8 @@ function testMachine_mixedBracketedAndLineBased() {
   assertEqual(g.edgeCount(), 1);
 }
 
-function testMachine_lineBasedEquivalentToBracketed() {
+// TEST0126: Machine line based equivalent to bracketed
+function test0126_Machine_lineBasedEquivalentToBracketed() {
   const g1 = Machine.fromString(
     '[extract cap:in="media:pdf";extract;out="media:txt;textable"]' +
     '[doc -> extract -> text]'
@@ -3161,7 +3190,8 @@ function testMachine_lineBasedEquivalentToBracketed() {
   assert(g1.isEquivalent(g2), 'Line-based and bracketed must produce equivalent graphs');
 }
 
-function testMachine_lineBasedFormatSerialization() {
+// TEST0127: Machine line based format serialization
+function test0127_Machine_lineBasedFormatSerialization() {
   const g = new Machine([
     new MachineEdge(
       [MediaUrn.fromString('media:pdf')],
@@ -3182,7 +3212,8 @@ function testMachine_lineBasedFormatSerialization() {
   assert(g.isEquivalent(reparsed), 'Line-based round-trip must produce equivalent graph');
 }
 
-function testMachine_lineBasedAndBracketedParseSameGraph() {
+// TEST0128: Machine line based and bracketed parse same graph
+function test0128_Machine_lineBasedAndBracketedParseSameGraph() {
   const g = new Machine([
     new MachineEdge(
       [MediaUrn.fromString('media:pdf')],
@@ -3208,7 +3239,7 @@ function testMachine_lineBasedAndBracketedParseSameGraph() {
 
 // --- Machine graph tests (mirrors graph.rs tests) ---
 
-function testMachine_edgeEquivalenceSameUrns() {
+function test0129_Machine_edgeEquivalenceSameUrns() {
   const e1 = new MachineEdge(
     [MediaUrn.fromString('media:pdf')],
     CapUrn.fromString('cap:in="media:pdf";extract;out="media:txt;textable"'),
@@ -3224,7 +3255,8 @@ function testMachine_edgeEquivalenceSameUrns() {
   assert(e1.isEquivalent(e2), 'Same URNs should be equivalent');
 }
 
-function testMachine_edgeEquivalenceDifferentCapUrns() {
+// TEST0130: Machine edge equivalence different cap urns
+function test0130_Machine_edgeEquivalenceDifferentCapUrns() {
   const e1 = new MachineEdge(
     [MediaUrn.fromString('media:pdf')],
     CapUrn.fromString('cap:in="media:pdf";extract;out="media:txt;textable"'),
@@ -3240,7 +3272,8 @@ function testMachine_edgeEquivalenceDifferentCapUrns() {
   assert(!e1.isEquivalent(e2), 'Different cap URNs should not be equivalent');
 }
 
-function testMachine_edgeEquivalenceDifferentTargets() {
+// TEST0131: Machine edge equivalence different targets
+function test0131_Machine_edgeEquivalenceDifferentTargets() {
   const e1 = new MachineEdge(
     [MediaUrn.fromString('media:pdf')],
     CapUrn.fromString('cap:in="media:pdf";extract;out="media:txt;textable"'),
@@ -3256,7 +3289,8 @@ function testMachine_edgeEquivalenceDifferentTargets() {
   assert(!e1.isEquivalent(e2), 'Different targets should not be equivalent');
 }
 
-function testMachine_edgeEquivalenceDifferentLoopFlag() {
+// TEST0132: Machine edge equivalence different loop flag
+function test0132_Machine_edgeEquivalenceDifferentLoopFlag() {
   const e1 = new MachineEdge(
     [MediaUrn.fromString('media:pdf')],
     CapUrn.fromString('cap:in="media:pdf";extract;out="media:txt;textable"'),
@@ -3272,7 +3306,8 @@ function testMachine_edgeEquivalenceDifferentLoopFlag() {
   assert(!e1.isEquivalent(e2), 'Different loop flags should not be equivalent');
 }
 
-function testMachine_edgeEquivalenceSourceOrderIndependent() {
+// TEST0133: Machine edge equivalence source order independent
+function test0133_Machine_edgeEquivalenceSourceOrderIndependent() {
   const e1 = new MachineEdge(
     [MediaUrn.fromString('media:txt;textable'), MediaUrn.fromString('media:model-spec;textable')],
     CapUrn.fromString('cap:in="media:txt;textable";embed;out="media:embedding-vector;record;textable"'),
@@ -3288,7 +3323,8 @@ function testMachine_edgeEquivalenceSourceOrderIndependent() {
   assert(e1.isEquivalent(e2), 'Source order should not matter for equivalence');
 }
 
-function testMachine_edgeEquivalenceDifferentSourceCount() {
+// TEST0134: Machine edge equivalence different source count
+function test0134_Machine_edgeEquivalenceDifferentSourceCount() {
   const e1 = new MachineEdge(
     [MediaUrn.fromString('media:txt;textable')],
     CapUrn.fromString('cap:in="media:txt;textable";embed;out="media:embedding-vector;record;textable"'),
@@ -3304,7 +3340,8 @@ function testMachine_edgeEquivalenceDifferentSourceCount() {
   assert(!e1.isEquivalent(e2), 'Different source counts should not be equivalent');
 }
 
-function testMachine_graphEquivalenceSameEdges() {
+// TEST0135: Machine graph equivalence same edges
+function test0135_Machine_graphEquivalenceSameEdges() {
   const mkEdge = (src, cap, tgt) => new MachineEdge(
     [MediaUrn.fromString(src)], CapUrn.fromString(cap), MediaUrn.fromString(tgt), false
   );
@@ -3319,7 +3356,8 @@ function testMachine_graphEquivalenceSameEdges() {
   assert(g1.isEquivalent(g2), 'Same edges should be equivalent');
 }
 
-function testMachine_graphEquivalenceReorderedEdges() {
+// TEST0136: Machine graph equivalence reordered edges
+function test0136_Machine_graphEquivalenceReorderedEdges() {
   const mkEdge = (src, cap, tgt) => new MachineEdge(
     [MediaUrn.fromString(src)], CapUrn.fromString(cap), MediaUrn.fromString(tgt), false
   );
@@ -3334,7 +3372,8 @@ function testMachine_graphEquivalenceReorderedEdges() {
   assert(g1.isEquivalent(g2), 'Reordered edges should still be equivalent');
 }
 
-function testMachine_graphNotEquivalentDifferentEdgeCount() {
+// TEST0137: Machine graph not equivalent different edge count
+function test0137_Machine_graphNotEquivalentDifferentEdgeCount() {
   const mkEdge = (src, cap, tgt) => new MachineEdge(
     [MediaUrn.fromString(src)], CapUrn.fromString(cap), MediaUrn.fromString(tgt), false
   );
@@ -3348,7 +3387,8 @@ function testMachine_graphNotEquivalentDifferentEdgeCount() {
   assert(!g1.isEquivalent(g2), 'Different edge counts should not be equivalent');
 }
 
-function testMachine_graphNotEquivalentDifferentCap() {
+// TEST0138: Machine graph not equivalent different cap
+function test0138_Machine_graphNotEquivalentDifferentCap() {
   const mkEdge = (src, cap, tgt) => new MachineEdge(
     [MediaUrn.fromString(src)], CapUrn.fromString(cap), MediaUrn.fromString(tgt), false
   );
@@ -3361,19 +3401,22 @@ function testMachine_graphNotEquivalentDifferentCap() {
   assert(!g1.isEquivalent(g2), 'Different caps should not be equivalent');
 }
 
-function testMachine_graphEmpty() {
+// TEST0139: Machine graph empty
+function test0139_Machine_graphEmpty() {
   const g = Machine.empty();
   assert(g.isEmpty(), 'Empty graph should be empty');
   assertEqual(g.edgeCount(), 0);
 }
 
-function testMachine_graphEmptyEquivalence() {
+// TEST0140: Machine graph empty equivalence
+function test0140_Machine_graphEmptyEquivalence() {
   const g1 = Machine.empty();
   const g2 = Machine.empty();
   assert(g1.isEquivalent(g2), 'Two empty graphs should be equivalent');
 }
 
-function testMachine_rootSourcesLinearChain() {
+// TEST0141: Machine root sources linear chain
+function test0141_Machine_rootSourcesLinearChain() {
   const mkEdge = (src, cap, tgt) => new MachineEdge(
     [MediaUrn.fromString(src)], CapUrn.fromString(cap), MediaUrn.fromString(tgt), false
   );
@@ -3387,7 +3430,8 @@ function testMachine_rootSourcesLinearChain() {
     'Root source should be media:pdf');
 }
 
-function testMachine_leafTargetsLinearChain() {
+// TEST0142: Machine leaf targets linear chain
+function test0142_Machine_leafTargetsLinearChain() {
   const mkEdge = (src, cap, tgt) => new MachineEdge(
     [MediaUrn.fromString(src)], CapUrn.fromString(cap), MediaUrn.fromString(tgt), false
   );
@@ -3401,7 +3445,8 @@ function testMachine_leafTargetsLinearChain() {
     'Leaf target should be media:embedding-vector;record;textable');
 }
 
-function testMachine_rootSourcesFanIn() {
+// TEST0143: Machine root sources fan in
+function test0143_Machine_rootSourcesFanIn() {
   const e = new MachineEdge(
     [MediaUrn.fromString('media:txt;textable'), MediaUrn.fromString('media:model-spec;textable')],
     CapUrn.fromString('cap:in="media:txt;textable";embed;out="media:embedding-vector;record;textable"'),
@@ -3413,7 +3458,8 @@ function testMachine_rootSourcesFanIn() {
   assertEqual(roots.length, 2);
 }
 
-function testMachine_displayEdge() {
+// TEST0144: Machine display edge
+function test0144_Machine_displayEdge() {
   const e = new MachineEdge(
     [MediaUrn.fromString('media:pdf')],
     CapUrn.fromString('cap:in="media:pdf";extract;out="media:txt;textable"'),
@@ -3424,7 +3470,8 @@ function testMachine_displayEdge() {
   assert(display.includes('media:pdf'), 'Display should contain media:pdf');
 }
 
-function testMachine_displayGraph() {
+// TEST0145: Machine display graph
+function test0145_Machine_displayGraph() {
   const e = new MachineEdge(
     [MediaUrn.fromString('media:pdf')],
     CapUrn.fromString('cap:in="media:pdf";extract;out="media:txt;textable"'),
@@ -3437,7 +3484,7 @@ function testMachine_displayGraph() {
 
 // --- Machine serializer tests (mirrors serializer.rs tests) ---
 
-function testMachine_serializeSingleEdge() {
+function test0146_Machine_serializeSingleEdge() {
   const g = new Machine([new MachineEdge(
     [MediaUrn.fromString('media:pdf')],
     CapUrn.fromString('cap:in="media:pdf";extract;out="media:txt;textable"'),
@@ -3452,7 +3499,8 @@ function testMachine_serializeSingleEdge() {
   assert(notation.includes('-> n1]'), 'Should use n1 for target: ' + notation);
 }
 
-function testMachine_serializeTwoEdgeChain() {
+// TEST0147: Machine serialize two edge chain
+function test0147_Machine_serializeTwoEdgeChain() {
   const mkEdge = (src, cap, tgt) => new MachineEdge(
     [MediaUrn.fromString(src)], CapUrn.fromString(cap), MediaUrn.fromString(tgt), false
   );
@@ -3465,11 +3513,13 @@ function testMachine_serializeTwoEdgeChain() {
   assertEqual(bracketCount, 4, 'Should have 4 brackets (2 headers + 2 wirings)');
 }
 
-function testMachine_serializeEmptyGraph() {
+// TEST0148: Machine serialize empty graph
+function test0148_Machine_serializeEmptyGraph() {
   assertEqual(Machine.empty().toMachineNotation(), '');
 }
 
-function testMachine_roundtripSingleEdge() {
+// TEST0149: Machine roundtrip single edge
+function test0149_Machine_roundtripSingleEdge() {
   const original = new Machine([new MachineEdge(
     [MediaUrn.fromString('media:pdf')],
     CapUrn.fromString('cap:in="media:pdf";extract;out="media:txt;textable"'),
@@ -3482,7 +3532,8 @@ function testMachine_roundtripSingleEdge() {
     'Single edge round-trip failed: ' + notation);
 }
 
-function testMachine_roundtripTwoEdgeChain() {
+// TEST0151: Machine roundtrip two edge chain
+function test0151_Machine_roundtripTwoEdgeChain() {
   const mkEdge = (src, cap, tgt) => new MachineEdge(
     [MediaUrn.fromString(src)], CapUrn.fromString(cap), MediaUrn.fromString(tgt), false
   );
@@ -3496,7 +3547,8 @@ function testMachine_roundtripTwoEdgeChain() {
     'Two-edge chain round-trip failed: ' + notation);
 }
 
-function testMachine_roundtripFanOut() {
+// TEST0152: Machine roundtrip fan out
+function test0152_Machine_roundtripFanOut() {
   const mkEdge = (src, cap, tgt) => new MachineEdge(
     [MediaUrn.fromString(src)], CapUrn.fromString(cap), MediaUrn.fromString(tgt), false
   );
@@ -3511,7 +3563,8 @@ function testMachine_roundtripFanOut() {
     'Fan-out round-trip failed: ' + notation);
 }
 
-function testMachine_roundtripLoopEdge() {
+// TEST0153: Machine roundtrip loop edge
+function test0153_Machine_roundtripLoopEdge() {
   const original = new Machine([new MachineEdge(
     [MediaUrn.fromString('media:disbound-page;textable')],
     CapUrn.fromString('cap:in="media:disbound-page;textable";page-to-text;out="media:txt;textable"'),
@@ -3524,7 +3577,8 @@ function testMachine_roundtripLoopEdge() {
   assertEqual(reparsed.edges()[0].isLoop, true, 'isLoop must be preserved');
 }
 
-function testMachine_serializationIsDeterministic() {
+// TEST0154: Machine serialization is deterministic
+function test0154_Machine_serializationIsDeterministic() {
   const mkEdge = (src, cap, tgt) => new MachineEdge(
     [MediaUrn.fromString(src)], CapUrn.fromString(cap), MediaUrn.fromString(tgt), false
   );
@@ -3537,7 +3591,8 @@ function testMachine_serializationIsDeterministic() {
   assertEqual(n1, n2, 'Serialization must be deterministic');
 }
 
-function testMachine_reorderedEdgesProduceSameNotation() {
+// TEST0155: Machine reordered edges produce same notation
+function test0155_Machine_reorderedEdgesProduceSameNotation() {
   const mkEdge = (src, cap, tgt) => new MachineEdge(
     [MediaUrn.fromString(src)], CapUrn.fromString(cap), MediaUrn.fromString(tgt), false
   );
@@ -3553,7 +3608,8 @@ function testMachine_reorderedEdgesProduceSameNotation() {
     'Same graph with reordered edges must produce identical notation');
 }
 
-function testMachine_multilineSerializeFormat() {
+// TEST0160: Machine multiline serialize format
+function test0160_Machine_multilineSerializeFormat() {
   const g = new Machine([new MachineEdge(
     [MediaUrn.fromString('media:pdf')],
     CapUrn.fromString('cap:in="media:pdf";extract;out="media:txt;textable"'),
@@ -3569,7 +3625,7 @@ function testMachine_multilineSerializeFormat() {
 
 // Aliases are pure-index `edge_<N>` regardless of the cap's tags; there is
 // no privileged `op` tag to derive a friendlier name from.
-function testMachine_aliasFromOpTag() {
+function test0161_Machine_aliasFromOpTag() {
   const g = new Machine([new MachineEdge(
     [MediaUrn.fromString('media:pdf')],
     CapUrn.fromString('cap:in="media:pdf";extract;out="media:txt;textable"'),
@@ -3580,7 +3636,8 @@ function testMachine_aliasFromOpTag() {
   assert(notation.includes('[edge_0 '), 'Expected edge_0 alias, got: ' + notation);
 }
 
-function testMachine_aliasFallbackWithoutOpTag() {
+// TEST0162: Machine alias fallback without op tag
+function test0162_Machine_aliasFallbackWithoutOpTag() {
   const g = new Machine([new MachineEdge(
     [MediaUrn.fromString('media:pdf')],
     CapUrn.fromString('cap:in="media:pdf";out="media:txt;textable"'),
@@ -3592,7 +3649,7 @@ function testMachine_aliasFallbackWithoutOpTag() {
 }
 
 // Pure-index aliases inherently disambiguate edges that share a marker tag.
-function testMachine_duplicateOpTagsDisambiguated() {
+function test0163_Machine_duplicateOpTagsDisambiguated() {
   const g = new Machine([
     new MachineEdge(
       [MediaUrn.fromString('media:pdf')],
@@ -3614,7 +3671,7 @@ function testMachine_duplicateOpTagsDisambiguated() {
 
 // --- Machine builder tests ---
 
-function testMachine_builderSingleEdge() {
+function test0164_Machine_builderSingleEdge() {
   const builder = new MachineBuilder();
   builder.addEdge(
     ['media:pdf'],
@@ -3626,7 +3683,8 @@ function testMachine_builderSingleEdge() {
   assertEqual(g.edges()[0].isLoop, false);
 }
 
-function testMachine_builderWithLoop() {
+// TEST0165: Machine builder with loop
+function test0165_Machine_builderWithLoop() {
   const builder = new MachineBuilder();
   builder.addEdge(
     ['media:disbound-page;textable'],
@@ -3638,7 +3696,8 @@ function testMachine_builderWithLoop() {
   assertEqual(g.edges()[0].isLoop, true);
 }
 
-function testMachine_builderChaining() {
+// TEST0166: Machine builder chaining
+function test0166_Machine_builderChaining() {
   const g = new MachineBuilder()
     .addEdge(['media:pdf'], 'cap:in="media:pdf";extract;out="media:txt;textable"', 'media:txt;textable')
     .addEdge(['media:txt;textable'], 'cap:in="media:txt;textable";embed;out="media:embedding-vector;record;textable"', 'media:embedding-vector;record;textable')
@@ -3646,7 +3705,8 @@ function testMachine_builderChaining() {
   assertEqual(g.edgeCount(), 2);
 }
 
-function testMachine_builderEquivalentToParsed() {
+// TEST0167: Machine builder equivalent to parsed
+function test0167_Machine_builderEquivalentToParsed() {
   const parsed = Machine.fromString(
     '[extract cap:in="media:pdf";extract;out="media:txt;textable"]' +
     '[doc -> extract -> text]'
@@ -3658,7 +3718,8 @@ function testMachine_builderEquivalentToParsed() {
     'Builder-constructed graph should be equivalent to parsed graph');
 }
 
-function testMachine_builderRoundTrip() {
+// TEST0168: Machine builder round trip
+function test0168_Machine_builderRoundTrip() {
   const built = new MachineBuilder()
     .addEdge(['media:pdf'], 'cap:in="media:pdf";extract;out="media:txt;textable"', 'media:txt;textable')
     .addEdge(['media:txt;textable'], 'cap:in="media:txt;textable";embed;out="media:embedding-vector;record;textable"', 'media:embedding-vector;record;textable')
@@ -3670,7 +3731,7 @@ function testMachine_builderRoundTrip() {
 
 // --- CapUrn.isEquivalent/isComparable tests ---
 
-function testMachine_capUrnIsEquivalent() {
+function test0169_Machine_capUrnIsEquivalent() {
   const a = CapUrn.fromString('cap:in="media:pdf";extract;out="media:txt;textable"');
   const b = CapUrn.fromString('cap:in="media:pdf";extract;out="media:txt;textable"');
   assert(a.isEquivalent(b), 'Same cap URNs should be equivalent');
@@ -3678,21 +3739,24 @@ function testMachine_capUrnIsEquivalent() {
   assert(!a.isEquivalent(c), 'Different cap URNs should not be equivalent');
 }
 
-function testMachine_capUrnIsComparable() {
+// TEST0170: Machine cap urn is comparable
+function test0170_Machine_capUrnIsComparable() {
   const general = CapUrn.fromString('cap:in="media:pdf";out="media:txt;textable"');
   const specific = CapUrn.fromString('cap:in="media:pdf";extract;out="media:txt;textable"');
   assert(general.isComparable(specific), 'General should be comparable to specific');
   assert(specific.isComparable(general), 'isComparable should be symmetric');
 }
 
-function testMachine_capUrnInMediaUrn() {
+// TEST0171: Machine cap urn in media urn
+function test0171_Machine_capUrnInMediaUrn() {
   const cap = CapUrn.fromString('cap:in="media:pdf";extract;out="media:txt;textable"');
   const inUrn = cap.inMediaUrn();
   assert(inUrn instanceof MediaUrn, 'inMediaUrn should return MediaUrn');
   assert(inUrn.isEquivalent(MediaUrn.fromString('media:pdf')), 'inMediaUrn should be media:pdf');
 }
 
-function testMachine_capUrnOutMediaUrn() {
+// TEST0172: Machine cap urn out media urn
+function test0172_Machine_capUrnOutMediaUrn() {
   const cap = CapUrn.fromString('cap:in="media:pdf";extract;out="media:txt;textable"');
   const outUrn = cap.outMediaUrn();
   assert(outUrn instanceof MediaUrn, 'outMediaUrn should return MediaUrn');
@@ -3701,7 +3765,7 @@ function testMachine_capUrnOutMediaUrn() {
 
 // --- MediaUrn.isEquivalent/isComparable tests ---
 
-function testMachine_mediaUrnIsEquivalent() {
+function test0173_Machine_mediaUrnIsEquivalent() {
   const a = MediaUrn.fromString('media:pdf');
   const b = MediaUrn.fromString('media:pdf');
   assert(a.isEquivalent(b), 'Same media URNs should be equivalent');
@@ -3709,7 +3773,8 @@ function testMachine_mediaUrnIsEquivalent() {
   assert(!a.isEquivalent(c), 'Different media URNs should not be equivalent');
 }
 
-function testMachine_mediaUrnIsComparable() {
+// TEST0174: Machine media urn is comparable
+function test0174_Machine_mediaUrnIsComparable() {
   const general = MediaUrn.fromString('media:textable');
   const specific = MediaUrn.fromString('media:txt;textable');
   assert(general.isComparable(specific), 'General should be comparable to specific');
@@ -3722,7 +3787,7 @@ function testMachine_mediaUrnIsComparable() {
 // Phase 0A: Position tracking tests
 // ============================================================================
 
-function testMachine_parseMachineWithAST_headerLocation() {
+function test0175_Machine_parseMachineWithAST_headerLocation() {
   const input = '[extract cap:in="media:pdf";extract;out="media:txt;textable"][doc -> extract -> text]';
   const result = parseMachineWithAST(input);
   assert(result.statements.length === 2, 'Should have 2 statements');
@@ -3738,7 +3803,8 @@ function testMachine_parseMachineWithAST_headerLocation() {
   assertEqual(stmt.alias, 'extract', 'Alias should be extract');
 }
 
-function testMachine_parseMachineWithAST_wiringLocation() {
+// TEST0176: Machine parse machine with a s t wiring location
+function test0176_Machine_parseMachineWithAST_wiringLocation() {
   const input = '[extract cap:in="media:pdf";extract;out="media:txt;textable"]\n[doc -> extract -> text]';
   const result = parseMachineWithAST(input);
   assert(result.statements.length === 2, 'Should have 2 statements');
@@ -3752,7 +3818,8 @@ function testMachine_parseMachineWithAST_wiringLocation() {
   assertEqual(wiring.target, 'text', 'Target should be text');
 }
 
-function testMachine_parseMachineWithAST_multilinePositions() {
+// TEST0177: Machine parse machine with a s t multiline positions
+function test0177_Machine_parseMachineWithAST_multilinePositions() {
   const input = '[extract cap:in="media:pdf";extract;out="media:txt;textable"]\n[doc -> extract -> text]';
   const result = parseMachineWithAST(input);
   const headerLoc = result.statements[0].location;
@@ -3761,7 +3828,8 @@ function testMachine_parseMachineWithAST_multilinePositions() {
   assertEqual(wiringLoc.start.line, 2, 'Wiring should be on line 2');
 }
 
-function testMachine_parseMachineWithAST_fanInSourceLocations() {
+// TEST0178: Machine parse machine with a s t fan in source locations
+function test0178_Machine_parseMachineWithAST_fanInSourceLocations() {
   const input = [
     '[describe cap:in="media:image;png";describe-image;out="media:image-description;textable"]',
     '[(thumbnail, model_spec) -> describe -> description]'
@@ -3772,7 +3840,8 @@ function testMachine_parseMachineWithAST_fanInSourceLocations() {
   assert(wiring.sourceLocations.length === 2, 'Should have 2 source locations');
 }
 
-function testMachine_parseMachineWithAST_aliasMap() {
+// TEST0179: Machine parse machine with a s t alias map
+function test0179_Machine_parseMachineWithAST_aliasMap() {
   const input = [
     '[extract cap:in="media:pdf";extract;out="media:txt;textable"]',
     '[embed cap:in="media:txt;textable";embed;out="media:embedding-vector;record;textable"]',
@@ -3790,7 +3859,8 @@ function testMachine_parseMachineWithAST_aliasMap() {
   assert(extractEntry.capUrnLocation !== undefined, 'Alias entry should have capUrnLocation');
 }
 
-function testMachine_parseMachineWithAST_nodeMedia() {
+// TEST0180: Machine parse machine with a s t node media
+function test0180_Machine_parseMachineWithAST_nodeMedia() {
   const input = [
     '[extract cap:in="media:pdf";extract;out="media:txt;textable"]',
     '[doc -> extract -> text]',
@@ -3802,7 +3872,8 @@ function testMachine_parseMachineWithAST_nodeMedia() {
   assertEqual(result.nodeMedia.get('text').toString(), 'media:textable;txt', 'text should be media:textable;txt');
 }
 
-function testMachine_errorLocation_parseError() {
+// TEST0181: Machine error location parse error
+function test0181_Machine_errorLocation_parseError() {
   try {
     parseMachine('[this is not valid');
     throw new Error('Expected MachineSyntaxError');
@@ -3812,7 +3883,8 @@ function testMachine_errorLocation_parseError() {
   }
 }
 
-function testMachine_errorLocation_duplicateAlias() {
+// TEST0182: Machine error location duplicate alias
+function test0182_Machine_errorLocation_duplicateAlias() {
   try {
     parseMachine(
       '[extract cap:in="media:pdf";extract;out="media:txt;textable"]' +
@@ -3826,7 +3898,8 @@ function testMachine_errorLocation_duplicateAlias() {
   }
 }
 
-function testMachine_errorLocation_undefinedAlias() {
+// TEST0183: Machine error location undefined alias
+function test0183_Machine_errorLocation_undefinedAlias() {
   try {
     parseMachine('[doc -> nonexistent -> text]');
     throw new Error('Expected MachineSyntaxError');
@@ -3840,7 +3913,7 @@ function testMachine_errorLocation_undefinedAlias() {
 // Phase 0C: Machine.toMermaid() tests
 // ============================================================================
 
-function testMachine_toMermaid_linearChain() {
+function test0184_Machine_toMermaid_linearChain() {
   const machine = Machine.fromString(
     '[extract cap:in="media:pdf";extract;out="media:txt;textable"]' +
     '[doc -> extract -> text]'
@@ -3858,7 +3931,8 @@ function testMachine_toMermaid_linearChain() {
   assert(mermaid.includes('(['), 'Should have stadium shape nodes');
 }
 
-function testMachine_toMermaid_loopEdge() {
+// TEST0185: Machine to mermaid loop edge
+function test0185_Machine_toMermaid_loopEdge() {
   const machine = Machine.fromString(
     '[p2t cap:in="media:disbound-page;textable";page-to-text;out="media:txt;textable"]' +
     '[pages -> LOOP p2t -> texts]'
@@ -3869,13 +3943,15 @@ function testMachine_toMermaid_loopEdge() {
   assert(mermaid.includes('.->'), 'Should use dotted arrow for LOOP');
 }
 
-function testMachine_toMermaid_emptyGraph() {
+// TEST0186: Machine to mermaid empty graph
+function test0186_Machine_toMermaid_emptyGraph() {
   const machine = Machine.empty();
   const mermaid = machine.toMermaid();
   assert(mermaid.includes('empty graph'), 'Should indicate empty graph');
 }
 
-function testMachine_toMermaid_fanIn() {
+// TEST0187: Machine to mermaid fan in
+function test0187_Machine_toMermaid_fanIn() {
   const machine = Machine.fromString(
     '[describe cap:in="media:image;png";describe-image;out="media:image-description;textable"]' +
     '[(thumbnail, model_spec) -> describe -> description]'
@@ -3886,7 +3962,8 @@ function testMachine_toMermaid_fanIn() {
   assertEqual(arrowCount, 2, 'Fan-in should produce 2 arrows');
 }
 
-function testMachine_toMermaid_fanOut() {
+// TEST0188: Machine to mermaid fan out
+function test0188_Machine_toMermaid_fanOut() {
   const input = [
     '[meta cap:in="media:pdf";extract-metadata;out="media:file-metadata;record;textable"]',
     '[thumb cap:in="media:pdf";generate-thumbnail;out="media:image;png;thumbnail"]',
@@ -3906,7 +3983,7 @@ function testMachine_toMermaid_fanOut() {
 // Phase 0B: FabricRegistryClient tests
 // ============================================================================
 
-function testMachine_capRegistryEntry_construction() {
+function test0189_Machine_capRegistryEntry_construction() {
   const entry = new FabricRegistryEntry({
     urn: 'cap:in="media:pdf";extract;out="media:txt;textable"',
     title: 'PDF Extractor',
@@ -3929,7 +4006,8 @@ function testMachine_capRegistryEntry_construction() {
   assertEqual(entry.urnTags.op, 'extract', 'op tag should match');
 }
 
-function testMachine_mediaRegistryEntry_construction() {
+// TEST0190: Machine media registry entry construction
+function test0190_Machine_mediaRegistryEntry_construction() {
   const entry = new MediaRegistryEntry({
     urn: 'media:pdf',
     title: 'PDF Document',
@@ -3942,14 +4020,16 @@ function testMachine_mediaRegistryEntry_construction() {
   assertEqual(entry.description, 'Portable Document Format', 'Description should match');
 }
 
-function testMachine_capRegistryClient_construction() {
+// TEST0191: Machine cap registry client construction
+function test0191_Machine_capRegistryClient_construction() {
   const client = new FabricRegistryClient('https://example.com', 600);
   assert(client !== null, 'Client should be constructed');
   // Invalidate should not throw
   client.invalidate();
 }
 
-function testMachine_capRegistryEntry_defaults() {
+// TEST0192: Machine cap registry entry defaults
+function test0192_Machine_capRegistryEntry_defaults() {
   // Verify that missing fields default gracefully
   const entry = new FabricRegistryEntry({ urn: 'cap:in=media:;test;out=media:' });
   assertEqual(entry.urn, 'cap:in=media:;test;out=media:', 'URN should match');
@@ -4014,14 +4094,16 @@ if (typeof global.createCap === 'undefined') {
   global.createCap = require('./capdag.js').createCap;
 }
 
-function testRenderer_cardinalityLabel_allFourCases() {
+// TEST0193: Renderer cardinality label all four cases
+function test0193_Renderer_cardinalityLabel_allFourCases() {
   assertEqual(rendererCardinalityLabel(false, false), '1\u21921', 'scalar-to-scalar');
   assertEqual(rendererCardinalityLabel(true, false),  'n\u21921', 'sequence-to-scalar');
   assertEqual(rendererCardinalityLabel(false, true),  '1\u2192n', 'scalar-to-sequence');
   assertEqual(rendererCardinalityLabel(true, true),   'n\u2192n', 'sequence-to-sequence');
 }
 
-function testRenderer_cardinalityLabel_usesUnicodeArrow() {
+// TEST0194: Renderer cardinality label uses unicode arrow
+function test0194_Renderer_cardinalityLabel_usesUnicodeArrow() {
   // The label must use the real rightwards arrow (U+2192), not ASCII "->".
   // Downstream styling and tests depend on this glyph.
   const label = rendererCardinalityLabel(false, true);
@@ -4029,7 +4111,8 @@ function testRenderer_cardinalityLabel_usesUnicodeArrow() {
   assert(!label.includes('->'), 'label must not contain the ASCII replacement "->"');
 }
 
-function testRenderer_cardinalityFromCap_findsStdinArgNotFirstArg() {
+// TEST0195: Renderer cardinality from cap finds stdin arg not first arg
+function test0195_Renderer_cardinalityFromCap_findsStdinArgNotFirstArg() {
   // The main input arg is the one whose sources include a stdin source.
   // A naive implementation that reads args[0] would see `cli-only` (not a
   // sequence) and report 1→1 even though the stdin arg is a sequence.
@@ -4053,7 +4136,8 @@ function testRenderer_cardinalityFromCap_findsStdinArgNotFirstArg() {
     'must pick the arg that has a stdin source, not args[0]');
 }
 
-function testRenderer_cardinalityFromCap_scalarDefaultsWhenFieldsMissing() {
+// TEST0196: Renderer cardinality from cap scalar defaults when fields missing
+function test0196_Renderer_cardinalityFromCap_scalarDefaultsWhenFieldsMissing() {
   // No args and no output: both sides collapse to 1 (scalar default).
   // If a bug makes the function return "n" for missing data, this fails.
   const cap = { urn: 'cap:in="media:";noop;out="media:"' };
@@ -4061,7 +4145,8 @@ function testRenderer_cardinalityFromCap_scalarDefaultsWhenFieldsMissing() {
     'missing args/output must default to scalar on both sides');
 }
 
-function testRenderer_cardinalityFromCap_outputOnlySequence() {
+// TEST0197: Renderer cardinality from cap output only sequence
+function test0197_Renderer_cardinalityFromCap_outputOnlySequence() {
   // One scalar stdin arg, output is a sequence: expects 1→n.
   const cap = {
     urn: 'cap:in="media:textable";generate;out="media:textable;list"',
@@ -4072,7 +4157,8 @@ function testRenderer_cardinalityFromCap_outputOnlySequence() {
     'scalar stdin with sequence output must yield 1→n');
 }
 
-function testRenderer_cardinalityFromCap_rejectsStringIsSequence() {
+// TEST0198: Renderer cardinality from cap rejects string is sequence
+function test0198_Renderer_cardinalityFromCap_rejectsStringIsSequence() {
   // The function must use strict `=== true` to avoid treating truthy strings
   // as booleans. "true" is a string, not a boolean — it must NOT be treated
   // as a sequence, because downstream renderers expect boolean semantics.
@@ -4085,7 +4171,8 @@ function testRenderer_cardinalityFromCap_rejectsStringIsSequence() {
     'string "true" must not be treated as boolean true');
 }
 
-function testRenderer_cardinalityFromCap_throwsOnNonObject() {
+// TEST0199: Renderer cardinality from cap throws on non object
+function test0199_Renderer_cardinalityFromCap_throwsOnNonObject() {
   // Fail-hard on invalid input; no fallback to a default cardinality.
   let threw = false;
   try {
@@ -4104,7 +4191,8 @@ function testRenderer_cardinalityFromCap_throwsOnNonObject() {
   assert(threw, 'cardinalityFromCap(string) must throw');
 }
 
-function testRenderer_canonicalMediaUrn_normalizesTagOrder() {
+// TEST0200: Renderer canonical media urn normalizes tag order
+function test0200_Renderer_canonicalMediaUrn_normalizesTagOrder() {
   // Two media URNs with identical tags in different input orders must
   // produce the same canonical string. If canonicalization is bypassed,
   // the two strings remain different and this test exposes it.
@@ -4113,12 +4201,14 @@ function testRenderer_canonicalMediaUrn_normalizesTagOrder() {
   assertEqual(a, b, 'tag-order differences must not survive canonicalization');
 }
 
-function testRenderer_canonicalMediaUrn_preservesValueTags() {
+// TEST0201: Renderer canonical media urn preserves value tags
+function test0201_Renderer_canonicalMediaUrn_preservesValueTags() {
   const c = rendererCanonicalMediaUrn('media:model;quant=q4');
   assert(c.includes('quant=q4'), 'value tag must be preserved');
 }
 
-function testRenderer_canonicalMediaUrn_rejectsCapUrn() {
+// TEST0202: Renderer canonical media urn rejects cap urn
+function test0202_Renderer_canonicalMediaUrn_rejectsCapUrn() {
   // MediaUrn.fromString enforces the media: prefix. Feeding a cap URN to
   // canonicalMediaUrn must fail hard.
   let threw = false;
@@ -4130,7 +4220,8 @@ function testRenderer_canonicalMediaUrn_rejectsCapUrn() {
   assert(threw, 'canonicalMediaUrn must reject non-media URNs');
 }
 
-function testRenderer_mediaNodeLabel_rejectsUrnDerivedLabels() {
+// TEST0203: Renderer media node label rejects urn derived labels
+function test0203_Renderer_mediaNodeLabel_rejectsUrnDerivedLabels() {
   let threw = false;
   let message = '';
   try {
@@ -4144,7 +4235,8 @@ function testRenderer_mediaNodeLabel_rejectsUrnDerivedLabels() {
     'error must explain that explicit titles are required');
 }
 
-function testRenderer_buildBrowseGraphData_rejectsMissingMediaTitles() {
+// TEST0204: Renderer build browse graph data rejects missing media titles
+function test0204_Renderer_buildBrowseGraphData_rejectsMissingMediaTitles() {
   let threw = false;
   let message = '';
   try {
@@ -4201,7 +4293,8 @@ function makeCollectStep(mediaDef) {
   };
 }
 
-function testRenderer_validateStrandStep_rejectsUnknownVariant() {
+// TEST0205: Renderer validate strand step rejects unknown variant
+function test0205_Renderer_validateStrandStep_rejectsUnknownVariant() {
   // A step with an unknown variant must fail hard at validation; no
   // silent coercion.
   let threw = false;
@@ -4218,7 +4311,8 @@ function testRenderer_validateStrandStep_rejectsUnknownVariant() {
   assert(threw, 'unknown variant must throw');
 }
 
-function testRenderer_validateStrandStep_requiresBooleanIsSequence() {
+// TEST0206: Renderer validate strand step requires boolean is sequence
+function test0206_Renderer_validateStrandStep_requiresBooleanIsSequence() {
   // A Cap variant must have boolean is_sequence fields; number or string
   // must reject.
   let threw = false;
@@ -4240,7 +4334,8 @@ function testRenderer_validateStrandStep_requiresBooleanIsSequence() {
   assert(threw, 'non-boolean is_sequence must throw');
 }
 
-function testRenderer_classifyStrandCapSteps_capFlags() {
+// TEST0207: Renderer classify strand cap steps cap flags
+function test0207_Renderer_classifyStrandCapSteps_capFlags() {
   // Strand: ForEach → cap1 → cap2 → cap3 → Collect. cap1 should have
   // prevForEach=true; cap3 should have nextCollect=true; cap2 should
   // have neither.
@@ -4261,7 +4356,8 @@ function testRenderer_classifyStrandCapSteps_capFlags() {
   assert(capFlags.get(3).nextCollect, 'cap3 has nextCollect');
 }
 
-function testRenderer_classifyStrandCapSteps_nestedForks() {
+// TEST0208: Renderer classify strand cap steps nested forks
+function test0208_Renderer_classifyStrandCapSteps_nestedForks() {
   // Nested strand: ForEach → cap1 → ForEach → cap2 → Collect → cap3 → Collect.
   // cap1 has prevForEach (outer), cap2 has prevForEach (inner) and
   // nextCollect (inner), cap3 has nextCollect (outer).
@@ -4291,7 +4387,8 @@ function withMediaDisplayNames(payload, mediaDisplayNames) {
   });
 }
 
-function testRenderer_buildStrandGraphData_singleCapPlain() {
+// TEST0209: Renderer build strand graph data single cap plain
+function test0209_Renderer_buildStrandGraphData_singleCapPlain() {
   // Minimal strand with one plain 1→1 cap. Plan builder produces:
   //   input_slot → step_0 (cap) → output
   // (two edges, three nodes). No cardinality marker in the cap label
@@ -4318,7 +4415,8 @@ function testRenderer_buildStrandGraphData_singleCapPlain() {
   assert(outEdge !== undefined, 'output edge from step_0 to output exists');
 }
 
-function testRenderer_buildStrandGraphData_sequenceShowsCardinality() {
+// TEST0210: Renderer build strand graph data sequence shows cardinality
+function test0210_Renderer_buildStrandGraphData_sequenceShowsCardinality() {
   // A cap with input_is_sequence=true MUST emit "(n→1)" on its edge
   // label.
   const payload = withMediaDisplayNames({
@@ -4338,7 +4436,8 @@ function testRenderer_buildStrandGraphData_sequenceShowsCardinality() {
     `cap edge label must include (n\u21921) marker; got: ${capEdge.label}`);
 }
 
-function testRenderer_buildStrandGraphData_foreachCollectSpan() {
+// TEST0211: Renderer build strand graph data foreach collect span
+function test0211_Renderer_buildStrandGraphData_foreachCollectSpan() {
   // Strand: [ForEach, Cap, Collect]. Plan builder produces:
   //   input_slot (source) →direct→ step_1 (cap) — cap emits its own
   //                                              direct edge from prev
@@ -4389,7 +4488,8 @@ function testRenderer_buildStrandGraphData_foreachCollectSpan() {
   assertEqual(collectNode.label, 'collect', 'Collect node labeled "collect"');
 }
 
-function testRenderer_buildStrandGraphData_standaloneCollect() {
+// TEST0212: Renderer build strand graph data standalone collect
+function test0212_Renderer_buildStrandGraphData_standaloneCollect() {
   // Strand with a standalone Collect (no enclosing ForEach). Plan
   // builder creates a Collect node consuming prev directly — plain
   // direct edge, no iteration/collection semantics.
@@ -4416,7 +4516,8 @@ function testRenderer_buildStrandGraphData_standaloneCollect() {
   assertEqual(collectNode.label, 'collect', 'Collect node labeled "collect"');
 }
 
-function testRenderer_buildStrandGraphData_unclosedForEachBody() {
+// TEST0213: Renderer build strand graph data unclosed for each body
+function test0213_Renderer_buildStrandGraphData_unclosedForEachBody() {
   // Strand: [Cap_a, ForEach, Cap_b] with no closing Collect. The plan
   // builder's "unclosed ForEach" branch creates a ForEach node
   // connecting Cap_a to Cap_b via iteration, with prev becoming the
@@ -4453,7 +4554,8 @@ function testRenderer_buildStrandGraphData_unclosedForEachBody() {
     'output edge step_2 → output');
 }
 
-function testRenderer_buildStrandGraphData_nestedForEachThrows() {
+// TEST0214: Renderer build strand graph data nested for each throws
+function test0214_Renderer_buildStrandGraphData_nestedForEachThrows() {
   // Nested ForEach without an intervening body cap in the outer
   // ForEach is an illegal nesting per plan_builder. The renderer
   // must throw the same error to surface the issue rather than
@@ -4481,7 +4583,8 @@ function testRenderer_buildStrandGraphData_nestedForEachThrows() {
   assert(threw, 'nested ForEach without outer body cap must throw');
 }
 
-function testRenderer_collapseStrand_singleCapBodyKeepsCapOwnLabel() {
+// TEST0215: Renderer collapse strand single cap body keeps cap own label
+function test0215_Renderer_collapseStrand_singleCapBodyKeepsCapOwnLabel() {
   // User spec: ForEach/Collect are NOT rendered as nodes, and
   // the collapse does NOT relabel cap edges. Each cap edge
   // carries whatever label the strand builder emitted — the
@@ -4533,7 +4636,8 @@ function testRenderer_collapseStrand_singleCapBodyKeepsCapOwnLabel() {
     'collect bridge is unlabeled');
 }
 
-function testRenderer_collapseStrand_unclosedForEachBodyCollapses() {
+// TEST0216: Renderer collapse strand unclosed for each body collapses
+function test0216_Renderer_collapseStrand_unclosedForEachBodyCollapses() {
   // [Cap_a(1→1), ForEach, Cap_b(1→1)] with no Collect,
   // source=media:a, target=media:c. Cap_b's to_spec is media:c
   // which is equivalent to target_media_urn, so the output node is
@@ -4589,7 +4693,8 @@ function testRenderer_collapseStrand_unclosedForEachBodyCollapses() {
     'merged step_2 takes on the strand-target role');
 }
 
-function testRenderer_collapseStrand_standaloneCollectCollapses() {
+// TEST0217: Renderer collapse strand standalone collect collapses
+function test0217_Renderer_collapseStrand_standaloneCollectCollapses() {
   // [Cap, Collect] with no enclosing ForEach, source=media:a,
   // target=media:b;list (NOT equivalent to cap's to_spec media:b,
   // so the output node is retained after collapse).
@@ -4632,7 +4737,8 @@ function testRenderer_collapseStrand_standaloneCollectCollapses() {
     'the synthesized bridging edge for a standalone Collect is an unlabeled connector (cap labels carry all cardinality info)');
 }
 
-function testRenderer_collapseStrand_sequenceProducingCapBeforeForeach() {
+// TEST0218: Renderer collapse strand sequence producing cap before foreach
+function test0218_Renderer_collapseStrand_sequenceProducingCapBeforeForeach() {
   // Regression test mirroring the user's real strand:
   // [Cap_disbind (output_is_sequence=true), ForEach, Cap_make_decision],
   // source = media:pdf, target = media:decision (equivalent to
@@ -4696,7 +4802,8 @@ function testRenderer_collapseStrand_sequenceProducingCapBeforeForeach() {
     'output node merged into step_2 because they represent the same URN');
 }
 
-function testRenderer_collapseStrand_plainCapMergesTrailingOutput() {
+// TEST0219: Renderer collapse strand plain cap merges trailing output
+function test0219_Renderer_collapseStrand_plainCapMergesTrailingOutput() {
   // A strand with a single plain 1→1 cap whose to_spec equals
   // target_media_urn. The plan-builder topology produces:
   //   input_slot → step_0 (cap) → output
@@ -4732,7 +4839,8 @@ function testRenderer_collapseStrand_plainCapMergesTrailingOutput() {
   assertEqual(collapsed.edges[0].label, 'x', 'cap title preserved as edge label');
 }
 
-function testRenderer_collapseStrand_plainCapDistinctTargetNoMerge() {
+// TEST0220: Renderer collapse strand plain cap distinct target no merge
+function test0220_Renderer_collapseStrand_plainCapDistinctTargetNoMerge() {
   // A strand with a single plain cap whose to_spec is NOT
   // equivalent to target_media_urn. The output node must be retained
   // and the trailing connector edge preserved.
@@ -4758,7 +4866,8 @@ function testRenderer_collapseStrand_plainCapDistinctTargetNoMerge() {
     'step_0 retained');
 }
 
-function testRenderer_validateStrandPayload_missingSourceMediaUrn() {
+// TEST0221: Renderer validate strand payload missing source media urn
+function test0221_Renderer_validateStrandPayload_missingSourceMediaUrn() {
   let threw = false;
   try {
     rendererValidateStrandPayload({ target_media_urn: 'media:b', steps: [] });
@@ -4771,7 +4880,7 @@ function testRenderer_validateStrandPayload_missingSourceMediaUrn() {
 
 // ---------------- run builder ----------------
 
-function testRenderer_validateBodyOutcome_rejectsNegativeIndex() {
+function test0222_Renderer_validateBodyOutcome_rejectsNegativeIndex() {
   let threw = false;
   try {
     rendererValidateBodyOutcome({ body_index: -1, success: true, cap_urns: [] }, 'test');
@@ -4781,7 +4890,8 @@ function testRenderer_validateBodyOutcome_rejectsNegativeIndex() {
   assert(threw, 'negative body_index must throw');
 }
 
-function testRenderer_buildRunGraphData_pagesSuccessesAndFailures() {
+// TEST0223: Renderer build run graph data pages successes and failures
+function test0223_Renderer_buildRunGraphData_pagesSuccessesAndFailures() {
   // 6 successes, 4 failures. visible=3+2, total=10. Body has 2
   // caps (a, b). Each body replica is a chain of:
   //   entry node + body_step_0 (cap a) + body_step_1 (cap b)
@@ -4851,7 +4961,8 @@ function testRenderer_buildRunGraphData_pagesSuccessesAndFailures() {
   assertEqual(failureShowMore.data.hiddenCount, 2, 'failure hidden count = 2');
 }
 
-function testRenderer_buildRunGraphData_failureWithoutFailedCapRendersFullTrace() {
+// TEST0224: Renderer build run graph data failure without failed cap renders full trace
+function test0224_Renderer_buildRunGraphData_failureWithoutFailedCapRendersFullTrace() {
   // A failure without failed_cap (infrastructure failure) must
   // still render the full body trace — the builder must not
   // crash or produce zero replicas.
@@ -4889,7 +5000,8 @@ function testRenderer_buildRunGraphData_failureWithoutFailedCapRendersFullTrace(
   assertEqual(failureNodes, 2, 'entry + body cap = 2 failure replica nodes');
 }
 
-function testRenderer_buildRunGraphData_usesCapUrnIsEquivalentForFailedCap() {
+// TEST0225: Renderer build run graph data uses cap urn is equivalent for failed cap
+function test0225_Renderer_buildRunGraphData_usesCapUrnIsEquivalentForFailedCap() {
   // The renderer matches failed_cap against step cap URNs via
   // CapUrn.isEquivalent, NOT string equality. Feed a payload where
   // failed_cap and the step's cap_urn differ only in tag order — they
@@ -4948,7 +5060,8 @@ function testRenderer_buildRunGraphData_usesCapUrnIsEquivalentForFailedCap() {
   assertEqual(failureNodes, 3, 'trace truncates at cap y via isEquivalent, yielding entry + 2 cap nodes');
 }
 
-function testRenderer_buildRunGraphData_backboneHasNoForeachNode() {
+// TEST0226: Renderer build run graph data backbone has no foreach node
+function test0226_Renderer_buildRunGraphData_backboneHasNoForeachNode() {
   // Regression test for the run-mode rendering fix: the backbone
   // delivered to cytoscape must NOT contain any strand-foreach or
   // strand-collect nodes. Run mode inherits the same cosmetic
@@ -5002,7 +5115,8 @@ function testRenderer_buildRunGraphData_backboneHasNoForeachNode() {
   assertEqual(built.showMoreNodes.length, 0, 'no show-more nodes when no hidden outcomes');
 }
 
-function testRenderer_buildRunGraphData_allFailedDropsTargetPlaceholder() {
+// TEST0227: Renderer build run graph data all failed drops target placeholder
+function test0227_Renderer_buildRunGraphData_allFailedDropsTargetPlaceholder() {
   // When every body fails, the strand target node was never
   // reached by any execution. The render drops BOTH the backbone
   // foreach-entry edge AND the orphaned target node so the user
@@ -5067,7 +5181,8 @@ function testRenderer_buildRunGraphData_allFailedDropsTargetPlaceholder() {
   assertEqual(hasInputSlot, true, 'input_slot survives as the shared source');
 }
 
-function testRenderer_buildRunGraphData_unclosedForeachSuccessNoMerge() {
+// TEST0228: Renderer build run graph data unclosed foreach success no merge
+function test0228_Renderer_buildRunGraphData_unclosedForeachSuccessNoMerge() {
   // Strand without a Collect: [Disbind, ForEach, make_decision].
   // Under the machfab realize_strand semantics there's no Collect,
   // so each body produces its OWN terminal output. Successful
@@ -5128,7 +5243,8 @@ function testRenderer_buildRunGraphData_unclosedForeachSuccessNoMerge() {
   assertEqual(forkEdges.length, 1, 'fork edge input_slot → body-0-entry exists');
 }
 
-function testRenderer_buildRunGraphData_closedForeachSuccessMergesAtCollectTarget() {
+// TEST0229: Renderer build run graph data closed foreach success merges at collect target
+function test0229_Renderer_buildRunGraphData_closedForeachSuccessMergesAtCollectTarget() {
   // With a Collect closing the body, successful replicas DO merge
   // into the post-collect target so the flow converges.
   // Strand: [Disbind, ForEach, Cap_a, Cap_b, Collect] with a
@@ -5183,7 +5299,7 @@ function testRenderer_buildRunGraphData_closedForeachSuccessMergesAtCollectTarge
 
 // ---------------- editor-graph builder ----------------
 
-function testRenderer_validateEditorGraphPayload_rejectsUnknownKind() {
+function test0230_Renderer_validateEditorGraphPayload_rejectsUnknownKind() {
   let threw = false;
   try {
     rendererValidateEditorGraphPayload({
@@ -5197,7 +5313,8 @@ function testRenderer_validateEditorGraphPayload_rejectsUnknownKind() {
   assert(threw, 'unknown element kind must throw');
 }
 
-function testRenderer_buildEditorGraphData_collapsesCapsIntoLabeledEdges() {
+// TEST0231: Renderer build editor graph data collapses caps into labeled edges
+function test0231_Renderer_buildEditorGraphData_collapsesCapsIntoLabeledEdges() {
   // The notation analyzer emits a bipartite chain per cap
   // application: data_node → arg_edge → cap_node → arg_edge →
   // data_node. The machine builder collapses each cap into a
@@ -5235,7 +5352,8 @@ function testRenderer_buildEditorGraphData_collapsesCapsIntoLabeledEdges() {
     'edge carries the cap node tokenId so editor cross-highlight points to the cap in source text');
 }
 
-function testRenderer_buildEditorGraphData_loopMarkedEdgeGetsLoopClass() {
+// TEST0232: Renderer build editor graph data loop marked edge gets loop class
+function test0232_Renderer_buildEditorGraphData_loopMarkedEdgeGetsLoopClass() {
   // A cap marked `is_loop: true` must produce a `machine-loop`
   // edge so the stylesheet's dashed amber rule applies.
   const data = {
@@ -5253,7 +5371,8 @@ function testRenderer_buildEditorGraphData_loopMarkedEdgeGetsLoopClass() {
     'loop-marked cap emits machine-loop class on the collapsed edge');
 }
 
-function testRenderer_buildEditorGraphData_cardinalityFromDataSlotSequenceFlags() {
+// TEST0233: Renderer build editor graph data cardinality from data slot sequence flags
+function test0233_Renderer_buildEditorGraphData_cardinalityFromDataSlotSequenceFlags() {
   // Cardinality markers come from the source and target data
   // slots' `is_sequence` flags. A cap whose output data slot has
   // `is_sequence=true` shows "(1→n)" on its collapsed edge.
@@ -5272,7 +5391,8 @@ function testRenderer_buildEditorGraphData_cardinalityFromDataSlotSequenceFlags(
     'cardinality marker "(1→n)" derived from output data slot is_sequence=true');
 }
 
-function testRenderer_buildEditorGraphData_capWithoutCompleteArgsIsDropped() {
+// TEST0234: Renderer build editor graph data cap without complete args is dropped
+function test0234_Renderer_buildEditorGraphData_capWithoutCompleteArgsIsDropped() {
   // A cap with no incoming or no outgoing argument edges (e.g.
   // the user is mid-typing) contributes nothing to the render.
   // The data slots are still emitted.
@@ -5289,7 +5409,8 @@ function testRenderer_buildEditorGraphData_capWithoutCompleteArgsIsDropped() {
     'incomplete cap (no outgoing argument) drops out of the render');
 }
 
-function testRenderer_buildEditorGraphData_rejectsEdgeWithMissingSource() {
+// TEST0235: Renderer build editor graph data rejects edge with missing source
+function test0235_Renderer_buildEditorGraphData_rejectsEdgeWithMissingSource() {
   let threw = false;
   try {
     rendererBuildEditorGraphData({
@@ -5305,7 +5426,7 @@ function testRenderer_buildEditorGraphData_rejectsEdgeWithMissingSource() {
 
 // ---------------- resolved-machine builder ----------------
 
-function testRenderer_buildResolvedMachineGraphData_singleStrandLinearChain() {
+function test0236_Renderer_buildResolvedMachineGraphData_singleStrandLinearChain() {
   // A single-strand machine: media:pdf → extract → media:txt
   // → embed → media:embedding. Two edges, three nodes, no
   // loops, no fan-in. Tests the basic shape — nodes and
@@ -5363,7 +5484,8 @@ function testRenderer_buildResolvedMachineGraphData_singleStrandLinearChain() {
     'output anchor node carries strand-target class');
 }
 
-function testRenderer_buildResolvedMachineGraphData_loopEdgeGetsLoopClass() {
+// TEST0237: Renderer build resolved machine graph data loop edge gets loop class
+function test0237_Renderer_buildResolvedMachineGraphData_loopEdgeGetsLoopClass() {
   // An is_loop edge corresponds to a strand step inside a
   // ForEach body. The renderer must mark it with the
   // `machine-loop` class so the dashed amber rule applies.
@@ -5397,7 +5519,8 @@ function testRenderer_buildResolvedMachineGraphData_loopEdgeGetsLoopClass() {
     'is_loop=true must produce a machine-loop class on the cap edge');
 }
 
-function testRenderer_buildResolvedMachineGraphData_fanInProducesEdgePerAssignment() {
+// TEST0238: Renderer build resolved machine graph data fan in produces edge per assignment
+function test0238_Renderer_buildResolvedMachineGraphData_fanInProducesEdgePerAssignment() {
   // A cap with two input args (a fan-in) gets one rendered
   // edge per (source_node, target_node) pair so cytoscape can
   // draw both incoming wires. Both edges share the cap title
@@ -5437,7 +5560,8 @@ function testRenderer_buildResolvedMachineGraphData_fanInProducesEdgePerAssignme
   assertEqual(built.edges[1].data.target, 'n2', 'second edge targets n2');
 }
 
-function testRenderer_buildResolvedMachineGraphData_multiStrandKeepsStrandsDisjoint() {
+// TEST0239: Renderer build resolved machine graph data multi strand keeps strands disjoint
+function test0239_Renderer_buildResolvedMachineGraphData_multiStrandKeepsStrandsDisjoint() {
   // Two strands inside one machine. Each strand has its own
   // nodes and edges. Node ids are globally unique across
   // strands (Rust assigns them via a single counter), so no
@@ -5499,7 +5623,8 @@ function testRenderer_buildResolvedMachineGraphData_multiStrandKeepsStrandsDisjo
   assertEqual(idToStrand['n3'], 1, 'n3 belongs to strand 1');
 }
 
-function testRenderer_buildResolvedMachineGraphData_duplicateNodeIdAcrossStrandsFailsHard() {
+// TEST0240: Renderer build resolved machine graph data duplicate node id across strands fails hard
+function test0240_Renderer_buildResolvedMachineGraphData_duplicateNodeIdAcrossStrandsFailsHard() {
   // Node ids must be globally unique across strands. The
   // Rust serializer guarantees this via a single global
   // counter. If the host ever feeds a payload that violates
@@ -5534,7 +5659,8 @@ function testRenderer_buildResolvedMachineGraphData_duplicateNodeIdAcrossStrands
     'error must name the colliding node id');
 }
 
-function testRenderer_validateResolvedMachinePayload_rejectsMissingFields() {
+// TEST0241: Renderer validate resolved machine payload rejects missing fields
+function test0241_Renderer_validateResolvedMachinePayload_rejectsMissingFields() {
   // The validator must reject any payload missing a required
   // field on a strand, edge, node, or assignment binding.
   // We exercise the most-likely-to-be-missed field on each
@@ -6065,9 +6191,9 @@ async function runTests() {
   // /api/capabilities). These tests guard the minimal API the renderer relies
   // on: new CapFab(), addCap(cap, registryName), getEdges(), getOutgoing().
   console.log('\n--- cap_fab (browse-mode API used by cap-fab-renderer) ---');
-  runTest('cap_fab: add_cap_populates_edges_and_nodes', testCapFabAddCapPopulatesEdgesAndNodes);
-  runTest('cap_fab: get_outgoing_conforms_to_matching', testCapFabGetOutgoingConformsToMatching);
-  runTest('cap_fab: distinct_registry_names_recorded_per_edge', testCapFabDistinctRegistryNames);
+  runTest('cap_fab: add_cap_populates_edges_and_nodes', test0052_CapFabAddCapPopulatesEdgesAndNodes);
+  runTest('cap_fab: get_outgoing_conforms_to_matching', test0053_CapFabGetOutgoingConformsToMatching);
+  runTest('cap_fab: distinct_registry_names_recorded_per_edge', test0057_CapFabDistinctRegistryNames);
 
   // caller.rs: TEST156-TEST159
   console.log('\n--- caller.rs (StdinSource) ---');
@@ -6096,22 +6222,22 @@ async function runTests() {
   runTest('TEST308: model_path_urn', test308_modelPathUrn);
   runTest('TEST309: model_availability_and_path_are_distinct', test309_modelAvailabilityAndPathAreDistinct);
   runTest('TEST310: llm_generate_text_urn', test310_llmGenerateTextUrn);
-  runTest('llm_generate_text_urn_specs', testLlmGenerateTextUrnSpecs);
+  runTest('llm_generate_text_urn_specs', test0058_LlmGenerateTextUrnSpecs);
   runTest('TEST312: all_urn_builders_produce_valid_urns', test312_allUrnBuildersProduceValidUrns);
 
   // JS-specific tests (no Rust number)
   console.log('\n--- JS-specific ---');
-  runTest('JS: build_extension_index', testJS_buildExtensionIndex);
-  runTest('JS: media_urns_for_extension', testJS_mediaUrnsForExtension);
-  runTest('JS: get_extension_mappings', testJS_getExtensionMappings);
-  runTest('JS: resolve_media_urn_from_specs', testJS_resolveMediaUrnFromSpecs);
-  runTest('JS: cap_json_serialization', testJS_capJSONSerialization);
-  runTest('JS: cap_documentation_round_trip', testJS_capDocumentationRoundTrip);
-  runTest('JS: cap_documentation_omitted_when_null', testJS_capDocumentationOmittedWhenNull);
-  runTest('JS: media_def_documentation_propagates_through_resolve', testJS_mediaDefDocumentationPropagatesThroughResolve);
-  runTest('JS: stdin_source_kind_constants', testJS_stdinSourceKindConstants);
-  runTest('JS: stdin_source_null_data', testJS_stdinSourceNullData);
-  runTest('JS: media_def_construction', testJS_mediaDefConstruction);
+  runTest('JS: build_extension_index', test0059_JS_buildExtensionIndex);
+  runTest('JS: media_urns_for_extension', test0069_JS_mediaUrnsForExtension);
+  runTest('JS: get_extension_mappings', test0070_JS_getExtensionMappings);
+  runTest('JS: resolve_media_urn_from_specs', test0073_JS_resolveMediaUrnFromSpecs);
+  runTest('JS: cap_json_serialization', test0079_JS_capJSONSerialization);
+  runTest('JS: cap_documentation_round_trip', test0080_JS_capDocumentationRoundTrip);
+  runTest('JS: cap_documentation_omitted_when_null', test0081_JS_capDocumentationOmittedWhenNull);
+  runTest('JS: media_def_documentation_propagates_through_resolve', test0082_JS_mediaDefDocumentationPropagatesThroughResolve);
+  runTest('JS: stdin_source_kind_constants', test0083_JS_stdinSourceKindConstants);
+  runTest('JS: stdin_source_null_data', test0084_JS_stdinSourceNullData);
+  runTest('JS: media_def_construction', test0085_JS_mediaDefConstruction);
 
   // cartridge_repo: CartridgeRepoServer and CartridgeRepoClient tests
   console.log('\n--- cartridge_repo ---');
@@ -6179,174 +6305,174 @@ async function runTests() {
 
   // machine module: parser tests (mirrors parser.rs)
   console.log('\n--- machine/parser.rs ---');
-  runTest('MACHINE:empty_input', testMachine_emptyInput);
-  runTest('MACHINE:whitespace_only', testMachine_whitespaceOnly);
-  runTest('MACHINE:header_only_no_wirings', testMachine_headerOnlyNoWirings);
-  runTest('MACHINE:duplicate_alias', testMachine_duplicateAlias);
-  runTest('MACHINE:simple_linear_chain', testMachine_simpleLinearChain);
-  runTest('MACHINE:two_step_chain', testMachine_twoStepChain);
-  runTest('MACHINE:fan_out', testMachine_fanOut);
-  runTest('MACHINE:fan_in_secondary_assigned_by_prior_wiring', testMachine_fanInSecondaryAssignedByPriorWiring);
-  runTest('MACHINE:fan_in_secondary_unassigned_gets_wildcard', testMachine_fanInSecondaryUnassignedGetsWildcard);
-  runTest('MACHINE:loop_edge', testMachine_loopEdge);
-  runTest('MACHINE:undefined_alias_fails', testMachine_undefinedAliasFails);
-  runTest('MACHINE:node_alias_collision', testMachine_nodeAliasCollision);
-  runTest('MACHINE:conflicting_media_types_fail', testMachine_conflictingMediaTypesFail);
-  runTest('MACHINE:multiline_format', testMachine_multilineFormat);
-  runTest('MACHINE:different_aliases_same_graph', testMachine_differentAliasesSameGraph);
-  runTest('MACHINE:malformed_input_fails', testMachine_malformedInputFails);
-  runTest('MACHINE:unterminated_bracket_fails', testMachine_unterminatedBracketFails);
+  runTest('MACHINE:empty_input', test0087_Machine_emptyInput);
+  runTest('MACHINE:whitespace_only', test0088_Machine_whitespaceOnly);
+  runTest('MACHINE:header_only_no_wirings', test0089_Machine_headerOnlyNoWirings);
+  runTest('MACHINE:duplicate_alias', test0090_Machine_duplicateAlias);
+  runTest('MACHINE:simple_linear_chain', test0094_Machine_simpleLinearChain);
+  runTest('MACHINE:two_step_chain', test0095_Machine_twoStepChain);
+  runTest('MACHINE:fan_out', test0096_Machine_fanOut);
+  runTest('MACHINE:fan_in_secondary_assigned_by_prior_wiring', test0097_Machine_fanInSecondaryAssignedByPriorWiring);
+  runTest('MACHINE:fan_in_secondary_unassigned_gets_wildcard', test0098_Machine_fanInSecondaryUnassignedGetsWildcard);
+  runTest('MACHINE:loop_edge', test0111_Machine_loopEdge);
+  runTest('MACHINE:undefined_alias_fails', test0112_Machine_undefinedAliasFails);
+  runTest('MACHINE:node_alias_collision', test0113_Machine_nodeAliasCollision);
+  runTest('MACHINE:conflicting_media_types_fail', test0114_Machine_conflictingMediaTypesFail);
+  runTest('MACHINE:multiline_format', test0117_Machine_multilineFormat);
+  runTest('MACHINE:different_aliases_same_graph', test0118_Machine_differentAliasesSameGraph);
+  runTest('MACHINE:malformed_input_fails', test0119_Machine_malformedInputFails);
+  runTest('MACHINE:unterminated_bracket_fails', test0120_Machine_unterminatedBracketFails);
 
   // machine module: line-based mode tests
   console.log('\n--- machine/parser.rs (line-based) ---');
-  runTest('MACHINE:line_based_simple_chain', testMachine_lineBasedSimpleChain);
-  runTest('MACHINE:line_based_two_step_chain', testMachine_lineBasedTwoStepChain);
-  runTest('MACHINE:line_based_loop', testMachine_lineBasedLoop);
-  runTest('MACHINE:line_based_fan_in', testMachine_lineBasedFanIn);
-  runTest('MACHINE:mixed_bracketed_and_line_based', testMachine_mixedBracketedAndLineBased);
-  runTest('MACHINE:line_based_equivalent_to_bracketed', testMachine_lineBasedEquivalentToBracketed);
-  runTest('MACHINE:line_based_format_serialization', testMachine_lineBasedFormatSerialization);
-  runTest('MACHINE:line_based_and_bracketed_parse_same_graph', testMachine_lineBasedAndBracketedParseSameGraph);
+  runTest('MACHINE:line_based_simple_chain', test0121_Machine_lineBasedSimpleChain);
+  runTest('MACHINE:line_based_two_step_chain', test0122_Machine_lineBasedTwoStepChain);
+  runTest('MACHINE:line_based_loop', test0123_Machine_lineBasedLoop);
+  runTest('MACHINE:line_based_fan_in', test0124_Machine_lineBasedFanIn);
+  runTest('MACHINE:mixed_bracketed_and_line_based', test0125_Machine_mixedBracketedAndLineBased);
+  runTest('MACHINE:line_based_equivalent_to_bracketed', test0126_Machine_lineBasedEquivalentToBracketed);
+  runTest('MACHINE:line_based_format_serialization', test0127_Machine_lineBasedFormatSerialization);
+  runTest('MACHINE:line_based_and_bracketed_parse_same_graph', test0128_Machine_lineBasedAndBracketedParseSameGraph);
 
   // machine module: graph tests (mirrors graph.rs)
   console.log('\n--- machine/graph.rs ---');
-  runTest('MACHINE:edge_equivalence_same_urns', testMachine_edgeEquivalenceSameUrns);
-  runTest('MACHINE:edge_equivalence_different_cap_urns', testMachine_edgeEquivalenceDifferentCapUrns);
-  runTest('MACHINE:edge_equivalence_different_targets', testMachine_edgeEquivalenceDifferentTargets);
-  runTest('MACHINE:edge_equivalence_different_loop_flag', testMachine_edgeEquivalenceDifferentLoopFlag);
-  runTest('MACHINE:edge_equivalence_source_order_independent', testMachine_edgeEquivalenceSourceOrderIndependent);
-  runTest('MACHINE:edge_equivalence_different_source_count', testMachine_edgeEquivalenceDifferentSourceCount);
-  runTest('MACHINE:graph_equivalence_same_edges', testMachine_graphEquivalenceSameEdges);
-  runTest('MACHINE:graph_equivalence_reordered_edges', testMachine_graphEquivalenceReorderedEdges);
-  runTest('MACHINE:graph_not_equivalent_different_edge_count', testMachine_graphNotEquivalentDifferentEdgeCount);
-  runTest('MACHINE:graph_not_equivalent_different_cap', testMachine_graphNotEquivalentDifferentCap);
-  runTest('MACHINE:graph_empty', testMachine_graphEmpty);
-  runTest('MACHINE:graph_empty_equivalence', testMachine_graphEmptyEquivalence);
-  runTest('MACHINE:root_sources_linear_chain', testMachine_rootSourcesLinearChain);
-  runTest('MACHINE:leaf_targets_linear_chain', testMachine_leafTargetsLinearChain);
-  runTest('MACHINE:root_sources_fan_in', testMachine_rootSourcesFanIn);
-  runTest('MACHINE:display_edge', testMachine_displayEdge);
-  runTest('MACHINE:display_graph', testMachine_displayGraph);
+  runTest('MACHINE:edge_equivalence_same_urns', test0129_Machine_edgeEquivalenceSameUrns);
+  runTest('MACHINE:edge_equivalence_different_cap_urns', test0130_Machine_edgeEquivalenceDifferentCapUrns);
+  runTest('MACHINE:edge_equivalence_different_targets', test0131_Machine_edgeEquivalenceDifferentTargets);
+  runTest('MACHINE:edge_equivalence_different_loop_flag', test0132_Machine_edgeEquivalenceDifferentLoopFlag);
+  runTest('MACHINE:edge_equivalence_source_order_independent', test0133_Machine_edgeEquivalenceSourceOrderIndependent);
+  runTest('MACHINE:edge_equivalence_different_source_count', test0134_Machine_edgeEquivalenceDifferentSourceCount);
+  runTest('MACHINE:graph_equivalence_same_edges', test0135_Machine_graphEquivalenceSameEdges);
+  runTest('MACHINE:graph_equivalence_reordered_edges', test0136_Machine_graphEquivalenceReorderedEdges);
+  runTest('MACHINE:graph_not_equivalent_different_edge_count', test0137_Machine_graphNotEquivalentDifferentEdgeCount);
+  runTest('MACHINE:graph_not_equivalent_different_cap', test0138_Machine_graphNotEquivalentDifferentCap);
+  runTest('MACHINE:graph_empty', test0139_Machine_graphEmpty);
+  runTest('MACHINE:graph_empty_equivalence', test0140_Machine_graphEmptyEquivalence);
+  runTest('MACHINE:root_sources_linear_chain', test0141_Machine_rootSourcesLinearChain);
+  runTest('MACHINE:leaf_targets_linear_chain', test0142_Machine_leafTargetsLinearChain);
+  runTest('MACHINE:root_sources_fan_in', test0143_Machine_rootSourcesFanIn);
+  runTest('MACHINE:display_edge', test0144_Machine_displayEdge);
+  runTest('MACHINE:display_graph', test0145_Machine_displayGraph);
 
   // machine module: serializer tests (mirrors serializer.rs)
   console.log('\n--- machine/serializer.rs ---');
-  runTest('MACHINE:serialize_single_edge', testMachine_serializeSingleEdge);
-  runTest('MACHINE:serialize_two_edge_chain', testMachine_serializeTwoEdgeChain);
-  runTest('MACHINE:serialize_empty_graph', testMachine_serializeEmptyGraph);
-  runTest('MACHINE:roundtrip_single_edge', testMachine_roundtripSingleEdge);
-  runTest('MACHINE:roundtrip_two_edge_chain', testMachine_roundtripTwoEdgeChain);
-  runTest('MACHINE:roundtrip_fan_out', testMachine_roundtripFanOut);
-  runTest('MACHINE:roundtrip_loop_edge', testMachine_roundtripLoopEdge);
-  runTest('MACHINE:serialization_is_deterministic', testMachine_serializationIsDeterministic);
-  runTest('MACHINE:reordered_edges_produce_same_notation', testMachine_reorderedEdgesProduceSameNotation);
-  runTest('MACHINE:multiline_serialize_format', testMachine_multilineSerializeFormat);
-  runTest('MACHINE:alias_from_op_tag', testMachine_aliasFromOpTag);
-  runTest('MACHINE:alias_fallback_without_op_tag', testMachine_aliasFallbackWithoutOpTag);
-  runTest('MACHINE:duplicate_op_tags_disambiguated', testMachine_duplicateOpTagsDisambiguated);
+  runTest('MACHINE:serialize_single_edge', test0146_Machine_serializeSingleEdge);
+  runTest('MACHINE:serialize_two_edge_chain', test0147_Machine_serializeTwoEdgeChain);
+  runTest('MACHINE:serialize_empty_graph', test0148_Machine_serializeEmptyGraph);
+  runTest('MACHINE:roundtrip_single_edge', test0149_Machine_roundtripSingleEdge);
+  runTest('MACHINE:roundtrip_two_edge_chain', test0151_Machine_roundtripTwoEdgeChain);
+  runTest('MACHINE:roundtrip_fan_out', test0152_Machine_roundtripFanOut);
+  runTest('MACHINE:roundtrip_loop_edge', test0153_Machine_roundtripLoopEdge);
+  runTest('MACHINE:serialization_is_deterministic', test0154_Machine_serializationIsDeterministic);
+  runTest('MACHINE:reordered_edges_produce_same_notation', test0155_Machine_reorderedEdgesProduceSameNotation);
+  runTest('MACHINE:multiline_serialize_format', test0160_Machine_multilineSerializeFormat);
+  runTest('MACHINE:alias_from_op_tag', test0161_Machine_aliasFromOpTag);
+  runTest('MACHINE:alias_fallback_without_op_tag', test0162_Machine_aliasFallbackWithoutOpTag);
+  runTest('MACHINE:duplicate_op_tags_disambiguated', test0163_Machine_duplicateOpTagsDisambiguated);
 
   // machine module: builder tests
   console.log('\n--- machine/builder ---');
-  runTest('MACHINE:builder_single_edge', testMachine_builderSingleEdge);
-  runTest('MACHINE:builder_with_loop', testMachine_builderWithLoop);
-  runTest('MACHINE:builder_chaining', testMachine_builderChaining);
-  runTest('MACHINE:builder_equivalent_to_parsed', testMachine_builderEquivalentToParsed);
-  runTest('MACHINE:builder_round_trip', testMachine_builderRoundTrip);
+  runTest('MACHINE:builder_single_edge', test0164_Machine_builderSingleEdge);
+  runTest('MACHINE:builder_with_loop', test0165_Machine_builderWithLoop);
+  runTest('MACHINE:builder_chaining', test0166_Machine_builderChaining);
+  runTest('MACHINE:builder_equivalent_to_parsed', test0167_Machine_builderEquivalentToParsed);
+  runTest('MACHINE:builder_round_trip', test0168_Machine_builderRoundTrip);
 
   // machine module: CapUrn.isEquivalent/isComparable
   console.log('\n--- machine/urn_predicates ---');
-  runTest('MACHINE:cap_urn_is_equivalent', testMachine_capUrnIsEquivalent);
-  runTest('MACHINE:cap_urn_is_comparable', testMachine_capUrnIsComparable);
-  runTest('MACHINE:cap_urn_in_media_urn', testMachine_capUrnInMediaUrn);
-  runTest('MACHINE:cap_urn_out_media_urn', testMachine_capUrnOutMediaUrn);
-  runTest('MACHINE:media_urn_is_equivalent', testMachine_mediaUrnIsEquivalent);
-  runTest('MACHINE:media_urn_is_comparable', testMachine_mediaUrnIsComparable);
+  runTest('MACHINE:cap_urn_is_equivalent', test0169_Machine_capUrnIsEquivalent);
+  runTest('MACHINE:cap_urn_is_comparable', test0170_Machine_capUrnIsComparable);
+  runTest('MACHINE:cap_urn_in_media_urn', test0171_Machine_capUrnInMediaUrn);
+  runTest('MACHINE:cap_urn_out_media_urn', test0172_Machine_capUrnOutMediaUrn);
+  runTest('MACHINE:media_urn_is_equivalent', test0173_Machine_mediaUrnIsEquivalent);
+  runTest('MACHINE:media_urn_is_comparable', test0174_Machine_mediaUrnIsComparable);
 
   // Phase 0A: Position tracking
   console.log('\n--- machine/position_tracking ---');
-  runTest('MACHINE:parseMachineWithAST_headerLocation', testMachine_parseMachineWithAST_headerLocation);
-  runTest('MACHINE:parseMachineWithAST_wiringLocation', testMachine_parseMachineWithAST_wiringLocation);
-  runTest('MACHINE:parseMachineWithAST_multilinePositions', testMachine_parseMachineWithAST_multilinePositions);
-  runTest('MACHINE:parseMachineWithAST_fanInSourceLocations', testMachine_parseMachineWithAST_fanInSourceLocations);
-  runTest('MACHINE:parseMachineWithAST_aliasMap', testMachine_parseMachineWithAST_aliasMap);
-  runTest('MACHINE:parseMachineWithAST_nodeMedia', testMachine_parseMachineWithAST_nodeMedia);
-  runTest('MACHINE:errorLocation_parseError', testMachine_errorLocation_parseError);
-  runTest('MACHINE:errorLocation_duplicateAlias', testMachine_errorLocation_duplicateAlias);
-  runTest('MACHINE:errorLocation_undefinedAlias', testMachine_errorLocation_undefinedAlias);
+  runTest('MACHINE:parseMachineWithAST_headerLocation', test0175_Machine_parseMachineWithAST_headerLocation);
+  runTest('MACHINE:parseMachineWithAST_wiringLocation', test0176_Machine_parseMachineWithAST_wiringLocation);
+  runTest('MACHINE:parseMachineWithAST_multilinePositions', test0177_Machine_parseMachineWithAST_multilinePositions);
+  runTest('MACHINE:parseMachineWithAST_fanInSourceLocations', test0178_Machine_parseMachineWithAST_fanInSourceLocations);
+  runTest('MACHINE:parseMachineWithAST_aliasMap', test0179_Machine_parseMachineWithAST_aliasMap);
+  runTest('MACHINE:parseMachineWithAST_nodeMedia', test0180_Machine_parseMachineWithAST_nodeMedia);
+  runTest('MACHINE:errorLocation_parseError', test0181_Machine_errorLocation_parseError);
+  runTest('MACHINE:errorLocation_duplicateAlias', test0182_Machine_errorLocation_duplicateAlias);
+  runTest('MACHINE:errorLocation_undefinedAlias', test0183_Machine_errorLocation_undefinedAlias);
 
   // Phase 0C: Machine.toMermaid()
   console.log('\n--- machine/mermaid ---');
-  runTest('MACHINE:toMermaid_linearChain', testMachine_toMermaid_linearChain);
-  runTest('MACHINE:toMermaid_loopEdge', testMachine_toMermaid_loopEdge);
-  runTest('MACHINE:toMermaid_emptyGraph', testMachine_toMermaid_emptyGraph);
-  runTest('MACHINE:toMermaid_fanIn', testMachine_toMermaid_fanIn);
-  runTest('MACHINE:toMermaid_fanOut', testMachine_toMermaid_fanOut);
+  runTest('MACHINE:toMermaid_linearChain', test0184_Machine_toMermaid_linearChain);
+  runTest('MACHINE:toMermaid_loopEdge', test0185_Machine_toMermaid_loopEdge);
+  runTest('MACHINE:toMermaid_emptyGraph', test0186_Machine_toMermaid_emptyGraph);
+  runTest('MACHINE:toMermaid_fanIn', test0187_Machine_toMermaid_fanIn);
+  runTest('MACHINE:toMermaid_fanOut', test0188_Machine_toMermaid_fanOut);
 
   // Phase 0B: FabricRegistryClient
   console.log('\n--- registry/client ---');
-  runTest('REGISTRY: capRegistryEntry_construction', testMachine_capRegistryEntry_construction);
-  runTest('REGISTRY: mediaRegistryEntry_construction', testMachine_mediaRegistryEntry_construction);
-  runTest('REGISTRY: capRegistryClient_construction', testMachine_capRegistryClient_construction);
-  runTest('REGISTRY: capRegistryEntry_defaults', testMachine_capRegistryEntry_defaults);
+  runTest('REGISTRY: capRegistryEntry_construction', test0189_Machine_capRegistryEntry_construction);
+  runTest('REGISTRY: mediaRegistryEntry_construction', test0190_Machine_mediaRegistryEntry_construction);
+  runTest('REGISTRY: capRegistryClient_construction', test0191_Machine_capRegistryClient_construction);
+  runTest('REGISTRY: capRegistryEntry_defaults', test0192_Machine_capRegistryEntry_defaults);
 
   // cap-fab-renderer pure helpers (no DOM dependency)
   console.log('\n--- cap-fab-renderer helpers ---');
-  runTest('RENDERER: cardinalityLabel_allFourCases',          testRenderer_cardinalityLabel_allFourCases);
-  runTest('RENDERER: cardinalityLabel_usesUnicodeArrow',      testRenderer_cardinalityLabel_usesUnicodeArrow);
-  runTest('RENDERER: cardinalityFromCap_findsStdinArg',       testRenderer_cardinalityFromCap_findsStdinArgNotFirstArg);
-  runTest('RENDERER: cardinalityFromCap_scalarDefaults',      testRenderer_cardinalityFromCap_scalarDefaultsWhenFieldsMissing);
-  runTest('RENDERER: cardinalityFromCap_outputOnlySequence',  testRenderer_cardinalityFromCap_outputOnlySequence);
-  runTest('RENDERER: cardinalityFromCap_rejectsStringBool',   testRenderer_cardinalityFromCap_rejectsStringIsSequence);
-  runTest('RENDERER: cardinalityFromCap_throwsOnNonObject',   testRenderer_cardinalityFromCap_throwsOnNonObject);
-  runTest('RENDERER: canonicalMediaUrn_normalizesTagOrder',   testRenderer_canonicalMediaUrn_normalizesTagOrder);
-  runTest('RENDERER: canonicalMediaUrn_preservesValueTags',   testRenderer_canonicalMediaUrn_preservesValueTags);
-  runTest('RENDERER: canonicalMediaUrn_rejectsCapUrn',        testRenderer_canonicalMediaUrn_rejectsCapUrn);
-  runTest('RENDERER: mediaNodeLabel_rejectsUrnDerived',       testRenderer_mediaNodeLabel_rejectsUrnDerivedLabels);
-  runTest('RENDERER: buildBrowse_rejectsMissingMediaTitles',  testRenderer_buildBrowseGraphData_rejectsMissingMediaTitles);
+  runTest('RENDERER: cardinalityLabel_allFourCases',          test0193_Renderer_cardinalityLabel_allFourCases);
+  runTest('RENDERER: cardinalityLabel_usesUnicodeArrow',      test0194_Renderer_cardinalityLabel_usesUnicodeArrow);
+  runTest('RENDERER: cardinalityFromCap_findsStdinArg',       test0195_Renderer_cardinalityFromCap_findsStdinArgNotFirstArg);
+  runTest('RENDERER: cardinalityFromCap_scalarDefaults',      test0196_Renderer_cardinalityFromCap_scalarDefaultsWhenFieldsMissing);
+  runTest('RENDERER: cardinalityFromCap_outputOnlySequence',  test0197_Renderer_cardinalityFromCap_outputOnlySequence);
+  runTest('RENDERER: cardinalityFromCap_rejectsStringBool',   test0198_Renderer_cardinalityFromCap_rejectsStringIsSequence);
+  runTest('RENDERER: cardinalityFromCap_throwsOnNonObject',   test0199_Renderer_cardinalityFromCap_throwsOnNonObject);
+  runTest('RENDERER: canonicalMediaUrn_normalizesTagOrder',   test0200_Renderer_canonicalMediaUrn_normalizesTagOrder);
+  runTest('RENDERER: canonicalMediaUrn_preservesValueTags',   test0201_Renderer_canonicalMediaUrn_preservesValueTags);
+  runTest('RENDERER: canonicalMediaUrn_rejectsCapUrn',        test0202_Renderer_canonicalMediaUrn_rejectsCapUrn);
+  runTest('RENDERER: mediaNodeLabel_rejectsUrnDerived',       test0203_Renderer_mediaNodeLabel_rejectsUrnDerivedLabels);
+  runTest('RENDERER: buildBrowse_rejectsMissingMediaTitles',  test0204_Renderer_buildBrowseGraphData_rejectsMissingMediaTitles);
 
   console.log('\n--- cap-fab-renderer strand builder ---');
-  runTest('RENDERER: validateStrandStep_unknownVariant',      testRenderer_validateStrandStep_rejectsUnknownVariant);
-  runTest('RENDERER: validateStrandStep_booleanIsSequence',   testRenderer_validateStrandStep_requiresBooleanIsSequence);
-  runTest('RENDERER: classifyStrandCapSteps_simple',          testRenderer_classifyStrandCapSteps_capFlags);
-  runTest('RENDERER: classifyStrandCapSteps_nested',          testRenderer_classifyStrandCapSteps_nestedForks);
-  runTest('RENDERER: buildStrand_singleCapPlain',             testRenderer_buildStrandGraphData_singleCapPlain);
-  runTest('RENDERER: buildStrand_sequenceShowsCardinality',   testRenderer_buildStrandGraphData_sequenceShowsCardinality);
-  runTest('RENDERER: buildStrand_foreachCollectSpan',         testRenderer_buildStrandGraphData_foreachCollectSpan);
-  runTest('RENDERER: buildStrand_standaloneCollect',          testRenderer_buildStrandGraphData_standaloneCollect);
-  runTest('RENDERER: buildStrand_unclosedForEachBody',        testRenderer_buildStrandGraphData_unclosedForEachBody);
-  runTest('RENDERER: buildStrand_nestedForEachThrows',        testRenderer_buildStrandGraphData_nestedForEachThrows);
-  runTest('RENDERER: collapseStrand_singleCapBody',           testRenderer_collapseStrand_singleCapBodyKeepsCapOwnLabel);
-  runTest('RENDERER: collapseStrand_unclosedForEachBody',     testRenderer_collapseStrand_unclosedForEachBodyCollapses);
-  runTest('RENDERER: collapseStrand_standaloneCollect',       testRenderer_collapseStrand_standaloneCollectCollapses);
-  runTest('RENDERER: collapseStrand_seqCapBeforeForeach',     testRenderer_collapseStrand_sequenceProducingCapBeforeForeach);
-  runTest('RENDERER: collapseStrand_plainCapMergesOutput',    testRenderer_collapseStrand_plainCapMergesTrailingOutput);
-  runTest('RENDERER: collapseStrand_plainCapDistinctTarget',  testRenderer_collapseStrand_plainCapDistinctTargetNoMerge);
-  runTest('RENDERER: validateStrand_missingSourceMediaUrn',   testRenderer_validateStrandPayload_missingSourceMediaUrn);
+  runTest('RENDERER: validateStrandStep_unknownVariant',      test0205_Renderer_validateStrandStep_rejectsUnknownVariant);
+  runTest('RENDERER: validateStrandStep_booleanIsSequence',   test0206_Renderer_validateStrandStep_requiresBooleanIsSequence);
+  runTest('RENDERER: classifyStrandCapSteps_simple',          test0207_Renderer_classifyStrandCapSteps_capFlags);
+  runTest('RENDERER: classifyStrandCapSteps_nested',          test0208_Renderer_classifyStrandCapSteps_nestedForks);
+  runTest('RENDERER: buildStrand_singleCapPlain',             test0209_Renderer_buildStrandGraphData_singleCapPlain);
+  runTest('RENDERER: buildStrand_sequenceShowsCardinality',   test0210_Renderer_buildStrandGraphData_sequenceShowsCardinality);
+  runTest('RENDERER: buildStrand_foreachCollectSpan',         test0211_Renderer_buildStrandGraphData_foreachCollectSpan);
+  runTest('RENDERER: buildStrand_standaloneCollect',          test0212_Renderer_buildStrandGraphData_standaloneCollect);
+  runTest('RENDERER: buildStrand_unclosedForEachBody',        test0213_Renderer_buildStrandGraphData_unclosedForEachBody);
+  runTest('RENDERER: buildStrand_nestedForEachThrows',        test0214_Renderer_buildStrandGraphData_nestedForEachThrows);
+  runTest('RENDERER: collapseStrand_singleCapBody',           test0215_Renderer_collapseStrand_singleCapBodyKeepsCapOwnLabel);
+  runTest('RENDERER: collapseStrand_unclosedForEachBody',     test0216_Renderer_collapseStrand_unclosedForEachBodyCollapses);
+  runTest('RENDERER: collapseStrand_standaloneCollect',       test0217_Renderer_collapseStrand_standaloneCollectCollapses);
+  runTest('RENDERER: collapseStrand_seqCapBeforeForeach',     test0218_Renderer_collapseStrand_sequenceProducingCapBeforeForeach);
+  runTest('RENDERER: collapseStrand_plainCapMergesOutput',    test0219_Renderer_collapseStrand_plainCapMergesTrailingOutput);
+  runTest('RENDERER: collapseStrand_plainCapDistinctTarget',  test0220_Renderer_collapseStrand_plainCapDistinctTargetNoMerge);
+  runTest('RENDERER: validateStrand_missingSourceMediaUrn',   test0221_Renderer_validateStrandPayload_missingSourceMediaUrn);
 
   console.log('\n--- cap-fab-renderer run builder ---');
-  runTest('RENDERER: validateBodyOutcome_negativeIndex',      testRenderer_validateBodyOutcome_rejectsNegativeIndex);
-  runTest('RENDERER: buildRun_pagesSuccessesAndFailures',     testRenderer_buildRunGraphData_pagesSuccessesAndFailures);
-  runTest('RENDERER: buildRun_failureWithoutFailedCap',       testRenderer_buildRunGraphData_failureWithoutFailedCapRendersFullTrace);
-  runTest('RENDERER: buildRun_usesIsEquivalentForFailedCap',  testRenderer_buildRunGraphData_usesCapUrnIsEquivalentForFailedCap);
-  runTest('RENDERER: buildRun_backboneHasNoForeachNode',      testRenderer_buildRunGraphData_backboneHasNoForeachNode);
-  runTest('RENDERER: buildRun_allFailedDropsPlaceholder',     testRenderer_buildRunGraphData_allFailedDropsTargetPlaceholder);
-  runTest('RENDERER: buildRun_unclosedForeachNoMerge',        testRenderer_buildRunGraphData_unclosedForeachSuccessNoMerge);
-  runTest('RENDERER: buildRun_closedForeachMerges',           testRenderer_buildRunGraphData_closedForeachSuccessMergesAtCollectTarget);
+  runTest('RENDERER: validateBodyOutcome_negativeIndex',      test0222_Renderer_validateBodyOutcome_rejectsNegativeIndex);
+  runTest('RENDERER: buildRun_pagesSuccessesAndFailures',     test0223_Renderer_buildRunGraphData_pagesSuccessesAndFailures);
+  runTest('RENDERER: buildRun_failureWithoutFailedCap',       test0224_Renderer_buildRunGraphData_failureWithoutFailedCapRendersFullTrace);
+  runTest('RENDERER: buildRun_usesIsEquivalentForFailedCap',  test0225_Renderer_buildRunGraphData_usesCapUrnIsEquivalentForFailedCap);
+  runTest('RENDERER: buildRun_backboneHasNoForeachNode',      test0226_Renderer_buildRunGraphData_backboneHasNoForeachNode);
+  runTest('RENDERER: buildRun_allFailedDropsPlaceholder',     test0227_Renderer_buildRunGraphData_allFailedDropsTargetPlaceholder);
+  runTest('RENDERER: buildRun_unclosedForeachNoMerge',        test0228_Renderer_buildRunGraphData_unclosedForeachSuccessNoMerge);
+  runTest('RENDERER: buildRun_closedForeachMerges',           test0229_Renderer_buildRunGraphData_closedForeachSuccessMergesAtCollectTarget);
 
   console.log('\n--- cap-fab-renderer editor-graph builder ---');
-  runTest('RENDERER: validateEditorGraph_unknownKind',          testRenderer_validateEditorGraphPayload_rejectsUnknownKind);
-  runTest('RENDERER: buildEditorGraph_collapsesCapsIntoEdges',  testRenderer_buildEditorGraphData_collapsesCapsIntoLabeledEdges);
-  runTest('RENDERER: buildEditorGraph_loopEdgeGetsClass',       testRenderer_buildEditorGraphData_loopMarkedEdgeGetsLoopClass);
-  runTest('RENDERER: buildEditorGraph_cardinalityFromIsSeq',    testRenderer_buildEditorGraphData_cardinalityFromDataSlotSequenceFlags);
-  runTest('RENDERER: buildEditorGraph_incompleteCapDropped',    testRenderer_buildEditorGraphData_capWithoutCompleteArgsIsDropped);
-  runTest('RENDERER: buildEditorGraph_rejectsEdgeMissingSrc',   testRenderer_buildEditorGraphData_rejectsEdgeWithMissingSource);
+  runTest('RENDERER: validateEditorGraph_unknownKind',          test0230_Renderer_validateEditorGraphPayload_rejectsUnknownKind);
+  runTest('RENDERER: buildEditorGraph_collapsesCapsIntoEdges',  test0231_Renderer_buildEditorGraphData_collapsesCapsIntoLabeledEdges);
+  runTest('RENDERER: buildEditorGraph_loopEdgeGetsClass',       test0232_Renderer_buildEditorGraphData_loopMarkedEdgeGetsLoopClass);
+  runTest('RENDERER: buildEditorGraph_cardinalityFromIsSeq',    test0233_Renderer_buildEditorGraphData_cardinalityFromDataSlotSequenceFlags);
+  runTest('RENDERER: buildEditorGraph_incompleteCapDropped',    test0234_Renderer_buildEditorGraphData_capWithoutCompleteArgsIsDropped);
+  runTest('RENDERER: buildEditorGraph_rejectsEdgeMissingSrc',   test0235_Renderer_buildEditorGraphData_rejectsEdgeWithMissingSource);
 
   console.log('\n--- cap-fab-renderer resolved-machine builder ---');
-  runTest('RENDERER: buildResolvedMachine_singleStrandLinear',     testRenderer_buildResolvedMachineGraphData_singleStrandLinearChain);
-  runTest('RENDERER: buildResolvedMachine_loopGetsLoopClass',      testRenderer_buildResolvedMachineGraphData_loopEdgeGetsLoopClass);
-  runTest('RENDERER: buildResolvedMachine_fanInOneEdgePerSrc',     testRenderer_buildResolvedMachineGraphData_fanInProducesEdgePerAssignment);
-  runTest('RENDERER: buildResolvedMachine_multiStrandDisjoint',    testRenderer_buildResolvedMachineGraphData_multiStrandKeepsStrandsDisjoint);
-  runTest('RENDERER: buildResolvedMachine_dupNodeIdFails',         testRenderer_buildResolvedMachineGraphData_duplicateNodeIdAcrossStrandsFailsHard);
-  runTest('RENDERER: validateResolvedMachine_rejectsMissingFields', testRenderer_validateResolvedMachinePayload_rejectsMissingFields);
+  runTest('RENDERER: buildResolvedMachine_singleStrandLinear',     test0236_Renderer_buildResolvedMachineGraphData_singleStrandLinearChain);
+  runTest('RENDERER: buildResolvedMachine_loopGetsLoopClass',      test0237_Renderer_buildResolvedMachineGraphData_loopEdgeGetsLoopClass);
+  runTest('RENDERER: buildResolvedMachine_fanInOneEdgePerSrc',     test0238_Renderer_buildResolvedMachineGraphData_fanInProducesEdgePerAssignment);
+  runTest('RENDERER: buildResolvedMachine_multiStrandDisjoint',    test0239_Renderer_buildResolvedMachineGraphData_multiStrandKeepsStrandsDisjoint);
+  runTest('RENDERER: buildResolvedMachine_dupNodeIdFails',         test0240_Renderer_buildResolvedMachineGraphData_duplicateNodeIdAcrossStrandsFailsHard);
+  runTest('RENDERER: validateResolvedMachine_rejectsMissingFields', test0241_Renderer_validateResolvedMachinePayload_rejectsMissingFields);
 
   console.log('\n--- CapKind classifier (test1800–test1805) ---');
   runTest('TEST1800: kind_identity_requires_effect_none',   test1800_kindIdentityOnlyForBareCap);
