@@ -692,7 +692,7 @@ function test046_matchingSemanticsFallbackPattern() {
 
 // TEST047: Matching semantics - thumbnail fallback with void input
 function test047_matchingSemanticsThumbnailVoidInput() {
-  const cap = CapUrn.fromString('cap:in="media:void";generate-thumbnail;out="media:image;png;thumbnail"');
+  const cap = CapUrn.fromString('cap:in="media:void";generate-thumbnail;out="media:ext=png;image;thumbnail"');
   const request = CapUrn.fromString('cap:ext=pdf;in="media:void";generate-thumbnail;out="media:image"');
   assert(cap.accepts(request), 'Void input cap should accept request; cap output conforms to less-specific request output');
 }
@@ -727,25 +727,25 @@ function test050_matchingSemanticsDirectionMismatch() {
 function test890_directionSemanticMatching() {
   // Generic wildcard cap accepts specific pdf request
   const genericCap = CapUrn.fromString(
-    'cap:in="media:";generate-thumbnail;out="media:image;png;thumbnail"'
+    'cap:in="media:";generate-thumbnail;out="media:ext=png;image;thumbnail"'
   );
   const pdfRequest = CapUrn.fromString(
-    'cap:in="media:ext=pdf";generate-thumbnail;out="media:image;png;thumbnail"'
+    'cap:in="media:ext=pdf";generate-thumbnail;out="media:ext=png;image;thumbnail"'
   );
   assert(genericCap.accepts(pdfRequest), 'Generic wildcard cap must accept pdf request');
 
   // Also accepts epub
   const epubRequest = CapUrn.fromString(
-    'cap:in="media:epub";generate-thumbnail;out="media:image;png;thumbnail"'
+    'cap:in="media:ext=epub";generate-thumbnail;out="media:ext=png;image;thumbnail"'
   );
   assert(genericCap.accepts(epubRequest), 'Generic wildcard cap must accept epub request');
 
   // Reverse: specific pdf cap does NOT accept generic bytes request
   const pdfCap = CapUrn.fromString(
-    'cap:in="media:ext=pdf";generate-thumbnail;out="media:image;png;thumbnail"'
+    'cap:in="media:ext=pdf";generate-thumbnail;out="media:ext=png;image;thumbnail"'
   );
   const genericRequest = CapUrn.fromString(
-    'cap:in="media:";generate-thumbnail;out="media:image;png;thumbnail"'
+    'cap:in="media:";generate-thumbnail;out="media:ext=png;image;thumbnail"'
   );
   assert(!pdfCap.accepts(genericRequest), 'Specific pdf cap must NOT accept generic wildcard request');
 
@@ -754,7 +754,7 @@ function test890_directionSemanticMatching() {
 
   // Output direction: cap producing more specific output satisfies less specific request
   const specificOutCap = CapUrn.fromString(
-    'cap:in="media:";generate-thumbnail;out="media:image;png;thumbnail"'
+    'cap:in="media:";generate-thumbnail;out="media:ext=png;image;thumbnail"'
   );
   const genericOutRequest = CapUrn.fromString(
     'cap:in="media:";generate-thumbnail;out="media:image"'
@@ -767,7 +767,7 @@ function test890_directionSemanticMatching() {
     'cap:in="media:";generate-thumbnail;out="media:image"'
   );
   const specificOutRequest = CapUrn.fromString(
-    'cap:in="media:";generate-thumbnail;out="media:image;png;thumbnail"'
+    'cap:in="media:";generate-thumbnail;out="media:ext=png;image;thumbnail"'
   );
   assert(!genericOutCap.accepts(specificOutRequest),
     'Generic output cap must NOT satisfy specific output request');
@@ -776,34 +776,34 @@ function test890_directionSemanticMatching() {
 // TEST891: Semantic direction specificity — more constraints in
 // either axis means a higher score under the truth-table-driven sum.
 // media: (top, no tags) scores 0; each marker tag scores 2; each
-// exact tag scores 3.
+// exact-value tag (e.g. ext=png) scores 4.
 function test891_directionSemanticSpecificity() {
   const genericCap = CapUrn.fromString(
-    'cap:in="media:";generate-thumbnail;out="media:image;png;thumbnail"'
+    'cap:in="media:";generate-thumbnail;out="media:ext=png;image;thumbnail"'
   );
   const specificCap = CapUrn.fromString(
-    'cap:in="media:ext=pdf";generate-thumbnail;out="media:image;png;thumbnail"'
+    'cap:in="media:ext=pdf";generate-thumbnail;out="media:ext=png;image;thumbnail"'
   );
 
   // generic:
-  //   out=media:image;png;thumbnail -> 2+2+2 = 6
+  //   out=media:ext=png;image;thumbnail -> 4 (ext=png exact-value) + 2 + 2 = 8
   //   in=media:                     -> 0
   //   y: generate-thumbnail marker  -> 2
-  //   spec_C = 10000*6 + 100*0 + 2 = 60002
-  assertEqual(genericCap.specificity(), 10000*6 + 100*0 + 2,
-    'out=image;png;thumbnail(6) + in=media:(0) + generate-thumbnail marker(2) = 60002');
+  //   spec_C = 10000*8 + 100*0 + 2 = 80002
+  assertEqual(genericCap.specificity(), 10000*8 + 100*0 + 2,
+    'out=ext=png(4)+image(2)+thumbnail(2)=8 + in=media:(0) + generate-thumbnail marker(2) = 80002');
   // specific:
-  //   out=media:image;png;thumbnail -> 6
+  //   out=media:ext=png;image;thumbnail -> 8
   //   in=media:ext=pdf              -> 4 (ext=pdf is an exact-value tag, not a bare marker)
   //   y: generate-thumbnail marker  -> 2
-  //   spec_C = 10000*6 + 100*4 + 2 = 60402
-  assertEqual(specificCap.specificity(), 10000*6 + 100*4 + 2,
-    'out=image;png;thumbnail(6) + in=ext=pdf(4) + generate-thumbnail marker(2) = 60402');
+  //   spec_C = 10000*8 + 100*4 + 2 = 80402
+  assertEqual(specificCap.specificity(), 10000*8 + 100*4 + 2,
+    'out=ext=png(4)+image(2)+thumbnail(2)=8 + in=ext=pdf(4) + generate-thumbnail marker(2) = 80402');
   assert(specificCap.specificity() > genericCap.specificity(), 'pdf should be more specific');
 
   // CapMatcher should prefer more specific
   const pdfRequest = CapUrn.fromString(
-    'cap:in="media:ext=pdf";generate-thumbnail;out="media:image;png;thumbnail"'
+    'cap:in="media:ext=pdf";generate-thumbnail;out="media:ext=png;image;thumbnail"'
   );
   const best = CapMatcher.findBestMatch([genericCap, specificCap], pdfRequest);
   assert(best !== null, 'Should find a match');
@@ -1008,7 +1008,7 @@ function test075_accepts() {
 function test076_specificity() {
   const s1 = MediaUrn.fromString('media:');
   const s2 = MediaUrn.fromString('media:ext=pdf');
-  const s3 = MediaUrn.fromString('media:image;png;thumbnail');
+  const s3 = MediaUrn.fromString('media:ext=png;image;thumbnail');
   assert(s2.specificity() > s1.specificity(), 'pdf should be more specific than wildcard');
   assert(s3.specificity() > s2.specificity(), 'image;png;thumbnail should be more specific than pdf');
 }
@@ -1208,13 +1208,13 @@ function test109_extensionsWithMetadataAndValidation() {
 function test110_multipleExtensions() {
   const mediaDefs = [
     {
-      urn: 'media:image;jpeg',
+      urn: 'media:ext=jpeg;image',
       media_type: 'image/jpeg',
       title: 'JPEG Image',
       extensions: ['jpg', 'jpeg']
     }
   ];
-  const resolved = resolveMediaUrn('media:image;jpeg', mediaDefs);
+  const resolved = resolveMediaUrn('media:ext=jpeg;image', mediaDefs);
   assertEqual(resolved.extensions.length, 2, 'Should have two extensions');
   assertEqual(resolved.extensions[0], 'jpg', 'First extension should be jpg');
   assertEqual(resolved.extensions[1], 'jpeg', 'Second extension should be jpeg');
@@ -1414,7 +1414,7 @@ function test0053_CapFabGetOutgoingConformsToMatching() {
   assertEqual(outgoingFromBroad.length, 1, 'Exact URN must match');
 
   // A totally unrelated URN must not match.
-  const outgoingFromUnrelated = graph.getOutgoing('media:image;png');
+  const outgoingFromUnrelated = graph.getOutgoing('media:ext=png;image');
   assertEqual(outgoingFromUnrelated.length, 0, 'Unrelated URN must not match');
 }
 
@@ -1663,7 +1663,7 @@ function test312_allUrnBuildersProduceValidUrns() {
 function test0059_JS_buildExtensionIndex() {
   const mediaDefs = [
     { urn: 'media:ext=pdf', media_type: 'application/pdf', extensions: ['pdf'] },
-    { urn: 'media:image;jpeg', media_type: 'image/jpeg', extensions: ['jpg', 'jpeg'] },
+    { urn: 'media:ext=jpeg;image', media_type: 'image/jpeg', extensions: ['jpg', 'jpeg'] },
     { urn: 'media:fmt=json', media_type: 'application/json', extensions: ['json'] }
   ];
   const index = buildExtensionIndex(mediaDefs);
@@ -1709,7 +1709,7 @@ function test0069_JS_mediaUrnsForExtension() {
 function test0070_JS_getExtensionMappings() {
   const mediaDefs = [
     { urn: 'media:ext=pdf', media_type: 'application/pdf', extensions: ['pdf'] },
-    { urn: 'media:image;jpeg', media_type: 'image/jpeg', extensions: ['jpg', 'jpeg'] }
+    { urn: 'media:ext=jpeg;image', media_type: 'image/jpeg', extensions: ['jpg', 'jpeg'] }
   ];
   const mappings = getExtensionMappings(mediaDefs);
   assert(Array.isArray(mappings), 'Should return an array');
@@ -2751,8 +2751,8 @@ async function test1878_bundledProviderWithoutBakedHashIsRejected() {
 // TEST1312: is_image returns true only when image marker tag is present
 function test1312_isImage() {
   assert(MediaUrn.fromString(MEDIA_PNG).isImage(), 'MEDIA_PNG should be image');
-  assert(MediaUrn.fromString('media:image;png;thumbnail').isImage(), 'media:image;png;thumbnail should be image');
-  assert(MediaUrn.fromString('media:image;jpg').isImage(), 'media:image;jpg should be image');
+  assert(MediaUrn.fromString('media:ext=png;image;thumbnail').isImage(), 'media:ext=png;image;thumbnail should be image');
+  assert(MediaUrn.fromString('media:ext=jpg;image').isImage(), 'media:ext=jpg;image should be image');
   // Non-image types
   assert(!MediaUrn.fromString(MEDIA_PDF).isImage(), 'MEDIA_PDF should not be image');
   assert(!MediaUrn.fromString(MEDIA_STRING).isImage(), 'MEDIA_STRING should not be image');
@@ -2764,7 +2764,7 @@ function test1312_isImage() {
 function test1313_isAudio() {
   assert(MediaUrn.fromString(MEDIA_AUDIO).isAudio(), 'MEDIA_AUDIO should be audio');
   assert(MediaUrn.fromString(MEDIA_AUDIO_SPEECH).isAudio(), 'MEDIA_AUDIO_SPEECH should be audio');
-  assert(MediaUrn.fromString('media:audio;mp3').isAudio(), 'media:audio;mp3 should be audio');
+  assert(MediaUrn.fromString('media:audio;ext=mp3').isAudio(), 'media:audio;ext=mp3 should be audio');
   // Non-audio types
   assert(!MediaUrn.fromString(MEDIA_VIDEO).isAudio(), 'MEDIA_VIDEO should not be audio');
   assert(!MediaUrn.fromString(MEDIA_PNG).isAudio(), 'MEDIA_PNG should not be audio');
@@ -2774,7 +2774,7 @@ function test1313_isAudio() {
 // TEST1314: is_video returns true only when video marker tag is present
 function test1314_isVideo() {
   assert(MediaUrn.fromString(MEDIA_VIDEO).isVideo(), 'MEDIA_VIDEO should be video');
-  assert(MediaUrn.fromString('media:video;mp4').isVideo(), 'media:video;mp4 should be video');
+  assert(MediaUrn.fromString('media:ext=mp4;video').isVideo(), 'media:ext=mp4;video should be video');
   // Non-video types
   assert(!MediaUrn.fromString(MEDIA_AUDIO).isVideo(), 'MEDIA_AUDIO should not be video');
   assert(!MediaUrn.fromString(MEDIA_PNG).isVideo(), 'MEDIA_PNG should not be video');
@@ -3197,7 +3197,7 @@ function test653_invalidEffectNoneDeclarationRejected() {
 // TEST654: effect=none preserves runtime media identity.
 function test654_effectNonePreservesRuntimeMedia() {
   const decimate = CapUrn.fromString('cap:decimate-sequence;effect=none');
-  const png = MediaUrn.fromString('media:image;png');
+  const png = MediaUrn.fromString('media:ext=png;image');
   const pdf = MediaUrn.fromString('media:ext=pdf');
   assertEqual(decimate.inferRuntimeOutputMedia(png).toString(), png.toString(), 'effect=none should preserve png');
   assertEqual(decimate.inferRuntimeOutputMedia(pdf).toString(), pdf.toString(), 'effect=none should preserve pdf');
@@ -3206,7 +3206,7 @@ function test654_effectNonePreservesRuntimeMedia() {
 // TEST655: default effect=declared does not preserve runtime refinements.
 function test655_effectDeclaredUsesDeclaredOutput() {
   const resize = CapUrn.fromString('cap:in=media:image;out=media:image;resize');
-  const png = MediaUrn.fromString('media:image;png;width=4000');
+  const png = MediaUrn.fromString('media:ext=png;image;width=4000');
   assertEqual(
     resize.inferRuntimeOutputMedia(png).toString(),
     'media:image',
@@ -3303,7 +3303,7 @@ function test0096_Machine_fanOut() {
   const g = Machine.fromString(
     '[meta cap:in="media:ext=pdf";extract-metadata;out="media:enc=utf-8;file-metadata;record"]' +
     '[outline cap:in="media:ext=pdf";extract-outline;out="media:document-outline;enc=utf-8;record"]' +
-    '[thumb cap:in="media:ext=pdf";generate-thumbnail;out="media:image;png;thumbnail"]' +
+    '[thumb cap:in="media:ext=pdf";generate-thumbnail;out="media:ext=png;image;thumbnail"]' +
     '[doc -> meta -> metadata]' +
     '[doc -> outline -> outline_data]' +
     '[doc -> thumb -> thumbnail]'
@@ -3319,9 +3319,9 @@ function test0096_Machine_fanOut() {
 // TEST0097: Machine fan in secondary assigned by prior wiring
 function test0097_Machine_fanInSecondaryAssignedByPriorWiring() {
   const g = Machine.fromString(
-    '[thumb cap:in="media:ext=pdf";generate-thumbnail;out="media:image;png;thumbnail"]' +
+    '[thumb cap:in="media:ext=pdf";generate-thumbnail;out="media:ext=png;image;thumbnail"]' +
     '[model_dl cap:in="media:enc=utf-8;model-spec";download;out="media:enc=utf-8;model-spec"]' +
-    '[describe cap:in="media:image;png";describe-image;out="media:enc=utf-8;image-description"]' +
+    '[describe cap:in="media:ext=png;image";describe-image;out="media:enc=utf-8;image-description"]' +
     '[doc -> thumb -> thumbnail]' +
     '[spec_input -> model_dl -> model_spec]' +
     '[(thumbnail, model_spec) -> describe -> description]'
@@ -3333,12 +3333,12 @@ function test0097_Machine_fanInSecondaryAssignedByPriorWiring() {
 // TEST0098: Machine fan in secondary unassigned gets wildcard
 function test0098_Machine_fanInSecondaryUnassignedGetsWildcard() {
   const g = Machine.fromString(
-    '[describe cap:in="media:image;png";describe-image;out="media:enc=utf-8;image-description"]\n' +
+    '[describe cap:in="media:ext=png;image";describe-image;out="media:enc=utf-8;image-description"]\n' +
     '[(thumbnail, model_spec) -> describe -> description]'
   );
   assertEqual(g.edges().length, 1);
   assertEqual(g.edges()[0].sources.length, 2);
-  assertEqual(g.edges()[0].sources[0].toString(), 'media:image;png');
+  assertEqual(g.edges()[0].sources[0].toString(), 'media:ext=png;image');
   assertEqual(g.edges()[0].sources[1].toString(), 'media:');
 }
 
@@ -3376,7 +3376,7 @@ function test0114_Machine_conflictingMediaTypesFail() {
   assertThrowsWithCode(
     () => Machine.fromString(
       '[cap1 cap:in="media:enc=utf-8;ext=txt";a;out="media:ext=pdf"]' +
-      '[cap2 cap:in="media:audio;wav";b;out="media:enc=utf-8;ext=txt"]' +
+      '[cap2 cap:in="media:audio;ext=wav";b;out="media:enc=utf-8;ext=txt"]' +
       '[src -> cap1 -> mid]' +
       '[mid -> cap2 -> dst]'
     ),
@@ -3463,9 +3463,9 @@ function test0123_Machine_lineBasedLoop() {
 // TEST0124: Machine line based fan in
 function test0124_Machine_lineBasedFanIn() {
   const g = Machine.fromString(
-    'thumb cap:in="media:ext=pdf";generate-thumbnail;out="media:image;png;thumbnail"\n' +
+    'thumb cap:in="media:ext=pdf";generate-thumbnail;out="media:ext=png;image;thumbnail"\n' +
     'model_dl cap:in="media:enc=utf-8;model-spec";download;out="media:enc=utf-8;model-spec"\n' +
-    'describe cap:in="media:image;png";describe-image;out="media:enc=utf-8;image-description"\n' +
+    'describe cap:in="media:ext=png;image";describe-image;out="media:enc=utf-8;image-description"\n' +
     'doc -> thumb -> thumbnail\n' +
     'spec_input -> model_dl -> model_spec\n' +
     '(thumbnail, model_spec) -> describe -> description'
@@ -3861,7 +3861,7 @@ function test0152_Machine_roundtripFanOut() {
   const original = new Machine([
     mkEdge('media:ext=pdf', 'cap:in="media:ext=pdf";extract-metadata;out="media:enc=utf-8;file-metadata;record"', 'media:enc=utf-8;file-metadata;record'),
     mkEdge('media:ext=pdf', 'cap:in="media:ext=pdf";extract-outline;out="media:document-outline;enc=utf-8;record"', 'media:document-outline;enc=utf-8;record'),
-    mkEdge('media:ext=pdf', 'cap:in="media:ext=pdf";generate-thumbnail;out="media:image;png;thumbnail"', 'media:image;png;thumbnail'),
+    mkEdge('media:ext=pdf', 'cap:in="media:ext=pdf";generate-thumbnail;out="media:ext=png;image;thumbnail"', 'media:ext=png;image;thumbnail'),
   ]);
   const notation = original.toMachineNotation();
   const reparsed = Machine.fromString(notation);
@@ -4137,7 +4137,7 @@ function test0177_Machine_parseMachineWithAST_multilinePositions() {
 // TEST0178: Machine parse machine with a s t fan in source locations
 function test0178_Machine_parseMachineWithAST_fanInSourceLocations() {
   const input = [
-    '[describe cap:in="media:image;png";describe-image;out="media:enc=utf-8;image-description"]',
+    '[describe cap:in="media:ext=png;image";describe-image;out="media:enc=utf-8;image-description"]',
     '[(thumbnail, model_spec) -> describe -> description]'
   ].join('\n');
   const result = parseMachineWithAST(input);
@@ -4259,7 +4259,7 @@ function test0186_Machine_toMermaid_emptyGraph() {
 // TEST0187: Machine to mermaid fan in
 function test0187_Machine_toMermaid_fanIn() {
   const machine = Machine.fromString(
-    '[describe cap:in="media:image;png";describe-image;out="media:enc=utf-8;image-description"]' +
+    '[describe cap:in="media:ext=png;image";describe-image;out="media:enc=utf-8;image-description"]' +
     '[(thumbnail, model_spec) -> describe -> description]'
   );
   const mermaid = machine.toMermaid();
@@ -4272,7 +4272,7 @@ function test0187_Machine_toMermaid_fanIn() {
 function test0188_Machine_toMermaid_fanOut() {
   const input = [
     '[meta cap:in="media:ext=pdf";extract-metadata;out="media:enc=utf-8;file-metadata;record"]',
-    '[thumb cap:in="media:ext=pdf";generate-thumbnail;out="media:image;png;thumbnail"]',
+    '[thumb cap:in="media:ext=pdf";generate-thumbnail;out="media:ext=png;image;thumbnail"]',
     '[doc -> meta -> metadata]',
     '[doc -> thumb -> thumbnail]'
   ].join('');
@@ -4647,9 +4647,9 @@ function test0207_Renderer_classifyStrandCapSteps_capFlags() {
   // have neither.
   const steps = [
     makeForEachStep('media:pdf;list'),
-    makeCapStep('cap:in="media:ext=pdf";a;out="media:image;png"', 'a', 'media:ext=pdf', 'media:image;png', false, false),
-    makeCapStep('cap:in="media:image;png";b;out="media:jpg"', 'b', 'media:image;png', 'media:jpg', false, false),
-    makeCapStep('cap:in="media:jpg";c;out="media:ext=txt"', 'c', 'media:jpg', 'media:ext=txt', false, false),
+    makeCapStep('cap:in="media:ext=pdf";a;out="media:ext=png;image"', 'a', 'media:ext=pdf', 'media:ext=png;image', false, false),
+    makeCapStep('cap:in="media:ext=png;image";b;out="media:ext=jpg"', 'b', 'media:ext=png;image', 'media:ext=jpg', false, false),
+    makeCapStep('cap:in="media:ext=jpg";c;out="media:ext=txt"', 'c', 'media:ext=jpg', 'media:ext=txt', false, false),
     makeCollectStep('media:ext=txt'),
   ];
   const { capStepIndices, capFlags } = rendererClassifyStrandCapSteps(steps);
@@ -5213,8 +5213,8 @@ function test0223_Renderer_buildRunGraphData_pagesSuccessesAndFailures() {
     target_media_urn: 'media:ext=txt',
     steps: [
       makeForEachStep('media:pdf;list'),
-      makeCapStep('cap:in="media:ext=pdf";a;out="media:image;png"', 'a', 'media:ext=pdf', 'media:image;png', false, false),
-      makeCapStep('cap:in="media:image;png";b;out="media:ext=txt"', 'b', 'media:image;png', 'media:ext=txt', false, false),
+      makeCapStep('cap:in="media:ext=pdf";a;out="media:ext=png;image"', 'a', 'media:ext=pdf', 'media:ext=png;image', false, false),
+      makeCapStep('cap:in="media:ext=png;image";b;out="media:ext=txt"', 'b', 'media:ext=png;image', 'media:ext=txt', false, false),
       makeCollectStep('media:ext=txt'),
     ],
   };
@@ -5230,7 +5230,7 @@ function test0223_Renderer_buildRunGraphData_pagesSuccessesAndFailures() {
       saved_paths: [],
       total_bytes: 0,
       duration_ms: 0,
-      failed_cap: 'cap:in="media:image;png";b;out="media:ext=txt"',
+      failed_cap: 'cap:in="media:ext=png;image";b;out="media:ext=txt"',
       error: 'oom',
     });
   }
@@ -5239,7 +5239,7 @@ function test0223_Renderer_buildRunGraphData_pagesSuccessesAndFailures() {
     media_display_names: {
       'media:pdf;list': 'PDF List',
       'media:ext=pdf': 'PDF',
-      'media:image;png': 'PNG',
+      'media:ext=png;image': 'PNG',
       'media:ext=txt': 'Text',
     },
     body_outcomes: outcomes,
@@ -5835,18 +5835,18 @@ function test0238_Renderer_buildResolvedMachineGraphData_fanInProducesEdgePerAss
     strands: [
       {
         nodes: [
-          { id: 'n0', urn: 'media:image;png', title: 'PNG Image' },
+          { id: 'n0', urn: 'media:ext=png;image', title: 'PNG Image' },
           { id: 'n1', urn: 'media:enc=utf-8;model-spec', title: 'Model Spec' },
           { id: 'n2', urn: 'media:enc=utf-8;image-description', title: 'Image Description' },
         ],
         edges: [
           {
             alias: 'edge_0',
-            cap_urn: 'cap:in=media:image;png;describe-image;out=media:enc=utf-8;image-description',
+            cap_urn: 'cap:in="media:ext=png;image";describe-image;out="media:enc=utf-8;image-description"',
             title: 'Describe Image',
             is_loop: false,
             assignment: [
-              { cap_arg_media_urn: 'media:image;png', source_node: 'n0' },
+              { cap_arg_media_urn: 'media:ext=png;image', source_node: 'n0' },
               { cap_arg_media_urn: 'media:enc=utf-8;model-spec', source_node: 'n1' },
             ],
             target_node: 'n2',
@@ -5945,7 +5945,7 @@ function test0240_Renderer_buildResolvedMachineGraphData_duplicateNodeIdAcrossSt
         output_anchor_nodes: ['n0'],
       },
       {
-        nodes: [{ id: 'n0', urn: 'media:html', title: 'HTML' }],
+        nodes: [{ id: 'n0', urn: 'media:ext=html', title: 'HTML' }],
         edges: [],
         input_anchor_nodes: ['n0'],
         output_anchor_nodes: ['n0'],
