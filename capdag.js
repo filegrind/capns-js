@@ -6069,6 +6069,14 @@ function probeCartridgeCapGroups(entryPath) {
     child.on('error', (e) => finish(new Error(`cartridge ${entryPath} spawn error: ${e.message}`)));
     child.on('close', () => finish(new Error(`cartridge ${entryPath} HELLO failed: connection closed before receiving HELLO`)));
 
+    // A cartridge that exits or closes its stdin before reading our HELLO
+    // surfaces the broken pipe as an ASYNCHRONOUS 'error' event on the pipe
+    // (EPIPE), not as a synchronous throw from write(). Without a listener,
+    // Node treats that as an unhandled 'error' and aborts the whole host
+    // process. Catch it here and route it through finish() so a single
+    // misbehaving cartridge fails its own probe instead of killing discovery.
+    child.stdin.on('error', (e) => finish(new Error(`cartridge ${entryPath} HELLO failed: ${e.message}`)));
+
     timer = setTimeout(() => finish(new Error(`cartridge ${entryPath} HELLO failed: timeout`)), 5000);
 
     // Send our HELLO first (host side).
@@ -6120,6 +6128,9 @@ function probeCartridgeCapGroups(entryPath) {
       buf = Buffer.concat([buf, chunk]);
       tryParse();
     });
+    // Guard the read side too: an error on the child's stdout (e.g. the pipe
+    // breaking mid-read) must not become an unhandled 'error' event.
+    child.stdout.on('error', (e) => finish(new Error(`cartridge ${entryPath} HELLO failed: ${e.message}`)));
   });
 }
 
