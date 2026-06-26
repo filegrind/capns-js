@@ -8,6 +8,12 @@ const {
   Cap, CapGroup, CapManifest, MediaDef, MediaDefError, MediaDefErrorCodes,
   resolveMediaUrn, buildExtensionIndex, mediaUrnsForExtension, getExtensionMappings,
   CartridgeInfo, CartridgeCapSummary, CartridgeSuggestion, CartridgeRepoClient, CartridgeRepoServer,
+  hostPlatform, CompatStatus, primaryPackage, CartridgeCompatibilityResolution,
+  registryUrlFromBuildEnv,
+  slugForSync, CartridgeInstallSource, validateRegistryUrlScheme, RegistryUrlSchemeResultKind,
+  CartridgeJson, CartridgeJsonError, CartridgeJsonErrorKind, hashCartridgeDirectory,
+  DiscoveryIdentity, DiscoveredCartridge, discoverCartridges,
+  CartridgeAttachmentErrorKind, CartridgeChannel,
   CapFabEdge, CapFabStats, CapFab,
   StdinSource, StdinSourceKind,
   validateNoMediaDefRedefinitionSync,
@@ -863,21 +869,9 @@ function test060_wrongPrefixFails() {
   );
 }
 
-// TEST061: Test is_binary returns true when textable tag is absent (binary = not textable)
-function test061_isBinary() {
-  // Binary types: no textable tag
-  assert(MediaUrn.fromString(MEDIA_IDENTITY).isBinary(), 'MEDIA_IDENTITY (media:) should be binary');
-  assert(MediaUrn.fromString(MEDIA_PNG).isBinary(), 'MEDIA_PNG should be binary');
-  assert(MediaUrn.fromString(MEDIA_PDF).isBinary(), 'MEDIA_PDF should be binary');
-  assert(MediaUrn.fromString('media:video').isBinary(), 'media:video should be binary');
-  assert(MediaUrn.fromString('media:epub').isBinary(), 'media:epub should be binary');
-  // Textable types: is_binary is false
-  assert(!MediaUrn.fromString('media:textable').isBinary(), 'media:textable should not be binary');
-  assert(!MediaUrn.fromString('media:textable;record').isBinary(), 'textable map should not be binary');
-  assert(!MediaUrn.fromString(MEDIA_STRING).isBinary(), 'MEDIA_STRING should not be binary');
-  assert(!MediaUrn.fromString(MEDIA_JSON).isBinary(), 'MEDIA_JSON should not be binary');
-  assert(!MediaUrn.fromString(MEDIA_MD).isBinary(), 'MEDIA_MD should not be binary');
-}
+// TEST061: REMOVED — the binary/text distinction no longer exists in the
+// vocabulary (isBinary() was deleted from MediaUrn; everything is bytes).
+// Encoding is now expressed by the orthogonal `enc=` tag, exercised by TEST067.
 
 // TEST062: Test is_record returns true when record marker tag is present indicating key-value structure
 function test062_isRecord() {
@@ -885,7 +879,7 @@ function test062_isRecord() {
   assert(MediaUrn.fromString('media:custom;record').isRecord(), 'custom;record should be record');
   assert(MediaUrn.fromString(MEDIA_JSON).isRecord(), 'MEDIA_JSON should be record');
   // Without record marker, is_record is false
-  assert(!MediaUrn.fromString('media:textable').isRecord(), 'plain textable should not be record');
+  assert(!MediaUrn.fromString('media:enc=utf-8').isRecord(), 'plain text should not be record');
   assert(!MediaUrn.fromString(MEDIA_STRING).isRecord(), 'MEDIA_STRING should not be record');
   assert(!MediaUrn.fromString(MEDIA_STRING_LIST).isRecord(), 'MEDIA_STRING_LIST should not be record');
 }
@@ -897,7 +891,7 @@ function test063_isScalar() {
   assert(MediaUrn.fromString(MEDIA_NUMBER).isScalar(), 'MEDIA_NUMBER should be scalar');
   assert(MediaUrn.fromString(MEDIA_BOOLEAN).isScalar(), 'MEDIA_BOOLEAN should be scalar');
   assert(MediaUrn.fromString(MEDIA_OBJECT).isScalar(), 'MEDIA_OBJECT (record but scalar) should be scalar');
-  assert(MediaUrn.fromString('media:textable').isScalar(), 'plain textable should be scalar');
+  assert(MediaUrn.fromString('media:enc=utf-8').isScalar(), 'plain text should be scalar');
   // With list marker, is_scalar is false
   assert(!MediaUrn.fromString(MEDIA_STRING_LIST).isScalar(), 'MEDIA_STRING_LIST should not be scalar');
   assert(!MediaUrn.fromString(MEDIA_OBJECT_LIST).isScalar(), 'MEDIA_OBJECT_LIST should not be scalar');
@@ -917,27 +911,34 @@ function test065_isOpaque() {
   assert(MediaUrn.fromString(MEDIA_STRING).isOpaque(), 'MEDIA_STRING should be opaque');
   assert(MediaUrn.fromString(MEDIA_STRING_LIST).isOpaque(), 'MEDIA_STRING_LIST (list but no record) should be opaque');
   assert(MediaUrn.fromString(MEDIA_PDF).isOpaque(), 'MEDIA_PDF should be opaque');
-  assert(MediaUrn.fromString('media:textable').isOpaque(), 'plain textable should be opaque');
+  assert(MediaUrn.fromString('media:enc=utf-8').isOpaque(), 'plain text should be opaque');
   // With record marker, is_opaque is false
   assert(!MediaUrn.fromString(MEDIA_OBJECT).isOpaque(), 'MEDIA_OBJECT should not be opaque');
   assert(!MediaUrn.fromString(MEDIA_JSON).isOpaque(), 'MEDIA_JSON should not be opaque');
 }
 
-// TEST066: Test is_json returns true only when json marker tag is present for JSON representation
+// TEST066: Test is_json returns true only when fmt=json content-format tag is present
 function test066_isJson() {
   assert(MediaUrn.fromString(MEDIA_JSON).isJson(), 'MEDIA_JSON should be json');
+  assert(MediaUrn.fromString('media:custom;fmt=json').isJson(), 'fmt=json should be json');
+  // record alone does not mean JSON representation
   assert(!MediaUrn.fromString(MEDIA_OBJECT).isJson(), 'MEDIA_OBJECT should not be json');
+  assert(!MediaUrn.fromString('media:enc=utf-8').isJson(), 'plain text should not be json');
 }
 
-// TEST067: Test is_text returns true only when textable marker tag is present
+// TEST067: Text-representability is now carried by the orthogonal `enc=` tag
+// (the old `textable` marker and isText() are gone). A media is "text" iff it
+// declares an encoding.
 function test067_isText() {
-  assert(MediaUrn.fromString(MEDIA_STRING).isText(), 'MEDIA_STRING should be text');
-  assert(MediaUrn.fromString(MEDIA_INTEGER).isText(), 'MEDIA_INTEGER should be text');
-  assert(MediaUrn.fromString(MEDIA_JSON).isText(), 'MEDIA_JSON should be text');
-  // Without textable tag, is_text is false
-  assert(!MediaUrn.fromString(MEDIA_IDENTITY).isText(), 'MEDIA_IDENTITY should not be text');
-  assert(!MediaUrn.fromString(MEDIA_PNG).isText(), 'MEDIA_PNG should not be text');
-  assert(!MediaUrn.fromString(MEDIA_OBJECT).isText(), 'MEDIA_OBJECT (no textable) should not be text');
+  // Has enc= → text-representable
+  assert(MediaUrn.fromString(MEDIA_STRING).getTag('enc') !== undefined, 'MEDIA_STRING should have enc');
+  assert(MediaUrn.fromString(MEDIA_BOOLEAN).getTag('enc') !== undefined, 'MEDIA_BOOLEAN should have enc');
+  // No enc= → not text-representable
+  assert(MediaUrn.fromString(MEDIA_INTEGER).getTag('enc') === undefined, 'MEDIA_INTEGER should not have enc');
+  assert(MediaUrn.fromString(MEDIA_JSON).getTag('enc') === undefined, 'MEDIA_JSON should not have enc');
+  assert(MediaUrn.fromString(MEDIA_IDENTITY).getTag('enc') === undefined, 'MEDIA_IDENTITY should not have enc');
+  assert(MediaUrn.fromString(MEDIA_PNG).getTag('enc') === undefined, 'MEDIA_PNG should not have enc');
+  assert(MediaUrn.fromString(MEDIA_OBJECT).getTag('enc') === undefined, 'MEDIA_OBJECT should not have enc');
 }
 
 // TEST068: Test is_void returns true when void flag or type=void tag is present
@@ -1082,7 +1083,7 @@ function test093_resolveUnresolvableFailsHard() {
 // TEST097: N/A for JS (Rust validation function)
 // TEST098: N/A for JS
 
-// TEST099: Test ResolvedMediaDef is_binary returns true when textable tag is absent
+// TEST099: Test ResolvedMediaDef is_binary returns true when enc tag is absent
 function test099_resolvedIsBinary() {
   const spec = new MediaDef('application/octet-stream', null, null, 'Binary', null, MEDIA_IDENTITY);
   assert(spec.isBinary(), 'Resolved binary spec should be binary');
@@ -1112,7 +1113,7 @@ function test103_resolvedIsJson() {
   assert(spec.isJSON(), 'Resolved json spec should be JSON');
 }
 
-// TEST104: Test ResolvedMediaDef is_text returns true when textable tag is present
+// TEST104: Test ResolvedMediaDef is_text returns true when enc tag is present
 function test104_resolvedIsText() {
   const spec = new MediaDef('text/plain', null, null, 'String', null, MEDIA_STRING);
   assert(spec.isText(), 'Resolved string spec should be text');
@@ -1555,9 +1556,8 @@ const { TaggedUrn } = require('tagged-urn');
 // TEST304: Test MEDIA_AVAILABILITY_OUTPUT constant parses as valid media URN with correct tags
 function test304_mediaAvailabilityOutputConstant() {
   const urn = TaggedUrn.fromString(MEDIA_AVAILABILITY_OUTPUT);
-  assert(urn.getTag('textable') !== undefined, 'model-availability must be textable');
+  assertEqual(urn.getTag('enc'), 'utf-8', 'model-availability must carry enc=utf-8');
   assertEqual(urn.getTag('record'), '*', 'model-availability must be record');
-  assert(urn.getTag('textable') !== undefined, 'model-availability must not be binary (has textable)');
   const reparsed = TaggedUrn.fromString(urn.toString());
   assert(urn.conformsTo(reparsed), 'roundtrip must match original');
 }
@@ -1565,9 +1565,8 @@ function test304_mediaAvailabilityOutputConstant() {
 // TEST305: Test MEDIA_PATH_OUTPUT constant parses as valid media URN with correct tags
 function test305_mediaPathOutputConstant() {
   const urn = TaggedUrn.fromString(MEDIA_PATH_OUTPUT);
-  assert(urn.getTag('textable') !== undefined, 'model-path must be textable');
+  assertEqual(urn.getTag('enc'), 'utf-8', 'model-path must carry enc=utf-8');
   assertEqual(urn.getTag('record'), '*', 'model-path must be record');
-  assert(urn.getTag('textable') !== undefined, 'model-path must not be binary (has textable)');
   const reparsed = TaggedUrn.fromString(urn.toString());
   assert(urn.conformsTo(reparsed), 'roundtrip must match original');
 }
@@ -2438,6 +2437,314 @@ function test335_cartridgeRepoServerClientIntegration() {
 }
 
 // ============================================================================
+// Host-compatibility resolution (cartridge_repo.rs: TEST1849-TEST1853)
+// ============================================================================
+
+// Construct a cartridge whose versions/platform-builds are fully specified.
+// `versions` is given newest-first as [version, [[platform, format, pkgName], ...]];
+// `version` (the "latest" field) is set to the first entry. Mirrors the Rust
+// test helper cartridge_with_versions.
+function cartridgeWithVersions(id, versions) {
+  const versionMap = {};
+  const available = [];
+  for (const [ver, builds] of versions) {
+    available.push(ver);
+    versionMap[ver] = {
+      releaseDate: '2026-02-07',
+      changelog: [],
+      minAppVersion: '',
+      builds: builds.map(([plat, fmt, name]) => ({
+        platform: plat,
+        packages: [{
+          name,
+          sha256: 'deadbeef',
+          size: 4242,
+          url: `https://cartridges.machinefabric.com/${name}`,
+          format: fmt,
+        }],
+      })),
+    };
+  }
+  const latest = versions.length > 0 ? versions[0][0] : '';
+  return new CartridgeInfo({
+    id,
+    name: id,
+    version: latest,
+    description: '',
+    author: '',
+    teamId: 'TEAM123',
+    signedAt: '2026-02-07T00:00:00Z',
+    minAppVersion: '',
+    pageUrl: '',
+    categories: [],
+    tags: [],
+    cap_groups: [],
+    versions: versionMap,
+    availableVersions: available,
+    channel: 'release',
+    registryUrl: 'https://example.com/cartridges',
+  });
+}
+
+// TEST1849: latest version has a host build → Compatible, resolving to the
+// latest version and that platform's native-format package.
+function test1849_resolveForHostCompatibleLatest() {
+  const cartridge = cartridgeWithVersions('c', [
+    ['1.2.0', [['darwin-arm64', 'pkg', 'c-1.2.0.pkg'], ['linux-x86_64', 'deb', 'c-1.2.0.deb']]],
+    ['1.1.0', [['darwin-arm64', 'pkg', 'c-1.1.0.pkg']]],
+  ]);
+
+  const r = cartridge.resolveForHost('linux-x86_64');
+  assertEqual(r.status, CompatStatus.COMPATIBLE, 'latest with host build is Compatible');
+  assertEqual(r.resolvedVersion, '1.2.0', 'resolves to the latest version');
+  assertEqual(r.resolvedPackage.name, 'c-1.2.0.deb', 'resolves to native-format package');
+  assertEqual(r.resolvedPackage.format, 'deb', 'package format is deb');
+  assert(r.reason === null, 'Compatible carries no reason');
+  assertEqual(r.hostPlatform, 'linux-x86_64', 'host platform echoed back');
+}
+
+// TEST1850: the latest version lacks a host build but an older version has one
+// → CompatibleOutdated, resolving to the NEWEST older version with a host build
+// (not the oldest), with a reason naming both the latest and the resolved.
+function test1850_resolveForHostCompatibleOutdated() {
+  const cartridge = cartridgeWithVersions('c', [
+    ['1.3.0', [['darwin-arm64', 'pkg', 'c-1.3.0.pkg']]],
+    ['1.2.0', [['darwin-arm64', 'pkg', 'c-1.2.0.pkg'], ['linux-x86_64', 'deb', 'c-1.2.0.deb']]],
+    ['1.1.0', [['linux-x86_64', 'deb', 'c-1.1.0.deb']]],
+  ]);
+
+  const r = cartridge.resolveForHost('linux-x86_64');
+  assertEqual(r.status, CompatStatus.COMPATIBLE_OUTDATED, 'latest lacks host build → CompatibleOutdated');
+  assertEqual(r.resolvedVersion, '1.2.0', 'newest-with-host-build is 1.2.0, not oldest 1.1.0');
+  assertEqual(r.resolvedPackage.name, 'c-1.2.0.deb', 'resolves to 1.2.0 deb package');
+  assert(r.reason !== null, 'outdated carries a reason');
+  assert(r.reason.includes('1.3.0'), `reason names the latest: ${r.reason}`);
+  assert(r.reason.includes('1.2.0'), `reason names the resolved: ${r.reason}`);
+}
+
+// TEST1851: no version ships a host build → Incompatible, no resolved
+// version/package, reason states the host platform.
+function test1851_resolveForHostIncompatible() {
+  const cartridge = cartridgeWithVersions('c', [
+    ['1.2.0', [['darwin-arm64', 'pkg', 'c-1.2.0.pkg']]],
+    ['1.1.0', [['darwin-arm64', 'pkg', 'c-1.1.0.pkg']]],
+  ]);
+
+  const r = cartridge.resolveForHost('windows-x86_64');
+  assertEqual(r.status, CompatStatus.INCOMPATIBLE, 'no host build → Incompatible');
+  assert(r.resolvedVersion === null, 'no resolved version when Incompatible');
+  assert(r.resolvedPackage === null, 'no resolved package when Incompatible');
+  assert(r.reason.includes('windows-x86_64'), `reason names the host platform: ${r.reason}`);
+}
+
+// TEST1852: a host build whose packages[] is empty AND has no legacy `package`
+// ships no installer; resolution must SKIP it (not resolve to an un-downloadable
+// version) and fall through to an older usable version.
+function test1852_resolveForHostSkipsBuildWithNoInstaller() {
+  const cartridge = cartridgeWithVersions('c', [
+    ['2.0.0', [['linux-x86_64', 'deb', 'c-2.0.0.deb']]],
+    ['1.0.0', [['linux-x86_64', 'deb', 'c-1.0.0.deb']]],
+  ]);
+  // Make 2.0.0's linux build ship nothing installable.
+  const v2 = cartridge.versions['2.0.0'];
+  v2.builds[0].packages = [];
+  delete v2.builds[0].package;
+
+  const r = cartridge.resolveForHost('linux-x86_64');
+  // 2.0.0 is skipped (no installer); newest USABLE host build is 1.0.0.
+  assertEqual(r.status, CompatStatus.COMPATIBLE_OUTDATED, '2.0.0 skipped → CompatibleOutdated to 1.0.0');
+  assertEqual(r.resolvedVersion, '1.0.0', 'resolves to the older usable version');
+  assertEqual(r.resolvedPackage.name, 'c-1.0.0.deb', 'resolves to 1.0.0 deb package');
+}
+
+// TEST1853: hostPlatform() returns a normalized {os}-{arch} string with arch
+// aarch64/arm64 mapped to arm64 — the exact form the registry uses.
+function test1853_hostPlatformNormalizedForm() {
+  const p = hostPlatform();
+  const dash = p.indexOf('-');
+  assert(dash > 0, `host_platform must be os-arch, got ${p}`);
+  const os = p.slice(0, dash);
+  const arch = p.slice(dash + 1);
+  assert((os === 'darwin' || os === 'linux' || os === 'windows') || os.length > 0, `os segment present: ${os}`);
+  // The registry never uses the raw "aarch64"; it must be normalized.
+  assert(arch !== 'aarch64', 'arch must be normalized to arm64');
+}
+
+// ============================================================================
+// Build-env registry identity (manifest.rs: TEST1872-TEST1874)
+// ============================================================================
+
+// TEST1872: a non-empty MFR_CARTRIDGE_REGISTRY_URL passes through verbatim —
+// a published build reports exactly the URL it was compiled with.
+function test1872_registryUrlFromBuildEnvPassesThroughNonempty() {
+  const url = 'https://cartridges.machinefabric.com/manifest';
+  assertEqual(registryUrlFromBuildEnv(url), url, 'non-empty URL passes through verbatim');
+}
+
+// TEST1873: an unset env (null/undefined) yields null — a dev build has no
+// baked registry and loads only `dev/` cartridges.
+function test1873_registryUrlFromBuildEnvNoneForDev() {
+  assert(registryUrlFromBuildEnv(null) === null, 'null env → null (dev build)');
+  assert(registryUrlFromBuildEnv(undefined) === null, 'absent env → null (dev build)');
+}
+
+// TEST1874: an exported-but-empty env ('') is neither a dev build nor a valid
+// identity and MUST fail hard, so the build can never silently hash the empty
+// string into a fake registry slug.
+function test1874_registryUrlFromBuildEnvRejectsEmptyString() {
+  let threw = false;
+  try {
+    registryUrlFromBuildEnv('');
+  } catch (e) {
+    threw = true;
+    assert(e.message.includes('MFR_CARTRIDGE_REGISTRY_URL must be unset'), `panic message names the variable: ${e.message}`);
+  }
+  assert(threw, 'empty string must fail hard');
+}
+
+// ============================================================================
+// Cartridge discovery (cartridge_discovery.rs: TEST1875-TEST1878)
+// ============================================================================
+
+// Lay down `{root}/{slug}/{channel}/{name}/{version}/`. When `cartridgeJson`
+// is provided, also write it plus an executable `entry` binary so readFromDir
+// accepts the directory and discovery reaches its own identity checks. Mirrors
+// the Rust test helper install_fixture.
+function discoveryInstallFixture(root, slug, channelFolder, name, version, cartridgeJson, entry) {
+  const fs = require('fs');
+  const path = require('path');
+  const dir = path.join(root, slug, channelFolder, name, version);
+  fs.mkdirSync(dir, { recursive: true });
+  if (cartridgeJson !== null && cartridgeJson !== undefined) {
+    fs.writeFileSync(path.join(dir, 'cartridge.json'), cartridgeJson);
+    const entryPath = path.join(dir, entry);
+    fs.writeFileSync(entryPath, '#!/bin/sh\nexit 0\n');
+    fs.chmodSync(entryPath, 0o755);
+  }
+}
+
+function discoveryDevCartridgeJson(channel, fabricManifestVersion) {
+  return JSON.stringify({
+    name: 'cart', version: '1.0.0', channel, registry_url: null, entry: 'cart',
+    installed_at: '2024-01-01T00:00:00Z', fabric_manifest_version: fabricManifestVersion,
+  });
+}
+
+function discoveryRegistryCartridgeJson(url, channel, fmv) {
+  return JSON.stringify({
+    name: 'cart', version: '1.0.0', channel, registry_url: url, entry: 'cart',
+    installed_at: '2024-01-01T00:00:00Z', fabric_manifest_version: fmv,
+  });
+}
+
+function discoveryMakeTempRoot() {
+  const fs = require('fs');
+  const os = require('os');
+  const path = require('path');
+  return fs.mkdtempSync(path.join(os.tmpdir(), 'capdag-disc-'));
+}
+
+function discoveryRemoveRoot(root) {
+  const fs = require('fs');
+  try { fs.rmSync(root, { recursive: true, force: true }); } catch (_e) { /* best effort */ }
+}
+
+function discoveryExpectIncompatible(out, kind) {
+  assertEqual(out.length, 1, 'expected exactly one discovered entry');
+  assertEqual(out[0].kind, 'incompatible', 'entry must be incompatible');
+  assertEqual(out[0].error.kind, kind, `wrong attachment-error kind: ${out[0].error.message}`);
+}
+
+// TEST1875: scan-all — a registry slug folder AND the dev slot present on disk
+// are BOTH scanned, regardless of the host's own baked registry. Both fixtures
+// lack a real bifaci binary, so both end at HandshakeFailed — proving discovery
+// REACHED them (was not filtered out by a registry pin). A registry-pin
+// rejection would instead surface BadInstallation and never probe.
+async function test1875_scanAllReachesBothDevAndRegistrySlugs() {
+  const root = discoveryMakeTempRoot();
+  try {
+    const url = 'https://cartridges.example.com/manifest';
+    const rslug = slugForSync(url);
+    // Host baked for a DIFFERENT registry than the on-disk registry cartridge.
+    const host = new DiscoveryIdentity({ channel: 'nightly', registryUrl: 'https://other.example.com/manifest', fabricManifestVersion: 1 });
+    discoveryInstallFixture(root, 'dev', 'nightly', 'devcart', '1.0.0', discoveryDevCartridgeJson('nightly', 1), 'cart');
+    discoveryInstallFixture(root, rslug, 'nightly', 'regcart', '1.0.0', discoveryRegistryCartridgeJson(url, 'nightly', 1), 'cart');
+    const out = await discoverCartridges(root, host);
+    assertEqual(out.length, 2, `both slugs must be scanned, got ${out.length}`);
+    for (const c of out) {
+      assertEqual(c.kind, 'incompatible', 'both reach the probe stage');
+      assertEqual(c.error.kind, CartridgeAttachmentErrorKind.HANDSHAKE_FAILED,
+        `both reached the probe (not registry-pin-rejected): ${c.error.message}`);
+    }
+  } finally {
+    discoveryRemoveRoot(root);
+  }
+}
+
+// TEST1876: only the host's channel subtree is scanned. A cartridge under a
+// slug's `release/` folder is invisible to a nightly host even though the slug
+// folder is present (its `nightly/` subtree is absent).
+async function test1876_otherChannelSubtreeIsSkipped() {
+  const root = discoveryMakeTempRoot();
+  try {
+    const url = 'https://cartridges.example.com/manifest';
+    const rslug = slugForSync(url);
+    discoveryInstallFixture(root, rslug, 'release', 'regcart', '1.0.0', discoveryRegistryCartridgeJson(url, 'release', 1), 'cart');
+    const out = await discoverCartridges(root, new DiscoveryIdentity({ channel: 'nightly', registryUrl: null, fabricManifestVersion: 1 }));
+    assertEqual(out.length, 0, 'a release-only slug must be invisible to a nightly host');
+  } finally {
+    discoveryRemoveRoot(root);
+  }
+}
+
+// TEST1877: a registry cartridge hand-copied under the WRONG registry slug
+// folder fails the three-place rule (BadInstallation) — scan-all does not mean
+// "accept anywhere"; placement must still be self-consistent.
+async function test1877_registryCartridgeUnderWrongSlugIsBadInstall() {
+  const root = discoveryMakeTempRoot();
+  try {
+    const url = 'https://cartridges.example.com/manifest';
+    const wrongSlug = slugForSync('https://somewhere-else.example.com/manifest');
+    const json = discoveryRegistryCartridgeJson(url, 'nightly', 1);
+    discoveryInstallFixture(root, wrongSlug, 'nightly', 'cart', '1.0.0', json, 'cart');
+    const out = await discoverCartridges(root, new DiscoveryIdentity({ channel: 'nightly', registryUrl: null, fabricManifestVersion: 1 }));
+    discoveryExpectIncompatible(out, CartridgeAttachmentErrorKind.BAD_INSTALLATION);
+  } finally {
+    discoveryRemoveRoot(root);
+  }
+}
+
+// TEST1878: a cartridge marked `installed_from: bundle` with no baked hash in
+// BUNDLED_PROVIDER_HASHES (empty in this mirror) is rejected as BadInstallation
+// — the bundled-integrity gate fires before the probe. Non-macOS only: on macOS
+// the baked-hash path is intentionally absent (OS code-signature is the guard),
+// so a bundled provider is accepted there and would instead end at the probe.
+async function test1878_bundledProviderWithoutBakedHashIsRejected() {
+  if (process.platform === 'darwin') {
+    // Mirrors the Rust #[cfg(not(target_os = "macos"))] gate: on macOS the
+    // baked-hash path does not exist, so this scenario is not exercised.
+    return;
+  }
+  const root = discoveryMakeTempRoot();
+  try {
+    // Dev slug (null registry) but installed_from=bundle — placement is
+    // self-consistent (null→dev), so it passes readFromDir and reaches the
+    // bundled-hash gate, which has no baked entry → BadInstallation.
+    const json = JSON.stringify({
+      name: 'cart', version: '1.0.0', channel: 'nightly', registry_url: null, entry: 'cart',
+      installed_at: '2024-01-01T00:00:00Z', installed_from: 'bundle', fabric_manifest_version: 1,
+    });
+    discoveryInstallFixture(root, 'dev', 'nightly', 'cart', '1.0.0', json, 'cart');
+    const out = await discoverCartridges(root, new DiscoveryIdentity({ channel: 'nightly', registryUrl: null, fabricManifestVersion: 1 }));
+    discoveryExpectIncompatible(out, CartridgeAttachmentErrorKind.BAD_INSTALLATION);
+    assert(out[0].error.message.includes('bundled provider integrity'),
+      `message should name the bundled-integrity failure: ${out[0].error.message}`);
+  } finally {
+    discoveryRemoveRoot(root);
+  }
+}
+
+// ============================================================================
 // media_urn.rs: TEST1294-TEST1302 (MediaUrn predicates)
 // ============================================================================
 
@@ -2521,37 +2828,36 @@ function test0086_isCollection() {
 
 // TEST1302: predicates are consistent with constants — every constant triggers exactly the expected predicates
 function test1302_predicateConstantConsistency() {
-  // MEDIA_INTEGER must be numeric, text, scalar, NOT binary/bool/image/audio/video
+  // MEDIA_INTEGER must be numeric, scalar, NOT enc-bearing/bool/image/list.
+  // Integers carry no enc= (a number is not a character-encoded string).
   const intUrn = MediaUrn.fromString(MEDIA_INTEGER);
   assert(intUrn.isNumeric(), 'MEDIA_INTEGER must be numeric');
-  assert(intUrn.isText(), 'MEDIA_INTEGER must be text');
+  assert(intUrn.getTag('enc') === undefined, 'MEDIA_INTEGER must not carry enc');
   assert(intUrn.isScalar(), 'MEDIA_INTEGER must be scalar');
-  assert(!intUrn.isBinary(), 'MEDIA_INTEGER must not be binary');
   assert(!intUrn.isBool(), 'MEDIA_INTEGER must not be bool');
   assert(!intUrn.isImage(), 'MEDIA_INTEGER must not be image');
   assert(!intUrn.isList(), 'MEDIA_INTEGER must not be list');
 
-  // MEDIA_BOOLEAN must be bool, text, scalar, NOT numeric
+  // MEDIA_BOOLEAN must be bool, enc-bearing, scalar, NOT numeric
   const boolUrn = MediaUrn.fromString(MEDIA_BOOLEAN);
   assert(boolUrn.isBool(), 'MEDIA_BOOLEAN must be bool');
-  assert(boolUrn.isText(), 'MEDIA_BOOLEAN must be text');
+  assert(boolUrn.getTag('enc') === 'utf-8', 'MEDIA_BOOLEAN must carry enc=utf-8');
   assert(boolUrn.isScalar(), 'MEDIA_BOOLEAN must be scalar');
   assert(!boolUrn.isNumeric(), 'MEDIA_BOOLEAN must not be numeric');
 
-  // MEDIA_JSON must be json, text, record, scalar, NOT binary
+  // MEDIA_JSON must be json, record, scalar, NOT list — and carries no enc
+  // (fmt= is the content-format axis, orthogonal to enc=).
   const jsonUrn = MediaUrn.fromString(MEDIA_JSON);
   assert(jsonUrn.isJson(), 'MEDIA_JSON must be json');
-  assert(jsonUrn.isText(), 'MEDIA_JSON must be text');
+  assert(jsonUrn.getTag('enc') === undefined, 'MEDIA_JSON must not carry enc');
   assert(jsonUrn.isRecord(), 'MEDIA_JSON must be record');
   assert(jsonUrn.isScalar(), 'MEDIA_JSON must be scalar (no list marker)');
-  assert(!jsonUrn.isBinary(), 'MEDIA_JSON must not be binary');
   assert(!jsonUrn.isList(), 'MEDIA_JSON must not be list');
 
-  // MEDIA_VOID is void, NOT text/numeric — but IS binary (no textable tag)
+  // MEDIA_VOID is void, NOT numeric, and carries no enc tag
   const voidUrn = MediaUrn.fromString(MEDIA_VOID);
   assert(voidUrn.isVoid(), 'MEDIA_VOID must be void');
-  assert(!voidUrn.isText(), 'MEDIA_VOID must not be text');
-  assert(voidUrn.isBinary(), 'MEDIA_VOID must be binary (no textable tag)');
+  assert(voidUrn.getTag('enc') === undefined, 'MEDIA_VOID must not carry enc');
   assert(!voidUrn.isNumeric(), 'MEDIA_VOID must not be numeric');
 }
 
@@ -2595,7 +2901,7 @@ function test1304_withInOutSpec() {
   // Chain both
   const changedBoth = cap.withInSpec('media:pdf').withOutSpec(MEDIA_TXT);
   assertEqual(changedBoth.getInSpec(), 'media:pdf', 'Chain should set inSpec');
-  assertEqual(changedBoth.getOutSpec(), 'media:ext=txt;textable', 'Chain should set outSpec');
+  assertEqual(changedBoth.getOutSpec(), 'media:enc=utf-8;ext=txt', 'Chain should set outSpec');
 
   const identity = CapUrn.fromString('cap:effect=none');
   assertThrows(
@@ -5591,17 +5897,17 @@ function test0239_Renderer_buildResolvedMachineGraphData_multiStrandKeepsStrands
       },
       {
         nodes: [
-          { id: 'n2', urn: 'media:json;record;textable', title: 'JSON Record' },
-          { id: 'n3', urn: 'media:csv;list;record;textable', title: 'CSV Rows' },
+          { id: 'n2', urn: 'media:fmt=json;record', title: 'JSON Record' },
+          { id: 'n3', urn: 'media:fmt=csv;list;record', title: 'CSV Rows' },
         ],
         edges: [
           {
             alias: 'edge_1',
-            cap_urn: 'cap:in=media:json;record;textable;convert-format;out=media:csv;list;record;textable',
+            cap_urn: 'cap:in=media:fmt=json;record;convert-format;out=media:fmt=csv;list;record',
             title: 'Convert Format',
             is_loop: false,
             assignment: [
-              { cap_arg_media_urn: 'media:json;record;textable', source_node: 'n2' },
+              { cap_arg_media_urn: 'media:fmt=json;record', source_node: 'n2' },
             ],
             target_node: 'n3',
           },
@@ -6144,7 +6450,7 @@ async function runTests() {
   // media_urn.rs: TEST060-TEST078
   console.log('\n--- media_urn.rs ---');
   runTest('TEST060: wrong_prefix_fails', test060_wrongPrefixFails);
-  runTest('TEST061: is_binary', test061_isBinary);
+  console.log('  SKIP TEST061: REMOVED (binary/text distinction gone; see TEST067 for enc=)');
   runTest('TEST062: is_record', test062_isRecord);
   runTest('TEST063: is_scalar', test063_isScalar);
   runTest('TEST064: is_list', test064_isList);
@@ -6257,6 +6563,27 @@ async function runTests() {
   runTest('TEST333: cartridge_repo_client_get_all_caps', test333_cartridgeRepoClientGetAllCaps);
   runTest('TEST334: cartridge_repo_client_needs_sync', test334_cartridgeRepoClientNeedsSync);
   runTest('TEST335: cartridge_repo_server_client_integration', test335_cartridgeRepoServerClientIntegration);
+
+  // cartridge_repo.rs: TEST1849-TEST1853 (host-compatibility resolution)
+  console.log('\n--- cartridge_repo.rs (resolve_for_host) ---');
+  runTest('TEST1849: resolve_for_host_compatible_latest', test1849_resolveForHostCompatibleLatest);
+  runTest('TEST1850: resolve_for_host_compatible_outdated', test1850_resolveForHostCompatibleOutdated);
+  runTest('TEST1851: resolve_for_host_incompatible', test1851_resolveForHostIncompatible);
+  runTest('TEST1852: resolve_for_host_skips_build_with_no_installer', test1852_resolveForHostSkipsBuildWithNoInstaller);
+  runTest('TEST1853: host_platform_normalized_form', test1853_hostPlatformNormalizedForm);
+
+  // manifest.rs: TEST1872-TEST1874 (registry_url_from_build_env)
+  console.log('\n--- manifest.rs (registry_url_from_build_env) ---');
+  runTest('TEST1872: registry_url_from_build_env_passes_through_nonempty', test1872_registryUrlFromBuildEnvPassesThroughNonempty);
+  runTest('TEST1873: registry_url_from_build_env_none_for_dev', test1873_registryUrlFromBuildEnvNoneForDev);
+  runTest('TEST1874: registry_url_from_build_env_rejects_empty_string', test1874_registryUrlFromBuildEnvRejectsEmptyString);
+
+  // cartridge_discovery.rs: TEST1875-TEST1878 (scan-all discovery)
+  console.log('\n--- cartridge_discovery.rs (discover_cartridges) ---');
+  await runTest('TEST1875: scan_all_reaches_both_dev_and_registry_slugs', test1875_scanAllReachesBothDevAndRegistrySlugs);
+  await runTest('TEST1876: other_channel_subtree_is_skipped', test1876_otherChannelSubtreeIsSkipped);
+  await runTest('TEST1877: registry_cartridge_under_wrong_slug_is_bad_install', test1877_registryCartridgeUnderWrongSlugIsBadInstall);
+  await runTest('TEST1878: bundled_provider_without_baked_hash_is_rejected', test1878_bundledProviderWithoutBakedHashIsRejected);
 
   // media_urn.rs: TEST1312-TEST1315, TEST1298-TEST1302 (MediaUrn predicates)
   console.log('\n--- media_urn.rs (predicates) ---');
