@@ -794,11 +794,11 @@ function test891_directionSemanticSpecificity() {
     'out=image;png;thumbnail(6) + in=media:(0) + generate-thumbnail marker(2) = 60002');
   // specific:
   //   out=media:image;png;thumbnail -> 6
-  //   in=media:ext=pdf                  -> 2
+  //   in=media:ext=pdf              -> 4 (ext=pdf is an exact-value tag, not a bare marker)
   //   y: generate-thumbnail marker  -> 2
-  //   spec_C = 10000*6 + 100*2 + 2 = 60202
-  assertEqual(specificCap.specificity(), 10000*6 + 100*2 + 2,
-    'out=image;png;thumbnail(6) + in=pdf(2) + generate-thumbnail marker(2) = 60202');
+  //   spec_C = 10000*6 + 100*4 + 2 = 60402
+  assertEqual(specificCap.specificity(), 10000*6 + 100*4 + 2,
+    'out=image;png;thumbnail(6) + in=ext=pdf(4) + generate-thumbnail marker(2) = 60402');
   assert(specificCap.specificity() > genericCap.specificity(), 'pdf should be more specific');
 
   // CapMatcher should prefer more specific
@@ -3188,7 +3188,7 @@ function test652_capIdentityConstantWorks() {
 // TEST653: invalid effect=none declarations fail at construction.
 function test653_invalidEffectNoneDeclarationRejected() {
   assertThrows(
-    () => CapUrn.fromString('cap:in=media:pdf;effect=none;out="media:enc=utf-8"'),
+    () => CapUrn.fromString('cap:in="media:ext=pdf";effect=none;out="media:enc=utf-8"'),
     ErrorCodes.ILLEGAL_DECLARATION,
     'invalid effect=none declaration must fail at construction'
   );
@@ -3217,7 +3217,7 @@ function test655_effectDeclaredUsesDeclaredOutput() {
 // TEST656: invalid effect=none declarations fail hard at construction.
 function test656_invalidEffectNoneFailsHard() {
   assertThrows(
-    () => CapUrn.fromString('cap:in=media:pdf;effect=none;out="media:enc=utf-8"'),
+    () => CapUrn.fromString('cap:in="media:ext=pdf";effect=none;out="media:enc=utf-8"'),
     ErrorCodes.ILLEGAL_DECLARATION,
     'invalid effect=none declaration must fail at construction'
   );
@@ -4649,8 +4649,8 @@ function test0207_Renderer_classifyStrandCapSteps_capFlags() {
     makeForEachStep('media:pdf;list'),
     makeCapStep('cap:in="media:ext=pdf";a;out="media:image;png"', 'a', 'media:ext=pdf', 'media:image;png', false, false),
     makeCapStep('cap:in="media:image;png";b;out="media:jpg"', 'b', 'media:image;png', 'media:jpg', false, false),
-    makeCapStep('cap:in="media:jpg";c;out="media:txt"', 'c', 'media:jpg', 'media:txt', false, false),
-    makeCollectStep('media:txt'),
+    makeCapStep('cap:in="media:jpg";c;out="media:ext=txt"', 'c', 'media:jpg', 'media:ext=txt', false, false),
+    makeCollectStep('media:ext=txt'),
   ];
   const { capStepIndices, capFlags } = rendererClassifyStrandCapSteps(steps);
   assertEqual(capStepIndices.length, 3, 'three cap steps');
@@ -4761,12 +4761,12 @@ function test0211_Renderer_buildStrandGraphData_foreachCollectSpan() {
     target_media_urn: 'media:txt;list',
     steps: [
       makeForEachStep('media:pdf;list'),
-      makeCapStep('cap:in="media:ext=pdf";extract;out="media:txt"', 'extract', 'media:ext=pdf', 'media:txt', false, false),
-      makeCollectStep('media:txt'),
+      makeCapStep('cap:in="media:ext=pdf";extract;out="media:ext=txt"', 'extract', 'media:ext=pdf', 'media:ext=txt', false, false),
+      makeCollectStep('media:ext=txt'),
     ],
   }, {
     'media:pdf;list': 'PDF List',
-    'media:txt': 'Plain Text',
+    'media:ext=txt': 'Plain Text',
     'media:txt;list': 'Text List',
   });
   const built = rendererBuildStrandGraphData(payload);
@@ -4909,12 +4909,12 @@ function test0215_Renderer_collapseStrand_singleCapBodyKeepsCapOwnLabel() {
     target_media_urn: 'media:txt;list',
     steps: [
       makeForEachStep('media:pdf;list'),
-      makeCapStep('cap:in="media:ext=pdf";extract;out="media:txt"', 'extract', 'media:ext=pdf', 'media:txt', false, false),
-      makeCollectStep('media:txt'),
+      makeCapStep('cap:in="media:ext=pdf";extract;out="media:ext=txt"', 'extract', 'media:ext=pdf', 'media:ext=txt', false, false),
+      makeCollectStep('media:ext=txt'),
     ],
   }, {
     'media:pdf;list': 'PDF List',
-    'media:txt': 'Plain Text',
+    'media:ext=txt': 'Plain Text',
     'media:txt;list': 'Text List',
   });
   const built = rendererBuildStrandGraphData(payload);
@@ -5210,12 +5210,12 @@ function test0223_Renderer_buildRunGraphData_pagesSuccessesAndFailures() {
   // failures.
   const strand = {
     source_media_urn: 'media:pdf;list',
-    target_media_urn: 'media:txt',
+    target_media_urn: 'media:ext=txt',
     steps: [
       makeForEachStep('media:pdf;list'),
       makeCapStep('cap:in="media:ext=pdf";a;out="media:image;png"', 'a', 'media:ext=pdf', 'media:image;png', false, false),
-      makeCapStep('cap:in="media:image;png";b;out="media:txt"', 'b', 'media:image;png', 'media:txt', false, false),
-      makeCollectStep('media:txt'),
+      makeCapStep('cap:in="media:image;png";b;out="media:ext=txt"', 'b', 'media:image;png', 'media:ext=txt', false, false),
+      makeCollectStep('media:ext=txt'),
     ],
   };
   const outcomes = [];
@@ -5230,7 +5230,7 @@ function test0223_Renderer_buildRunGraphData_pagesSuccessesAndFailures() {
       saved_paths: [],
       total_bytes: 0,
       duration_ms: 0,
-      failed_cap: 'cap:in="media:image;png";b;out="media:txt"',
+      failed_cap: 'cap:in="media:image;png";b;out="media:ext=txt"',
       error: 'oom',
     });
   }
@@ -5240,7 +5240,7 @@ function test0223_Renderer_buildRunGraphData_pagesSuccessesAndFailures() {
       'media:pdf;list': 'PDF List',
       'media:ext=pdf': 'PDF',
       'media:image;png': 'PNG',
-      'media:txt': 'Text',
+      'media:ext=txt': 'Text',
     },
     body_outcomes: outcomes,
     visible_success_count: 3,
@@ -5277,11 +5277,11 @@ function test0224_Renderer_buildRunGraphData_failureWithoutFailedCapRendersFullT
   // replica emits 1 entry node + 1 body cap node = 2 nodes.
   const strand = {
     source_media_urn: 'media:pdf;list',
-    target_media_urn: 'media:txt',
+    target_media_urn: 'media:ext=txt',
     steps: [
       makeForEachStep('media:pdf;list'),
-      makeCapStep('cap:in="media:ext=pdf";a;out="media:txt"', 'a', 'media:ext=pdf', 'media:txt', false, false),
-      makeCollectStep('media:txt'),
+      makeCapStep('cap:in="media:ext=pdf";a;out="media:ext=txt"', 'a', 'media:ext=pdf', 'media:ext=txt', false, false),
+      makeCollectStep('media:ext=txt'),
     ],
   };
   const payload = {
@@ -5289,7 +5289,7 @@ function test0224_Renderer_buildRunGraphData_failureWithoutFailedCapRendersFullT
     media_display_names: {
       'media:pdf;list': 'PDF List',
       'media:ext=pdf': 'PDF',
-      'media:txt': 'Text',
+      'media:ext=txt': 'Text',
     },
     body_outcomes: [
       { body_index: 0, success: false, cap_urns: [], saved_paths: [], total_bytes: 0, duration_ms: 0, error: 'unknown' },
@@ -5564,8 +5564,8 @@ function test0229_Renderer_buildRunGraphData_closedForeachSuccessMergesAtCollect
     target_media_urn: 'media:txt;list',
     steps: [
       makeForEachStep('media:pdf;list'),
-      makeCapStep('cap:in="media:ext=pdf";extract;out="media:txt"', 'extract', 'media:ext=pdf', 'media:txt', false, false),
-      makeCollectStep('media:txt'),
+      makeCapStep('cap:in="media:ext=pdf";extract;out="media:ext=txt"', 'extract', 'media:ext=pdf', 'media:ext=txt', false, false),
+      makeCollectStep('media:ext=txt'),
     ],
   };
   const payload = {
@@ -5573,7 +5573,7 @@ function test0229_Renderer_buildRunGraphData_closedForeachSuccessMergesAtCollect
     media_display_names: {
       'media:pdf;list': 'PDF List',
       'media:ext=pdf': 'PDF',
-      'media:txt': 'Text',
+      'media:ext=txt': 'Text',
       'media:txt;list': 'Text List',
     },
     body_outcomes: [
@@ -5733,7 +5733,7 @@ function test0235_Renderer_buildEditorGraphData_rejectsEdgeWithMissingSource() {
 // ---------------- resolved-machine builder ----------------
 
 function test0236_Renderer_buildResolvedMachineGraphData_singleStrandLinearChain() {
-  // A single-strand machine: media:ext=pdf → extract → media:txt
+  // A single-strand machine: media:ext=pdf → extract → media:ext=txt
   // → embed → media:embedding. Two edges, three nodes, no
   // loops, no fan-in. Tests the basic shape — nodes and
   // edges flow through verbatim from the resolved machine
@@ -5749,7 +5749,7 @@ function test0236_Renderer_buildResolvedMachineGraphData_singleStrandLinearChain
         edges: [
           {
             alias: 'edge_0',
-            cap_urn: 'cap:in=media:pdf;extract;out=media:enc=utf-8;ext=txt',
+            cap_urn: 'cap:in="media:ext=pdf";extract;out=media:enc=utf-8;ext=txt',
             title: 'Extract Text',
             is_loop: false,
             assignment: [
@@ -5883,7 +5883,7 @@ function test0239_Renderer_buildResolvedMachineGraphData_multiStrandKeepsStrands
         edges: [
           {
             alias: 'edge_0',
-            cap_urn: 'cap:in=media:pdf;extract;out=media:enc=utf-8;ext=txt',
+            cap_urn: 'cap:in="media:ext=pdf";extract;out=media:enc=utf-8;ext=txt',
             title: 'Extract Text',
             is_loop: false,
             assignment: [
@@ -6065,7 +6065,7 @@ function test1803_kindEffectWhenBothSidesVoid() {
 // TEST1804: Transform classifier — at least one side non-void, and
 // the cap is not the bare identity.
 function test1804_kindTransformForNormalDataProcessors() {
-  const extract = CapUrn.fromString('cap:extract;in=media:pdf;out="media:enc=utf-8;record"');
+  const extract = CapUrn.fromString('cap:extract;in="media:ext=pdf";out="media:enc=utf-8;record"');
   assertEqual(extract.kind(), CapKind.TRANSFORM, 'extract is a Transform');
 
   const labeled = CapUrn.fromString('cap:passthrough;in=media:;out=media:');
@@ -6118,7 +6118,7 @@ function test1805_kindInvariantUnderCanonicalSpellings() {
   const cases = [
     { a: 'cap:effect=none', b: 'cap:in=media:;out=media:;effect=none', expected: CapKind.IDENTITY },
     {
-      a: 'cap:extract;in=media:pdf;out="media:enc=utf-8"',
+      a: 'cap:extract;in="media:ext=pdf";out="media:enc=utf-8"',
       b: 'cap:extract;in="media:ext=pdf";out="media:enc=utf-8"',
       expected: CapKind.TRANSFORM,
     },
@@ -6325,7 +6325,7 @@ function test1843_rejectInvalidCombinations() {
 function test1844_axisWeightingOutDominates() {
   const bigOut = CapUrn.fromString('cap:in=media:;out="media:enc=utf-8;record"');
   const bigInAndY = CapUrn.fromString(
-    'cap:in=media:pdf;out=media:record;!constrained;?target;extract;stage!=alpha;target2=metadata;ver?=draft'
+    'cap:in="media:ext=pdf";out=media:record;!constrained;?target;extract;stage!=alpha;target2=metadata;ver?=draft'
   );
   assert(bigOut.specificity() > bigInAndY.specificity(),
     'out-axis difference must dominate combined in+y differences');
@@ -6333,7 +6333,7 @@ function test1844_axisWeightingOutDominates() {
 
 // TEST1845: With equal out, in-axis dominates over y-axis.
 function test1845_axisWeightingInDominatesY() {
-  const bigIn = CapUrn.fromString('cap:in=media:pdf;out=media:record');
+  const bigIn = CapUrn.fromString('cap:in="media:ext=pdf";out=media:record');
   const bigY = CapUrn.fromString(
     'cap:in=media:;out=media:record;!constrained;?target;extract;stage!=alpha;target2=metadata;ver?=draft'
   );
