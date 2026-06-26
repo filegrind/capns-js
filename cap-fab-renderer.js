@@ -2087,7 +2087,7 @@ function buildRunGraphData(data) {
   // labels the anchor→entry edge on the first body.
   //
   // Without such a preceding sequence cap, the source itself is
-  // already a list (e.g. `media:pdf;list` source_media_urn) and the
+  // already a list (e.g. `media:ext=pdf;list` source_media_urn) and the
   // ForEach iterates it directly.
   let seqProducerStepIdx = -1;
   let seqProducerStep = null;

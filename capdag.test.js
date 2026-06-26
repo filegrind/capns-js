@@ -4646,7 +4646,7 @@ function test0207_Renderer_classifyStrandCapSteps_capFlags() {
   // prevForEach=true; cap3 should have nextCollect=true; cap2 should
   // have neither.
   const steps = [
-    makeForEachStep('media:pdf;list'),
+    makeForEachStep('media:ext=pdf;list'),
     makeCapStep('cap:in="media:ext=pdf";a;out="media:ext=png;image"', 'a', 'media:ext=pdf', 'media:ext=png;image', false, false),
     makeCapStep('cap:in="media:ext=png;image";b;out="media:ext=jpg"', 'b', 'media:ext=png;image', 'media:ext=jpg', false, false),
     makeCapStep('cap:in="media:ext=jpg";c;out="media:ext=txt"', 'c', 'media:ext=jpg', 'media:ext=txt', false, false),
@@ -4757,15 +4757,15 @@ function test0211_Renderer_buildStrandGraphData_foreachCollectSpan() {
   // labels on cap edges — they're distinct processing units in the
   // plan. This mirrors capdag's plan_builder.rs exactly.
   const payload = withMediaDisplayNames({
-    source_media_urn: 'media:pdf;list',
+    source_media_urn: 'media:ext=pdf;list',
     target_media_urn: 'media:txt;list',
     steps: [
-      makeForEachStep('media:pdf;list'),
+      makeForEachStep('media:ext=pdf;list'),
       makeCapStep('cap:in="media:ext=pdf";extract;out="media:ext=txt"', 'extract', 'media:ext=pdf', 'media:ext=txt', false, false),
       makeCollectStep('media:ext=txt'),
     ],
   }, {
-    'media:pdf;list': 'PDF List',
+    'media:ext=pdf;list': 'PDF List',
     'media:ext=txt': 'Plain Text',
     'media:txt;list': 'Text List',
   });
@@ -4905,15 +4905,15 @@ function test0215_Renderer_collapseStrand_singleCapBodyKeepsCapOwnLabel() {
   // with the entry edge labeled "extract" and an unlabeled
   // connector bridge to the output.
   const payload = withMediaDisplayNames({
-    source_media_urn: 'media:pdf;list',
+    source_media_urn: 'media:ext=pdf;list',
     target_media_urn: 'media:txt;list',
     steps: [
-      makeForEachStep('media:pdf;list'),
+      makeForEachStep('media:ext=pdf;list'),
       makeCapStep('cap:in="media:ext=pdf";extract;out="media:ext=txt"', 'extract', 'media:ext=pdf', 'media:ext=txt', false, false),
       makeCollectStep('media:ext=txt'),
     ],
   }, {
-    'media:pdf;list': 'PDF List',
+    'media:ext=pdf;list': 'PDF List',
     'media:ext=txt': 'Plain Text',
     'media:txt;list': 'Text List',
   });
@@ -5209,10 +5209,10 @@ function test0223_Renderer_buildRunGraphData_pagesSuccessesAndFailures() {
   // Show-more nodes: one for 3 hidden successes, one for 2 hidden
   // failures.
   const strand = {
-    source_media_urn: 'media:pdf;list',
+    source_media_urn: 'media:ext=pdf;list',
     target_media_urn: 'media:ext=txt',
     steps: [
-      makeForEachStep('media:pdf;list'),
+      makeForEachStep('media:ext=pdf;list'),
       makeCapStep('cap:in="media:ext=pdf";a;out="media:ext=png;image"', 'a', 'media:ext=pdf', 'media:ext=png;image', false, false),
       makeCapStep('cap:in="media:ext=png;image";b;out="media:ext=txt"', 'b', 'media:ext=png;image', 'media:ext=txt', false, false),
       makeCollectStep('media:ext=txt'),
@@ -5237,7 +5237,7 @@ function test0223_Renderer_buildRunGraphData_pagesSuccessesAndFailures() {
   const payload = {
     resolved_strand: strand,
     media_display_names: {
-      'media:pdf;list': 'PDF List',
+      'media:ext=pdf;list': 'PDF List',
       'media:ext=pdf': 'PDF',
       'media:ext=png;image': 'PNG',
       'media:ext=txt': 'Text',
@@ -5276,10 +5276,10 @@ function test0224_Renderer_buildRunGraphData_failureWithoutFailedCapRendersFullT
   // Strand [ForEach, Cap, Collect] → body has 1 cap. Each body
   // replica emits 1 entry node + 1 body cap node = 2 nodes.
   const strand = {
-    source_media_urn: 'media:pdf;list',
+    source_media_urn: 'media:ext=pdf;list',
     target_media_urn: 'media:ext=txt',
     steps: [
-      makeForEachStep('media:pdf;list'),
+      makeForEachStep('media:ext=pdf;list'),
       makeCapStep('cap:in="media:ext=pdf";a;out="media:ext=txt"', 'a', 'media:ext=pdf', 'media:ext=txt', false, false),
       makeCollectStep('media:ext=txt'),
     ],
@@ -5287,7 +5287,7 @@ function test0224_Renderer_buildRunGraphData_failureWithoutFailedCapRendersFullT
   const payload = {
     resolved_strand: strand,
     media_display_names: {
-      'media:pdf;list': 'PDF List',
+      'media:ext=pdf;list': 'PDF List',
       'media:ext=pdf': 'PDF',
       'media:ext=txt': 'Text',
     },
@@ -5560,10 +5560,10 @@ function test0229_Renderer_buildRunGraphData_closedForeachSuccessMergesAtCollect
   // Actually simpler: [ForEach, Cap_a, Collect] with source=list
   // and target=list.
   const strand = {
-    source_media_urn: 'media:pdf;list',
+    source_media_urn: 'media:ext=pdf;list',
     target_media_urn: 'media:txt;list',
     steps: [
-      makeForEachStep('media:pdf;list'),
+      makeForEachStep('media:ext=pdf;list'),
       makeCapStep('cap:in="media:ext=pdf";extract;out="media:ext=txt"', 'extract', 'media:ext=pdf', 'media:ext=txt', false, false),
       makeCollectStep('media:ext=txt'),
     ],
@@ -5571,7 +5571,7 @@ function test0229_Renderer_buildRunGraphData_closedForeachSuccessMergesAtCollect
   const payload = {
     resolved_strand: strand,
     media_display_names: {
-      'media:pdf;list': 'PDF List',
+      'media:ext=pdf;list': 'PDF List',
       'media:ext=pdf': 'PDF',
       'media:ext=txt': 'Text',
       'media:txt;list': 'Text List',
