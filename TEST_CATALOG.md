@@ -81,7 +81,7 @@ This catalog lists all tests in the JS codebase.
 | test064 | `test064_isList` | TEST064: Test is_list returns true when list marker tag is present indicating ordered collection | capdag.test.js:901 |
 | test065 | `test065_isOpaque` | TEST065: Test is_opaque returns true when record marker is absent (opaque is default) | capdag.test.js:910 |
 | test066 | `test066_isJson` | TEST066: Test is_json returns true only when fmt=json content-format tag is present | capdag.test.js:921 |
-| test067 | `test067_isText` | TEST067: Text-representability is now carried by the orthogonal `enc=` tag (the old `textable` marker and isText() are gone). A media is "text" iff it declares an encoding. | capdag.test.js:932 |
+| test067 | `test067_isText` | TEST067: Text-representability is now carried by the orthogonal `enc=` tag (the old text marker and isText() are gone). A media is "text" iff it declares an encoding. | capdag.test.js:932 |
 | test068 | `test068_isVoid` | TEST068: Test is_void returns true when void flag or type=void tag is present | capdag.test.js:945 |
 | test0069 | `test0069_JS_mediaUrnsForExtension` | TEST0069: J s media urns for extension | capdag.test.js:1680 |
 | test0070 | `test0070_JS_getExtensionMappings` | TEST0070: J s get extension mappings | capdag.test.js:1709 |
@@ -269,7 +269,7 @@ This catalog lists all tests in the JS codebase.
 | test307 | `test307_modelAvailabilityUrn` | TEST307: Test model_availability_urn builds valid cap URN with correct op and media defs | capdag.test.js:1589 |
 | test308 | `test308_modelPathUrn` | TEST308: Test model_path_urn builds valid cap URN with correct op and media defs | capdag.test.js:1601 |
 | test309 | `test309_modelAvailabilityAndPathAreDistinct` | TEST309: Test model_availability_urn and model_path_urn produce distinct URNs | capdag.test.js:1613 |
-| test310 | `test310_llmGenerateTextUrn` | TEST310: llm_generate_text_urn() produces a valid cap URN with textable in/out specs | capdag.test.js:1620 |
+| test310 | `test310_llmGenerateTextUrn` | TEST310: llm_generate_text_urn() produces a valid cap URN with enc=utf-8 in/out specs | capdag.test.js:1620 |
 | test312 | `test312_allUrnBuildersProduceValidUrns` | TEST312: Test all URN builders produce parseable cap URNs | capdag.test.js:1643 |
 | test320 | `test320_cartridgeInfoConstruction` | TEST320-335: CartridgeRepoServer and CartridgeRepoClient tests | capdag.test.js:2007 |
 | test321 | `test321_cartridgeInfoIsSigned` | TEST321: CartridgeInfo.is_signed() returns true when signature is present | capdag.test.js:2041 |
