@@ -900,12 +900,12 @@ function validateEditorGraphPayload(data) {
 //   {
 //     "strands": [
 //       {
-//         "nodes": [{"id": "n0", "urn": "media:pdf"}, ...],
+//         "nodes": [{"id": "n0", "urn": "media:ext=pdf"}, ...],
 //         "edges": [{
 //           "alias": "edge_0",
 //           "cap_urn": "...",
 //           "is_loop": false,
-//           "assignment": [{"cap_arg_media_urn": "media:pdf", "source_node": "n0"}, ...],
+//           "assignment": [{"cap_arg_media_urn": "media:ext=pdf", "source_node": "n0"}, ...],
 //           "target_node": "n1"
 //         }, ...],
 //         "input_anchor_nodes": ["n0"],

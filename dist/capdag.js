@@ -2411,7 +2411,7 @@ const MediaDefErrorCodes = {
  * - `record` marker: presence = has internal fields, absence = opaque (default)
  *
  * Examples:
- * - `media:pdf` → scalar, opaque (no markers)
+ * - `media:ext=pdf` → scalar, opaque (no markers)
  * - `media:textable;list` → list, opaque (has list marker)
  * - `media:json;textable;record` → scalar, record (has record marker)
  * - `media:json;list;record;textable` → list of records (has both markers)
@@ -2677,7 +2677,7 @@ class MediaUrn {
 
   /**
    * Parse a media URN string. Validates the prefix is 'media'.
-   * @param {string} str - The media URN string (e.g., "media:pdf")
+   * @param {string} str - The media URN string (e.g., "media:ext=pdf")
    * @returns {MediaUrn}
    * @throws {MediaUrnError} If prefix is not 'media'
    */
@@ -3327,7 +3327,7 @@ function buildExtensionIndex(mediaDefs) {
  *
  * @example
  * const urns = mediaUrnsForExtension('pdf', mediaDefs);
- * // May return ['media:pdf']
+ * // May return ['media:ext=pdf']
  */
 function mediaUrnsForExtension(extension, mediaDefs) {
   const index = buildExtensionIndex(mediaDefs);
