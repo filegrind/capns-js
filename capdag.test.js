@@ -33,7 +33,10 @@ const {
   MEDIA_COLLECTION, MEDIA_COLLECTION_LIST,
   MEDIA_DECISION,
   MEDIA_AUDIO_SPEECH,
-  CAP_IDENTITY
+  CAP_IDENTITY,
+  ALIAS_TARGET_CAP, ALIAS_TARGET_MEDIA,
+  tokenIsUrn, isAliasToken, normalizeAliasName, classifyAliasTarget,
+  StoredAlias, Manifest
 } = require('./capdag.js');
 
 // ============================================================================
@@ -6377,6 +6380,64 @@ function test1848_capVersionNonZeroOnWire() {
   assertEqual(restored.version, 42, 'Restored version must equal 42');
 }
 
+// ===========================================================================
+// Fabric alias tests (shared numbers 1880-1882, 1887)
+//
+// Shared test numbers test the same behavior, with the same method, across
+// every capdag implementation. This lightweight JS mirror provides the alias
+// primitives + Manifest (de)serialization; the registry-resolution tests
+// (1888-1892) and notation-parser tests (1883-1886) belong to the mirrors
+// that implement the full registry/resolver pipeline.
+// ===========================================================================
+
+// TEST1880: alias name normalization lowercases and accepts the allowed char
+// class; rejects colon, whitespace, and out-of-class chars.
+function test1880_aliasNameNormalizationRules() {
+  assertEqual(normalizeAliasName('JSONDoc'), 'jsondoc', 'lowercases');
+  assertEqual(normalizeAliasName('pdf2text'), 'pdf2text', 'plain name');
+  assertEqual(normalizeAliasName('my.alias-1_x'), 'my.alias-1_x', 'allowed punctuation');
+  for (const bad of ['', 'pdf:text', 'my alias', 'a/b']) {
+    let threw = false;
+    try { normalizeAliasName(bad); } catch (_) { threw = true; }
+    assert(threw, `normalizeAliasName must reject ${JSON.stringify(bad)}`);
+  }
+}
+
+// TEST1881: URN-vs-alias detection keys purely on the presence of ':'.
+function test1881_tokenUrnVsAliasDetection() {
+  assert(tokenIsUrn('cap:in="media:ext=pdf";extract;out="media:enc=utf-8"'), 'cap URN is a URN');
+  assert(tokenIsUrn('media:fmt=json;record'), 'media URN is a URN');
+  assert(!tokenIsUrn('pdf2text'), 'bare name is not a URN');
+  assert(isAliasToken('pdf2text'), 'bare name is an alias token');
+  assert(!isAliasToken('media:enc=utf-8'), 'media URN is not an alias token');
+}
+
+// TEST1882: alias target classification distinguishes cap from media by
+// prefix and rejects a non-URN target.
+function test1882_classifyAliasTargetByPrefix() {
+  assertEqual(classifyAliasTarget('media:fmt=json;record'), ALIAS_TARGET_MEDIA, 'media target');
+  assertEqual(
+    classifyAliasTarget('cap:effect=patch;in="media:image";name;out="media:ext=png;image"'),
+    ALIAS_TARGET_CAP, 'cap target');
+  assertEqual(classifyAliasTarget('not-a-urn'), null, 'non-URN target is null');
+}
+
+// TEST1887: the Manifest type round-trips an `aliases` map.
+function test1887_manifestSerdeRoundTripsAliases() {
+  const body = '{"version":1,"previous":0,"caps":{},"media":{},"aliases":{"pdf2text":3,"jsondoc":1}}';
+  const m = Manifest.fromJSON(JSON.parse(body));
+  assertEqual(m.aliases['pdf2text'], 3, 'pdf2text defver');
+  assertEqual(m.aliases['jsondoc'], 1, 'jsondoc defver');
+  const back = m.toJSON();
+  assertEqual(back.aliases['pdf2text'], 3, 'round-trip pdf2text');
+  assertEqual(back.aliases['jsondoc'], 1, 'round-trip jsondoc');
+
+  // A StoredAlias round-trips its wire shape.
+  const a = StoredAlias.fromJSON({ name: 'pdf2text', target: 'cap:effect=none', version: 3 });
+  assertEqual(a.target, 'cap:effect=none', 'alias target');
+  assertEqual(JSON.stringify(a.toJSON()), '{"name":"pdf2text","target":"cap:effect=none","version":3}', 'alias wire shape');
+}
+
 // ============================================================================
 // Test runner
 // ============================================================================
@@ -6837,6 +6898,11 @@ async function runTests() {
   // Cap.version round-trip tests
   runTest('TEST1847: cap_version_zero_omitted_on_wire',     test1847_capVersionZeroOmittedOnWire);
   runTest('TEST1848: cap_version_nonzero_on_wire',          test1848_capVersionNonZeroOnWire);
+
+  runTest('TEST1880: alias_name_normalization_rules',       test1880_aliasNameNormalizationRules);
+  runTest('TEST1881: token_urn_vs_alias_detection',         test1881_tokenUrnVsAliasDetection);
+  runTest('TEST1882: classify_alias_target_by_prefix',      test1882_classifyAliasTargetByPrefix);
+  runTest('TEST1887: manifest_serde_round_trips_aliases',   test1887_manifestSerdeRoundTripsAliases);
 
   // Summary
   console.log(`\n${passCount + failCount} tests: ${passCount} passed, ${failCount} failed`);

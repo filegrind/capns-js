@@ -7551,8 +7551,139 @@ class FabricRegistryClient {
   }
 }
 
+// ===========================================================================
+// Aliases (the DNS-analogue translation layer over URNs)
+// ===========================================================================
+//
+// An alias is a first-class fabric definition: a short, contiguous,
+// case-insensitive name that resolves to exactly one cap or media URN. This
+// lightweight JS mirror provides the pure alias primitives (name rules,
+// URN-vs-alias detection, target classification), the StoredAlias wire shape,
+// and Manifest (de)serialization of the aliases map — the pieces the web UIs
+// and LSP need to recognize and present aliases. Full registry-side alias
+// resolution lives in the heavier mirrors (Rust/Go/Py/ObjC).
+
+const ALIAS_TARGET_CAP = 'cap';
+const ALIAS_TARGET_MEDIA = 'media';
+const ALIAS_NAME_RE = /^[a-z0-9._-]+$/;
+
+/**
+ * A contiguous token "looks like a URN" iff it contains ':'. Every tagged URN
+ * has the shape prefix:..., so the presence of ':' is the unambiguous
+ * discriminator between a URN and an alias name.
+ */
+function tokenIsUrn(token) {
+  return typeof token === 'string' && token.includes(':');
+}
+
+/** Complement of tokenIsUrn: a colon-free token is an alias candidate. */
+function isAliasToken(token) {
+  return !tokenIsUrn(token);
+}
+
+/**
+ * Normalize and validate an alias name. Lowercases the input, then requires it
+ * non-empty, free of ':' (so it can never look like a tagged URN), free of
+ * whitespace, and matching [a-z0-9._-]+. Returns the canonical lowercased
+ * name or throws — there is no lenient path.
+ */
+function normalizeAliasName(name) {
+  if (typeof name !== 'string' || name.length === 0) {
+    throw new Error('alias name is empty');
+  }
+  if (name.includes(':')) {
+    throw new Error(`alias name '${name}' contains ':' — aliases must never look like a tagged URN`);
+  }
+  if (/\s/.test(name)) {
+    throw new Error(`alias name '${name}' contains whitespace`);
+  }
+  const lowered = name.toLowerCase();
+  if (!ALIAS_NAME_RE.test(lowered)) {
+    throw new Error(`alias name '${name}' contains invalid characters; allowed: lowercase letters, digits, '.', '_', '-'`);
+  }
+  return lowered;
+}
+
+/**
+ * Classify an alias target URN by prefix. Returns 'cap', 'media', or null
+ * (not a cap/media URN).
+ */
+function classifyAliasTarget(target) {
+  try {
+    CapUrn.fromString(target);
+    return ALIAS_TARGET_CAP;
+  } catch (_) { /* not a cap URN */ }
+  try {
+    MediaUrn.fromString(target);
+    return ALIAS_TARGET_MEDIA;
+  } catch (_) { /* not a media URN */ }
+  return null;
+}
+
+/**
+ * The published wire/cache shape of a single fabric alias. Mirrors
+ * fabric/alias.schema.json: { name, target, version }.
+ */
+class StoredAlias {
+  constructor(name, target, version) {
+    this.name = name;
+    this.target = target;
+    this.version = version;
+  }
+  toJSON() {
+    return { name: this.name, target: this.target, version: this.version };
+  }
+  static fromJSON(obj) {
+    return new StoredAlias(obj.name, obj.target, obj.version);
+  }
+}
+
+/**
+ * A versioned registry snapshot. Mirrors fabric/manifest.schema.json:
+ * { version, previous, caps, media, aliases } where each map is
+ * name/urn -> defver.
+ */
+class Manifest {
+  constructor(version, previous, caps = {}, media = {}, aliases = {}) {
+    this.version = version;
+    this.previous = previous;
+    this.caps = caps;
+    this.media = media;
+    this.aliases = aliases;
+  }
+  static empty(version) {
+    return new Manifest(version, Math.max(0, version - 1), {}, {}, {});
+  }
+  toJSON() {
+    return {
+      version: this.version,
+      previous: this.previous,
+      caps: this.caps,
+      media: this.media,
+      aliases: this.aliases,
+    };
+  }
+  static fromJSON(obj) {
+    return new Manifest(
+      obj.version,
+      obj.previous,
+      obj.caps || {},
+      obj.media || {},
+      obj.aliases || {},
+    );
+  }
+}
+
 // Export for CommonJS
 module.exports = {
+  ALIAS_TARGET_CAP,
+  ALIAS_TARGET_MEDIA,
+  tokenIsUrn,
+  isAliasToken,
+  normalizeAliasName,
+  classifyAliasTarget,
+  StoredAlias,
+  Manifest,
   CapUrn,
   CapKind,
   CapEffect,
