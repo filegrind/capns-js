@@ -139,7 +139,7 @@ function makeGraphCap(inUrn, outUrn, title) {
 // cap_urn.rs: TEST001-TEST050, TEST890-TEST891
 // ============================================================================
 
-// TEST001: Test that cap URN is created with tags parsed correctly and direction specs accessible
+// TEST1: Test that cap URN is created with tags parsed correctly and direction specs accessible
 function test001_capUrnCreation() {
   const cap = CapUrn.fromString(test6204_Urn('generate;ext=pdf;target=thumbnail'));
   assert(cap.hasMarkerTag('generate'), 'Should get op tag');
@@ -149,7 +149,7 @@ function test001_capUrnCreation() {
   assertEqual(cap.getOutSpec(), MEDIA_OBJECT, 'Should get outSpec');
 }
 
-// TEST002: Test that missing 'in' or 'out' defaults to media: wildcard
+// TEST2: Test that missing 'in' or 'out' defaults to media: wildcard
 function test002_directionSpecsRequired() {
   const missingIn = CapUrn.fromString('cap:in=media:;out=media:void;test');
   assertEqual(missingIn.getInSpec(), MEDIA_IDENTITY, 'Missing in should default to media:');
@@ -160,7 +160,7 @@ function test002_directionSpecsRequired() {
   assertEqual(missingOut.getOutSpec(), MEDIA_IDENTITY, 'Missing out should default to media:');
 }
 
-// TEST003: Test that direction specs must match exactly, different in/out types don't match, wildcard matches any
+// TEST3: Test that direction specs must match exactly, different in/out types don't match, wildcard matches any
 function test003_directionMatching() {
   const cap = CapUrn.fromString(test6204_Urn('generate'));
   const request = CapUrn.fromString(test6204_Urn('generate'));
@@ -175,9 +175,7 @@ function test003_directionMatching() {
   assert(wildcardCap.accepts(request), 'Wildcard direction should match any');
 }
 
-// TEST004: Test that unquoted keys and values are normalized to lowercase.
-// Key lookup is case-insensitive: uppercase variants of `ext` resolve
-// to the same keyed tag.
+// TEST4: Test that unquoted keys and values are normalized to lowercase
 function test004_unquotedValuesLowercased() {
   const cap = CapUrn.fromString('cap:ext=pdf;generate;in=media:void;out="media:enc=utf-8;record"');
   assert(cap.hasMarkerTag('generate'), 'Unquoted value should be lowercased');
@@ -185,33 +183,33 @@ function test004_unquotedValuesLowercased() {
   assertEqual(cap.getTag('EXT'), 'pdf', 'Key lookup should be case-insensitive');
 }
 
-// TEST005: Test that quoted values preserve case while unquoted are lowercased
+// TEST5: Test that quoted values preserve case while unquoted are lowercased
 function test005_quotedValuesPreserveCase() {
   const cap = CapUrn.fromString('cap:in="media:void";key="HelloWorld";out="media:void"');
   assertEqual(cap.getTag('key'), 'HelloWorld', 'Quoted value should preserve case');
 }
 
-// TEST006: Test that quoted values can contain special characters (semicolons, equals, spaces)
+// TEST6: Test that quoted values can contain special characters (semicolons, equals, spaces)
 function test006_quotedValueSpecialChars() {
   const cap = CapUrn.fromString('cap:in="media:void";key="val;ue=with spaces";out="media:void"');
   assertEqual(cap.getTag('key'), 'val;ue=with spaces', 'Quoted value should preserve special chars');
 }
 
-// TEST007: Test that escape sequences in quoted values (\" and \\) are parsed correctly
+// TEST7: Test that escape sequences in quoted values (\" and \\) are parsed correctly
 function test007_quotedValueEscapeSequences() {
   const s = String.raw`cap:in="media:void";key="val\"ue\\test";out="media:void"`;
   const cap = CapUrn.fromString(s);
   assertEqual(cap.getTag('key'), 'val"ue\\test', 'Escaped quote and backslash should be unescaped');
 }
 
-// TEST008: Test that mixed quoted and unquoted values in same URN parse correctly
+// TEST8: Test that mixed quoted and unquoted values in same URN parse correctly
 function test008_mixedQuotedUnquoted() {
   const cap = CapUrn.fromString('cap:a=simple;b="Quoted";in="media:void";out="media:void"');
   assertEqual(cap.getTag('a'), 'simple', 'Unquoted value should be lowercase');
   assertEqual(cap.getTag('b'), 'Quoted', 'Quoted value should preserve case');
 }
 
-// TEST009: Test that unterminated quote produces UnterminatedQuote error
+// TEST9: Test that unterminated quote produces UnterminatedQuote error
 function test009_unterminatedQuoteError() {
   let threw = false;
   try {
@@ -224,7 +222,7 @@ function test009_unterminatedQuoteError() {
   assert(threw, 'Unterminated quote should produce CapUrnError');
 }
 
-// TEST010: Test that invalid escape sequences (like \n, \x) produce InvalidEscapeSequence error
+// TEST10: Test that invalid escape sequences (like \n, \x) produce InvalidEscapeSequence error
 function test010_invalidEscapeSequenceError() {
   let threw = false;
   try {
@@ -238,7 +236,7 @@ function test010_invalidEscapeSequenceError() {
   assert(threw, 'Invalid escape sequence should produce CapUrnError');
 }
 
-// TEST011: Test that serialization uses smart quoting (no quotes for simple lowercase, quotes for special chars/uppercase)
+// TEST11: Test that serialization uses smart quoting (no quotes for simple lowercase, quotes for special chars/uppercase)
 function test011_serializationSmartQuoting() {
   const cap = CapUrn.fromString('cap:a=simple;b="Has Space";in="media:void";out="media:void"');
   const s = cap.toString();
@@ -247,7 +245,7 @@ function test011_serializationSmartQuoting() {
   assert(s.includes('b="Has Space"'), 'Value with space should be quoted');
 }
 
-// TEST012: Test that simple cap URN round-trips (parse -> serialize -> parse equals original)
+// TEST12: Test that simple cap URN round-trips (parse -> serialize -> parse equals original)
 function test012_roundTripSimple() {
   const original = CapUrn.fromString(test6204_Urn('generate;ext=pdf'));
   const serialized = original.toString();
@@ -255,7 +253,7 @@ function test012_roundTripSimple() {
   assert(original.equals(reparsed), 'Simple round-trip should produce equal URN');
 }
 
-// TEST013: Test that quoted values round-trip preserving case and spaces
+// TEST13: Test that quoted values round-trip preserving case and spaces
 function test013_roundTripQuoted() {
   const original = CapUrn.fromString('cap:in="media:void";key="HelloWorld";out="media:void"');
   const serialized = original.toString();
@@ -264,7 +262,7 @@ function test013_roundTripQuoted() {
   assertEqual(reparsed.getTag('key'), 'HelloWorld', 'Quoted value should survive round-trip');
 }
 
-// TEST014: Test that escape sequences round-trip correctly
+// TEST14: Test that escape sequences round-trip correctly
 function test014_roundTripEscapes() {
   const s = String.raw`cap:in="media:void";key="val\"ue\\test";out="media:void"`;
   const original = CapUrn.fromString(s);
@@ -274,7 +272,7 @@ function test014_roundTripEscapes() {
   assertEqual(reparsed.getTag('key'), 'val"ue\\test', 'Escaped value should survive round-trip');
 }
 
-// TEST015: Test that cap: prefix is required and case-insensitive
+// TEST15: Test that cap: prefix is required and case-insensitive
 function test015_capPrefixRequired() {
   assertThrows(
     () => CapUrn.fromString('in="media:void";out="media:void";generate'),
@@ -286,7 +284,7 @@ function test015_capPrefixRequired() {
   assert(cap.hasMarkerTag('generate'), 'Should parse with valid cap: prefix');
 }
 
-// TEST016: Test that trailing semicolon is equivalent (same hash, same string, matches)
+// TEST16: Test that trailing semicolon is equivalent (same hash, same string, matches)
 function test016_trailingSemicolonEquivalence() {
   const cap1 = CapUrn.fromString(test6204_Urn('generate;ext=pdf'));
   const cap2 = CapUrn.fromString(test6204_Urn('generate;ext=pdf') + ';');
@@ -294,16 +292,7 @@ function test016_trailingSemicolonEquivalence() {
   assertEqual(cap1.toString(), cap2.toString(), 'Canonical forms should match');
 }
 
-// TEST939: The canonical form drops `in=media:` and `out=media:`
-// segments. Every spelling of "the same cap with wildcard in/out"
-// collapses to one byte-identical canonical string. This is the
-// contract that makes registry lookups work: the cap-publisher hashes
-// `<canonical-urn>` to compute the cache key, and every language port
-// (Rust, Go, Python, JS, ObjC) must agree on the canonical form for
-// cross-language lookups to land on the same key. A regression that
-// emitted the wildcard segments would silently move the published cap
-// to a different SHA-256 bucket, 404'ing every reader that hashes the
-// canonical form.
+// TEST939: The canonical form drops `in=media:` and `out=media:` segments. Every spelling of "the same cap with wildcard in/out" collapses to one byte-identical canonical string. This is the contract that makes registry lookups work: the cap-publisher hashes `<canonical-urn>` to compute the cache key, and every language port (Rust, Go, Python, JS, ObjC) must agree on the canonical form for cross-language lookups to land on the same key. A regression that emitted the wildcard segments would silently move the published cap to a different SHA-256 bucket, 404'ing every reader that hashes the canonical form.
 function test939_capUrnCanonicalFormDropsWildcardInOut() {
   const canonical = 'cap:decimate-sequence';
   const variants = [
@@ -331,7 +320,7 @@ function test939_capUrnCanonicalFormDropsWildcardInOut() {
   assert(identity.toString() !== 'cap:', 'cap:effect=none must not collapse to the illegal bare top form');
 }
 
-// TEST017: Test tag matching: exact match, subset match, wildcard match, value mismatch
+// TEST17: Test tag matching: exact match, subset match, wildcard match, value mismatch
 function test017_tagMatching() {
   const cap = CapUrn.fromString(test6204_Urn('generate;ext=pdf;target=thumbnail'));
 
@@ -355,14 +344,14 @@ function test017_tagMatching() {
   assert(!mismatch.accepts(cap), 'Reverse mismatch should also reject');
 }
 
-// TEST018: Test that quoted values with different case do NOT match (case-sensitive)
+// TEST18: Test that quoted values with different case do NOT match (case-sensitive)
 function test018_matchingCaseSensitiveValues() {
   const cap = CapUrn.fromString('cap:in="media:void";key="HelloWorld";out="media:void"');
   const request = CapUrn.fromString('cap:in="media:void";key=helloworld;out="media:void"');
   assert(!cap.accepts(request), 'Quoted HelloWorld should not match unquoted helloworld');
 }
 
-// TEST019: Missing tag in instance causes rejection — pattern's tags are constraints
+// TEST19: Missing tag in instance causes rejection — pattern's tags are constraints
 function test019_missingTagHandling() {
   const cap = CapUrn.fromString(test6204_Urn('generate'));
   const request = CapUrn.fromString(test6204_Urn('ext=pdf'));
@@ -412,8 +401,7 @@ function test020_specificity() {
     'out=record=2, in=*->0, y=test marker=2 -> 20002');
 }
 
-// TEST021: Test builder creates cap URN with marker + keyed tags and direction specs.
-// `op` is no longer a special key — operation names are markers (value-less tags).
+// TEST21: Test builder creates cap URN with correct tags and direction specs
 function test021_builder() {
   const cap = new CapUrnBuilder()
     .inSpec('media:void')
@@ -427,7 +415,7 @@ function test021_builder() {
   assertEqual(cap.getOutSpec(), 'media:object', 'Builder should set outSpec');
 }
 
-// TEST022: Test builder requires both in_spec and out_spec
+// TEST22: Test builder requires both in_spec and out_spec
 function test022_builderRequiresDirection() {
   assertThrows(
     () => new CapUrnBuilder().tag('op', 'test').build(),
@@ -441,7 +429,7 @@ function test022_builderRequiresDirection() {
   );
 }
 
-// TEST023: Test builder lowercases keys but preserves value case
+// TEST23: Test builder lowercases keys but preserves value case
 function test023_builderPreservesCase() {
   const cap = new CapUrnBuilder()
     .inSpec('media:void')
@@ -452,7 +440,7 @@ function test023_builderPreservesCase() {
   assertEqual(cap.getTag('MyKey'), 'MyValue', 'getTag should be case-insensitive for keys');
 }
 
-// TEST024: Directional accepts — pattern's tags are constraints, instance must satisfy
+// TEST24: Directional accepts — pattern's tags are constraints, instance must satisfy
 function test024_compatibility() {
   const cap1 = CapUrn.fromString(test6204_Urn('generate;ext=pdf'));
   const cap2 = CapUrn.fromString(test6204_Urn('generate;format=*'));
@@ -472,7 +460,7 @@ function test024_compatibility() {
   assert(broadIn.accepts(cap1), 'Wildcard input should accept specific input');
 }
 
-// TEST025: Test find_best_match returns most specific matching cap
+// TEST25: Test find_best_match returns most specific matching cap
 function test025_bestMatch() {
   const caps = [
     CapUrn.fromString('cap:in=*;out=*;op'),
@@ -485,7 +473,7 @@ function test025_bestMatch() {
   assertEqual(best.getTag('ext'), 'pdf', 'Best match should be the most specific (ext=pdf)');
 }
 
-// TEST026: Test merge combines tags from both caps, subset keeps only specified tags
+// TEST26: Test merge combines tags from both caps, subset keeps only specified tags
 function test026_mergeAndSubset() {
   const cap1 = CapUrn.fromString(test6204_Urn('generate'));
   const cap2 = CapUrn.fromString('cap:in="media:enc=utf-8";ext=pdf;format=binary;out="media:"');
@@ -504,7 +492,7 @@ function test026_mergeAndSubset() {
   assertEqual(sub.getInSpec(), 'media:enc=utf-8', 'Subset should preserve inSpec');
 }
 
-// TEST027: Test with_wildcard_tag sets tag to wildcard, including in/out
+// TEST27: Test with_wildcard_tag sets tag to wildcard, including in/out
 function test027_wildcardTag() {
   const cap = CapUrn.fromString(test6204_Urn('ext=pdf'));
   const wildcardExt = cap.withWildcardTag('ext');
@@ -517,7 +505,7 @@ function test027_wildcardTag() {
   assertEqual(wildcardOut.getOutSpec(), 'media:', 'Should set out to canonical top media:');
 }
 
-// TEST028: Test empty cap URN is illegal
+// TEST28: Test empty cap URN is illegal after effect transition
 function test028_emptyCapUrnNotAllowed() {
   assertThrows(
     () => CapUrn.fromString('cap:'),
@@ -526,7 +514,7 @@ function test028_emptyCapUrnNotAllowed() {
   );
 }
 
-// TEST029: Test minimal valid cap URN has just in and out, empty tags
+// TEST29: Test minimal valid cap URN has just in and out, empty tags
 function test029_minimalCapUrn() {
   const minimal = CapUrn.fromString('cap:in="media:void";out="media:void"');
   assertEqual(Object.keys(minimal.tags).length, 0, 'Should have no other tags');
@@ -534,14 +522,14 @@ function test029_minimalCapUrn() {
   assertEqual(minimal.getOutSpec(), 'media:void', 'Should have outSpec');
 }
 
-// TEST030: Test extended characters (forward slashes, colons) in tag values
+// TEST30: Test extended characters (forward slashes, colons) in tag values
 function test030_extendedCharacterSupport() {
   const cap = CapUrn.fromString(test6204_Urn('url=https://example_org/api;path=/some/file'));
   assertEqual(cap.getTag('url'), 'https://example_org/api', 'Should support colons and slashes');
   assertEqual(cap.getTag('path'), '/some/file', 'Should support forward slashes');
 }
 
-// TEST031: Test wildcard rejected in keys but accepted in values
+// TEST31: Test wildcard rejected in keys but accepted in values
 function test031_wildcardRestrictions() {
   assertThrows(
     () => CapUrn.fromString(test6204_Urn('*=value')),
@@ -559,7 +547,7 @@ function test031_wildcardRestrictions() {
   assertEqual(capWild.getOutSpec(), MEDIA_IDENTITY, 'Wildcard outSpec should normalize to media:');
 }
 
-// TEST032: Test duplicate keys are rejected with DuplicateKey error
+// TEST32: Test duplicate keys are rejected with DuplicateKey error
 function test032_duplicateKeyRejection() {
   assertThrows(
     () => CapUrn.fromString(test6204_Urn('key=value1;key=value2')),
@@ -568,7 +556,7 @@ function test032_duplicateKeyRejection() {
   );
 }
 
-// TEST033: Test pure numeric keys rejected, mixed alphanumeric allowed, numeric values allowed
+// TEST33: Test pure numeric keys rejected, mixed alphanumeric allowed, numeric values allowed
 function test033_numericKeyRestriction() {
   assertThrows(
     () => CapUrn.fromString(test6204_Urn('123=value')),
@@ -582,7 +570,7 @@ function test033_numericKeyRestriction() {
   assertEqual(cap2.getTag('x123key'), 'value', 'Mixed alphanumeric key should be allowed');
 }
 
-// TEST034: Test empty values are rejected
+// TEST34: Test empty values are rejected
 function test034_emptyValueError() {
   let threw = false;
   try {
@@ -595,7 +583,7 @@ function test034_emptyValueError() {
   assert(threw, 'Empty value (key=) should be rejected');
 }
 
-// TEST035: Test has_tag is case-sensitive for values, case-insensitive for keys, works for in/out
+// TEST35: Test has_tag is case-sensitive for values, case-insensitive for keys, works for in/out
 function test035_hasTagCaseSensitive() {
   const cap = CapUrn.fromString('cap:in="media:void";key="Value";out="media:void"');
   assert(cap.hasTag('key', 'Value'), 'hasTag should match exact value');
@@ -607,14 +595,14 @@ function test035_hasTagCaseSensitive() {
   assert(cap.hasTag('out', 'media:void'), 'hasTag should work for out');
 }
 
-// TEST036: Test with_tag preserves value case
+// TEST36: Test with_tag preserves value case
 function test036_withTagPreservesValue() {
   const cap = CapUrn.fromString('cap:in="media:void";out="media:void"');
   const modified = cap.withTag('key', 'MyValue');
   assertEqual(modified.getTag('key'), 'MyValue', 'withTag should preserve value case');
 }
 
-// TEST037: Test with_tag rejects empty value
+// TEST37: Test with_tag rejects empty value
 function test037_withTagRejectsEmptyValue() {
   const cap = CapUrn.fromString('cap:in="media:void";out="media:void"');
   assertThrows(
@@ -624,7 +612,7 @@ function test037_withTagRejectsEmptyValue() {
   );
 }
 
-// TEST038: Test semantic equivalence of unquoted and quoted simple lowercase values
+// TEST38: Test semantic equivalence of unquoted and quoted simple lowercase values
 function test038_semanticEquivalence() {
   const c1 = CapUrn.fromString('cap:in="media:void";key=simple;out="media:void"');
   const c2 = CapUrn.fromString('cap:in="media:void";key="simple";out="media:void"');
@@ -632,7 +620,7 @@ function test038_semanticEquivalence() {
   assertEqual(c1.getTag('key'), c2.getTag('key'), 'Values should be identical');
 }
 
-// TEST039: Test get_tag returns direction specs (in/out) with case-insensitive lookup
+// TEST39: Test get_tag returns direction specs (in/out) with case-insensitive lookup
 function test039_getTagReturnsDirectionSpecs() {
   const cap = CapUrn.fromString(`cap:in="${MEDIA_VOID}";out="${MEDIA_OBJECT}"`);
   assertEqual(cap.getTag('in'), MEDIA_VOID, 'getTag(in) should return inSpec');
@@ -641,14 +629,14 @@ function test039_getTagReturnsDirectionSpecs() {
   assertEqual(cap.getTag('OUT'), MEDIA_OBJECT, 'getTag(OUT) should return outSpec (case-insensitive)');
 }
 
-// TEST040: Matching semantics - exact match succeeds
+// TEST40: Matching semantics - exact match succeeds
 function test040_matchingSemanticsExactMatch() {
   const cap = CapUrn.fromString(test6204_Urn('generate;ext=pdf'));
   const request = CapUrn.fromString(test6204_Urn('generate;ext=pdf'));
   assert(cap.accepts(request), 'Exact match should accept');
 }
 
-// TEST041: Matching semantics - cap missing tag matches (implicit wildcard)
+// TEST41: Matching semantics - cap missing tag matches (implicit wildcard)
 function test041_matchingSemanticsCapMissingTag() {
   const cap = CapUrn.fromString(test6204_Urn('generate'));
   const request = CapUrn.fromString(test6204_Urn('generate;ext=pdf'));
@@ -656,7 +644,7 @@ function test041_matchingSemanticsCapMissingTag() {
   assert(!request.accepts(cap), 'Pattern requiring ext should reject instance missing ext');
 }
 
-// TEST042: Pattern rejects instance missing required tags
+// TEST42: Pattern rejects instance missing required tags
 function test042_matchingSemanticsCapHasExtraTag() {
   const cap = CapUrn.fromString(test6204_Urn('generate;ext=pdf;version=2'));
   const request = CapUrn.fromString(test6204_Urn('generate;ext=pdf'));
@@ -664,28 +652,28 @@ function test042_matchingSemanticsCapHasExtraTag() {
   assert(request.accepts(cap), 'General request should accept refined instance');
 }
 
-// TEST043: Matching semantics - request wildcard matches specific cap value
+// TEST43: Matching semantics - request wildcard matches specific cap value
 function test043_matchingSemanticsRequestHasWildcard() {
   const cap = CapUrn.fromString(test6204_Urn('generate;ext=pdf'));
   const request = CapUrn.fromString(test6204_Urn('generate;ext=*'));
   assert(cap.accepts(request), 'Request wildcard should match specific cap value');
 }
 
-// TEST044: Matching semantics - cap wildcard matches specific request value
+// TEST44: Matching semantics - cap wildcard matches specific request value
 function test044_matchingSemanticsCapHasWildcard() {
   const cap = CapUrn.fromString(test6204_Urn('generate;ext=*'));
   const request = CapUrn.fromString(test6204_Urn('generate;ext=pdf'));
   assert(cap.accepts(request), 'Cap wildcard should match specific request value');
 }
 
-// TEST045: Matching semantics - value mismatch does not match
+// TEST45: Matching semantics - value mismatch does not match
 function test045_matchingSemanticsValueMismatch() {
   const cap = CapUrn.fromString(test6204_Urn('generate;ext=pdf'));
   const request = CapUrn.fromString(test6204_Urn('generate;ext=docx'));
   assert(!cap.accepts(request), 'Value mismatch should not accept');
 }
 
-// TEST046: Matching semantics - fallback pattern (cap missing tag = implicit wildcard)
+// TEST46: Matching semantics - fallback pattern (cap missing tag = implicit wildcard)
 function test046_matchingSemanticsFallbackPattern() {
   const cap = CapUrn.fromString('cap:in="media:binary";generate-thumbnail;out="media:binary"');
   const request = CapUrn.fromString('cap:ext=wav;in="media:binary";generate-thumbnail;out="media:binary"');
@@ -693,21 +681,21 @@ function test046_matchingSemanticsFallbackPattern() {
   assert(!request.accepts(cap), 'Pattern requiring ext should reject instance missing ext');
 }
 
-// TEST047: Matching semantics - thumbnail fallback with void input
+// TEST47: Matching semantics - thumbnail fallback with void input
 function test047_matchingSemanticsThumbnailVoidInput() {
   const cap = CapUrn.fromString('cap:in="media:void";generate-thumbnail;out="media:ext=png;image;thumbnail"');
   const request = CapUrn.fromString('cap:ext=pdf;in="media:void";generate-thumbnail;out="media:image"');
   assert(cap.accepts(request), 'Void input cap should accept request; cap output conforms to less-specific request output');
 }
 
-// TEST048: Matching semantics - wildcard direction matches anything
+// TEST48: Matching semantics - wildcard direction matches anything
 function test048_matchingSemanticsWildcardDirection() {
   const cap = CapUrn.fromString('cap:generate');
   const request = CapUrn.fromString(test6204_Urn('generate;ext=pdf'));
   assert(cap.accepts(request), 'Generic declared directions should accept a more specific matching request');
 }
 
-// TEST049: Non-overlapping tags — neither direction accepts
+// TEST49: Non-overlapping tags — neither direction accepts
 function test049_matchingSemanticsCrossDimension() {
   const cap = CapUrn.fromString(test6204_Urn('generate'));
   const request = CapUrn.fromString(test6204_Urn('ext=pdf'));
@@ -715,7 +703,7 @@ function test049_matchingSemanticsCrossDimension() {
   assert(!request.accepts(cap), 'Pattern requiring ext should reject instance missing ext');
 }
 
-// TEST050: Matching semantics - direction mismatch prevents matching
+// TEST50: Matching semantics - direction mismatch prevents matching
 function test050_matchingSemanticsDirectionMismatch() {
   const cap = CapUrn.fromString(
     `cap:in="${MEDIA_STRING}";generate;out="${MEDIA_OBJECT}"`
@@ -776,10 +764,7 @@ function test890_directionSemanticMatching() {
     'Generic output cap must NOT satisfy specific output request');
 }
 
-// TEST891: Semantic direction specificity — more constraints in
-// either axis means a higher score under the truth-table-driven sum.
-// media: (top, no tags) scores 0; each marker tag scores 2; each
-// exact-value tag (e.g. ext=png) scores 4.
+// TEST891: Semantic direction specificity — more constraints in either axis means a higher score under the truth-table-driven sum. media: (top, no tags) scores 0; each marker tag scores 2; each exact tag scores 3.
 function test891_directionSemanticSpecificity() {
   const genericCap = CapUrn.fromString(
     'cap:in="media:";generate-thumbnail;out="media:ext=png;image;thumbnail"'
@@ -863,7 +848,7 @@ function test6220_xv5EmptyMediaDefsAllowed() {
 // media_urn.rs: TEST060-TEST078
 // ============================================================================
 
-// TEST060: Test wrong prefix fails with InvalidPrefix error showing expected and actual prefix
+// TEST60: Test wrong prefix fails with InvalidPrefix error showing expected and actual prefix
 function test060_wrongPrefixFails() {
   assertThrowsMediaUrn(
     () => MediaUrn.fromString('cap:string'),
@@ -876,7 +861,7 @@ function test060_wrongPrefixFails() {
 // vocabulary (isBinary() was deleted from MediaUrn; everything is bytes).
 // Encoding is now expressed by the orthogonal `enc=` tag, exercised by TEST067.
 
-// TEST062: Test is_record returns true when record marker tag is present indicating key-value structure
+// TEST62: Test is_record returns true when record marker tag is present indicating key-value structure
 function test062_isRecord() {
   assert(MediaUrn.fromString(MEDIA_OBJECT).isRecord(), 'MEDIA_OBJECT should be record');
   assert(MediaUrn.fromString('media:custom;record').isRecord(), 'custom;record should be record');
@@ -887,7 +872,7 @@ function test062_isRecord() {
   assert(!MediaUrn.fromString(MEDIA_STRING_LIST).isRecord(), 'MEDIA_STRING_LIST should not be record');
 }
 
-// TEST063: Test is_scalar returns true when list marker tag is absent (scalar is default)
+// TEST63: Test is_scalar returns true when list marker tag is absent (scalar is default)
 function test063_isScalar() {
   assert(MediaUrn.fromString(MEDIA_STRING).isScalar(), 'MEDIA_STRING should be scalar');
   assert(MediaUrn.fromString(MEDIA_INTEGER).isScalar(), 'MEDIA_INTEGER should be scalar');
@@ -900,7 +885,7 @@ function test063_isScalar() {
   assert(!MediaUrn.fromString(MEDIA_OBJECT_LIST).isScalar(), 'MEDIA_OBJECT_LIST should not be scalar');
 }
 
-// TEST064: Test is_list returns true when list marker tag is present indicating ordered collection
+// TEST64: Test is_list returns true when list marker tag is present indicating ordered collection
 function test064_isList() {
   assert(MediaUrn.fromString(MEDIA_STRING_LIST).isList(), 'MEDIA_STRING_LIST should be list');
   assert(MediaUrn.fromString(MEDIA_INTEGER_LIST).isList(), 'MEDIA_INTEGER_LIST should be list');
@@ -909,7 +894,7 @@ function test064_isList() {
   assert(!MediaUrn.fromString(MEDIA_OBJECT).isList(), 'MEDIA_OBJECT should not be list');
 }
 
-// TEST065: Test is_opaque returns true when record marker is absent (opaque is default)
+// TEST65: Test is_opaque returns true when record marker is absent (opaque is default)
 function test065_isOpaque() {
   assert(MediaUrn.fromString(MEDIA_STRING).isOpaque(), 'MEDIA_STRING should be opaque');
   assert(MediaUrn.fromString(MEDIA_STRING_LIST).isOpaque(), 'MEDIA_STRING_LIST (list but no record) should be opaque');
@@ -920,7 +905,7 @@ function test065_isOpaque() {
   assert(!MediaUrn.fromString(MEDIA_JSON).isOpaque(), 'MEDIA_JSON should not be opaque');
 }
 
-// TEST066: Test is_json returns true only when fmt=json content-format tag is present
+// TEST66: Test is_json returns true only when json marker tag is present for JSON representation
 function test066_isJson() {
   assert(MediaUrn.fromString(MEDIA_JSON).isJson(), 'MEDIA_JSON should be json');
   assert(MediaUrn.fromString('media:custom;fmt=json').isJson(), 'fmt=json should be json');
@@ -929,9 +914,7 @@ function test066_isJson() {
   assert(!MediaUrn.fromString('media:enc=utf-8').isJson(), 'plain text should not be json');
 }
 
-// TEST067: Text-representability is now carried by the orthogonal `enc=` tag
-// (the old text marker and isText() are gone). A media is "text" iff it
-// declares an encoding.
+// TEST67: Text-representability is now carried by the orthogonal `enc=` tag (the old `textable` marker and is_text() are gone). A media is "text" iff it declares an encoding. enc is orthogonal to format/numeric, so only media that actually carry enc= are text.
 function test067_isText() {
   // Has enc= → text-representable
   assert(MediaUrn.fromString(MEDIA_STRING).getTag('enc') !== undefined, 'MEDIA_STRING should have enc');
@@ -944,7 +927,7 @@ function test067_isText() {
   assert(MediaUrn.fromString(MEDIA_OBJECT).getTag('enc') === undefined, 'MEDIA_OBJECT should not have enc');
 }
 
-// TEST068: Test is_void returns true when void flag or type=void tag is present
+// TEST68: Test is_void returns true when void flag or type=void tag is present
 function test068_isVoid() {
   assert(MediaUrn.fromString('media:void').isVoid(), 'media:void should be void');
   assert(!MediaUrn.fromString(MEDIA_STRING).isVoid(), 'MEDIA_STRING should not be void');
@@ -952,7 +935,7 @@ function test068_isVoid() {
 
 // TEST069-TEST6240: N/A for JS (Rust-only binary_media_urn_for_ext/text_media_urn_for_ext)
 
-// TEST071: Test to_string roundtrip ensures serialization and deserialization preserve URN structure
+// TEST71: Test to_string roundtrip ensures serialization and deserialization preserve URN structure
 function test071_toStringRoundtrip() {
   const constants = [MEDIA_STRING, MEDIA_INTEGER, MEDIA_OBJECT, MEDIA_IDENTITY, MEDIA_PDF, MEDIA_JSON];
   for (const constant of constants) {
@@ -962,7 +945,7 @@ function test071_toStringRoundtrip() {
   }
 }
 
-// TEST072: Test all media URN constants parse successfully as valid media URNs
+// TEST72: Test all media URN constants parse successfully as valid media URNs
 function test072_constantsParse() {
   const constants = [
     MEDIA_STRING, MEDIA_INTEGER, MEDIA_NUMBER, MEDIA_BOOLEAN,
@@ -982,7 +965,7 @@ function test072_constantsParse() {
 
 // TEST6242: N/A for JS (Rust has binary_media_urn_for_ext/text_media_urn_for_ext)
 
-// TEST074: Test media URN conforms_to using tagged URN semantics with specific and generic requirements
+// TEST74: Test media URN conforms_to using tagged URN semantics with specific and generic requirements
 function test074_mediaUrnMatching() {
   const pdfUrn = MediaUrn.fromString(MEDIA_PDF);
   const pdfPattern = MediaUrn.fromString('media:ext=pdf');
@@ -996,7 +979,7 @@ function test074_mediaUrnMatching() {
   assert(pdfUrn.conformsTo(pdfUrn), 'Same URN should conform to itself');
 }
 
-// TEST075: Test accepts with implicit wildcards where handlers with fewer tags can handle more requests
+// TEST75: Test accepts with implicit wildcards where handlers with fewer tags can handle more requests
 function test075_accepts() {
   const handler = MediaUrn.fromString(MEDIA_PDF);
   const sameReq = MediaUrn.fromString(MEDIA_PDF);
@@ -1007,7 +990,7 @@ function test075_accepts() {
   assert(generalHandler.accepts(specificReq), 'General handler should accept specific request');
 }
 
-// TEST076: Test specificity increases with more tags for ranking conformance
+// TEST76: Test specificity increases with more tags for ranking conformance
 function test076_specificity() {
   const s1 = MediaUrn.fromString('media:');
   const s2 = MediaUrn.fromString('media:ext=pdf');
@@ -1016,7 +999,7 @@ function test076_specificity() {
   assert(s3.specificity() > s2.specificity(), 'image;png;thumbnail should be more specific than pdf');
 }
 
-// TEST077: Test serde roundtrip serializes to JSON string and deserializes back correctly
+// TEST77: Test serde roundtrip serializes to JSON string and deserializes back correctly
 function test077_serdeRoundtrip() {
   const original = MediaUrn.fromString(MEDIA_PDF);
   const json = JSON.stringify({ urn: original.toString() });
@@ -1025,7 +1008,7 @@ function test077_serdeRoundtrip() {
   assert(original.equals(restored), 'JSON round-trip should preserve MediaUrn');
 }
 
-// TEST078: conforms_to behavior between MEDIA_OBJECT and MEDIA_STRING
+// TEST78: conforms_to behavior between MEDIA_OBJECT and MEDIA_STRING
 function test078_debugMatchingBehavior() {
   const objUrn = MediaUrn.fromString(MEDIA_OBJECT);
   const strUrn = MediaUrn.fromString(MEDIA_STRING);
@@ -1040,7 +1023,7 @@ function test078_debugMatchingBehavior() {
 // TEST6279: N/A for JS
 // TEST6280: N/A for JS
 
-// TEST6282: Test resolving custom media URN from local media_defs takes precedence over registry
+// TEST6282: Test resolving a custom media URN from a registry-seeded media def
 function test6282_resolveCustomMediaDef() {
   const mediaDefs = [
     { urn: 'media:custom-json', media_type: 'application/json', title: 'Custom JSON', profile_uri: 'https://example.com/schema/custom' }
@@ -1050,7 +1033,7 @@ function test6282_resolveCustomMediaDef() {
   assertEqual(spec.profile, 'https://example.com/schema/custom', 'Should have custom profile');
 }
 
-// TEST6283: Test resolving custom record media def with schema from local media_defs
+// TEST6283: Test resolving a custom record media def carrying a schema from a registry-seeded media def
 function test6283_resolveCustomWithSchema() {
   const mediaDefs = [
     {
@@ -1067,8 +1050,8 @@ function test6283_resolveCustomWithSchema() {
   assertEqual(spec.schema.type, 'object', 'Schema should have correct type');
 }
 
-// TEST6284: Test resolving unknown media URN fails with UnresolvableMediaUrn error
-function test6284_resolveUnresolvableFailsHard() {
+// TEST93: Test resolving unknown media URN fails with UnresolvableMediaUrn error
+function test93_resolveUnresolvableFailsHard() {
   let caught = false;
   try {
     resolveMediaUrn('media:nonexistent', []);
@@ -1086,8 +1069,8 @@ function test6284_resolveUnresolvableFailsHard() {
 // TEST6292: N/A for JS (Rust validation function)
 // TEST6294: N/A for JS
 
-// TEST6297: Test ResolvedMediaDef is_binary returns true when enc tag is absent
-function test6297_resolvedIsBinary() {
+// TEST99: Test ResolvedMediaDef is_binary returns true when enc tag is absent
+function test99_resolvedIsBinary() {
   const spec = new MediaDef('application/octet-stream', null, null, 'Binary', null, MEDIA_IDENTITY);
   assert(spec.isBinary(), 'Resolved binary spec should be binary');
 }
@@ -1116,8 +1099,8 @@ function test103_resolvedIsJson() {
   assert(spec.isJSON(), 'Resolved json spec should be JSON');
 }
 
-// TEST6298: Test ResolvedMediaDef is_text returns true when enc tag is present
-function test6298_resolvedIsText() {
+// TEST104: Test ResolvedMediaDef is_text returns true when enc tag is present
+function test104_resolvedIsText() {
   const spec = new MediaDef('text/plain', null, null, 'String', null, MEDIA_STRING);
   assert(spec.isText(), 'Resolved string spec should be text');
 }
@@ -1619,7 +1602,7 @@ function test309_modelAvailabilityAndPathAreDistinct() {
   assert(avail.toString() !== path.toString(), 'availability and path must be distinct');
 }
 
-// TEST310: llm_generate_text_urn() produces a valid cap URN with enc=utf-8 in/out specs
+// TEST310: llm_generate_text_urn() produces a valid cap URN with a UTF-8 text input and plain-text terminal output.
 function test310_llmGenerateTextUrn() {
   const urn = llmGenerateTextUrn();
   assert(urn.hasMarkerTag('generate_text'), 'Must have generate_text marker');
@@ -2007,7 +1990,7 @@ const sampleRegistry = {
 };
 
 // TEST320-335: CartridgeRepoServer and CartridgeRepoClient tests
-function test6550_cartridgeInfoConstruction() {
+function test320_cartridgeInfoConstruction() {
   const data = {
     id: 'testcartridge',
     name: 'Test Cartridge',
@@ -2040,7 +2023,7 @@ function test6550_cartridgeInfoConstruction() {
   assert(cartridge.allCaps().length === 1, 'allCaps() should return 1 cap');
 }
 
-// TEST321: CartridgeInfo.is_signed() returns true when signature is present
+// TEST321: CartridgeInfo.is_signed() returns true when signature (team_id + signed_at) is present, false when either is empty.
 function test321_cartridgeInfoIsSigned() {
   const signed = new CartridgeInfo({id: 'test', registryUrl: 'https://test.example/manifest', channel: 'release', teamId: 'TEAM', signedAt: '2026-01-01', cap_groups: []});
   assert(signed.isSigned() === true, 'Cartridge with teamId and signedAt should be signed');
@@ -2052,7 +2035,7 @@ function test321_cartridgeInfoIsSigned() {
   assert(unsigned2.isSigned() === false, 'Cartridge without signedAt should not be signed');
 }
 
-// TEST322: CartridgeInfo.build_for_platform() returns the build matching the current platform
+// TEST322: CartridgeInfo.build_for_platform() returns the build that matches the requested platform string and None otherwise.
 function test322_cartridgeInfoBuildForPlatform() {
   const withBuilds = new CartridgeInfo({
     id: 'test', registryUrl: 'https://test.example/manifest', channel: 'release', version: '1.0.0', cap_groups: [],
@@ -2123,10 +2106,8 @@ function test323_cartridgeRepoServerValidateRegistry() {
   assert(threw, 'Should throw when nightly channel is missing');
 }
 
-// TEST6557: CartridgeRepoServer walks both channels and emits a flat
-// CartridgeInfo array preserving channel provenance. Release entries
-// appear first.
-function test6557_cartridgeRepoServerTransformToArray() {
+// TEST324: CartridgeRepoServer transforms a v4.0 entry into a flat CartridgeInfo, preserving cap_groups verbatim.
+function test324_cartridgeRepoServerTransformToArray() {
   const server = new CartridgeRepoServer(sampleRegistry);
   const cartridges = server.transformToCartridgeArray();
 
@@ -2162,8 +2143,7 @@ function test6557_cartridgeRepoServerTransformToArray() {
   assert(firstNightlyIdx > lastReleaseIdx, 'Release entries must precede nightly entries');
 }
 
-// TEST325: CartridgeRepoServer.getCartridges() wraps the transformed
-// flat array (across both channels) in the response envelope.
+// TEST325: get_cartridges() wraps the transformed array in the response envelope.
 function test325_cartridgeRepoServerGetCartridges() {
   const server = new CartridgeRepoServer(sampleRegistry);
   const response = server.getCartridges();
@@ -2175,9 +2155,7 @@ function test325_cartridgeRepoServerGetCartridges() {
     'Every cartridge must carry a channel');
 }
 
-// TEST326: CartridgeRepoServer.getCartridgeById() requires (channel,
-// id). Same id looked up in the wrong channel must miss — channels are
-// independent namespaces.
+// TEST326: get_cartridge_by_id requires a channel and returns Some for a known (channel, id), None otherwise. The same id looked up in the wrong channel must miss — channels are independent namespaces.
 function test326_cartridgeRepoServerGetCartridgeById() {
   const server = new CartridgeRepoServer(sampleRegistry);
 
@@ -2207,10 +2185,8 @@ function test326_cartridgeRepoServerGetCartridgeById() {
   assert(threw, 'Should throw for invalid channel');
 }
 
-// TEST6563: CartridgeRepoServer.searchCartridges() filters across both
-// channels by name/description/tags/cap titles. Cap URN strings are
-// not substring-matched.
-function test6563_cartridgeRepoServerSearchCartridges() {
+// TEST327: search_cartridges matches against name/description/tags and cap titles, but never against cap URN strings.
+function test327_cartridgeRepoServerSearchCartridges() {
   const server = new CartridgeRepoServer(sampleRegistry);
 
   const pdfResults = server.searchCartridges('pdf');
@@ -2230,9 +2206,9 @@ function test6563_cartridgeRepoServerSearchCartridges() {
   assert(noResults.length === 0, 'Should return empty for no matches');
 }
 
-// TEST6565: CartridgeRepoServer.getCartridgesByCategory() filters
+// TEST328: CartridgeRepoServer.getCartridgesByCategory() filters
 // cartridges by category across both channels.
-function test6565_cartridgeRepoServerGetByCategory() {
+function test328_cartridgeRepoServerGetByCategory() {
   const server = new CartridgeRepoServer(sampleRegistry);
 
   const docCartridges = server.getCartridgesByCategory('document');
@@ -2248,10 +2224,10 @@ function test6565_cartridgeRepoServerGetByCategory() {
   assert(dataCartridges[0].channel === 'nightly', 'Should be the nightly entry');
 }
 
-// TEST6568: CartridgeRepoServer.getCartridgesByCap() parses the input
+// TEST329: CartridgeRepoServer.getCartridgesByCap() parses the input
 // URN and matches each declared cap via `conformsTo`. Tag-order
 // differences resolve because matching is order-theoretic, not string.
-function test6568_cartridgeRepoServerGetByCap() {
+function test329_cartridgeRepoServerGetByCap() {
   const server = new CartridgeRepoServer(sampleRegistry);
 
   const disbindCap = 'cap:in="media:ext=pdf";disbind;out="media:disbound-page;enc=utf-8;list"';
@@ -2265,10 +2241,10 @@ function test6568_cartridgeRepoServerGetByCap() {
   assert(metadataCartridges.length === 1, 'Should find metadata cap');
 }
 
-// TEST6570: CartridgeRepoClient updates its local cache keyed by
+// TEST330: CartridgeRepoClient updates its local cache keyed by
 // "<channel>:<id>". The cache holds release and nightly entries
 // independently — the same id is allowed in both.
-function test6570_cartridgeRepoClientUpdateCache() {
+function test330_cartridgeRepoClientUpdateCache() {
   const client = new CartridgeRepoClient(3600);
   const server = new CartridgeRepoServer(sampleRegistry);
   const cartridges = server.transformToCartridgeArray().map(p => new CartridgeInfo(p));
@@ -2294,9 +2270,9 @@ function test6570_cartridgeRepoClientUpdateCache() {
   assert(cache.capToCartridges.size > 0, 'Should have cap mappings');
 }
 
-// TEST6572: CartridgeRepoClient.getSuggestionsForCap() returns cartridge
+// TEST331: CartridgeRepoClient.getSuggestionsForCap() returns cartridge
 // suggestions with channel propagated onto each suggestion.
-function test6572_cartridgeRepoClientGetSuggestions() {
+function test331_cartridgeRepoClientGetSuggestions() {
   const client = new CartridgeRepoClient(3600);
   const server = new CartridgeRepoServer(sampleRegistry);
   const cartridges = server.transformToCartridgeArray().map(p => new CartridgeInfo(p));
@@ -2324,9 +2300,8 @@ function test6572_cartridgeRepoClientGetSuggestions() {
   assert(nightlySuggestions[0].channel === 'nightly', 'Should report nightly channel');
 }
 
-// TEST6575: CartridgeRepoClient.getCartridge() requires (channel, id).
-// Same id in the wrong channel must miss.
-function test6575_cartridgeRepoClientGetCartridge() {
+// TEST332: get_cartridge requires a (channel, id) pair and returns the cached entry for known pairs, None otherwise. The same id in the wrong channel must miss.
+function test332_cartridgeRepoClientGetCartridge() {
   const client = new CartridgeRepoClient(3600);
   const server = new CartridgeRepoServer(sampleRegistry);
   const cartridges = server.transformToCartridgeArray().map(p => new CartridgeInfo(p));
@@ -2369,9 +2344,8 @@ function test6575_cartridgeRepoClientGetCartridge() {
   assert(threw, 'Should throw for invalid channel');
 }
 
-// TEST6577: CartridgeRepoClient.getAllAvailableCaps() returns the set
-// of normalized URNs across both channels.
-function test6577_cartridgeRepoClientGetAllCaps() {
+// TEST333: get_all_available_caps returns the deduplicated set of normalized URNs across cartridges.
+function test333_cartridgeRepoClientGetAllCaps() {
   const client = new CartridgeRepoClient(3600);
   const server = new CartridgeRepoServer(sampleRegistry);
   const cartridges = server.transformToCartridgeArray().map(p => new CartridgeInfo(p));
@@ -2386,8 +2360,7 @@ function test6577_cartridgeRepoClientGetAllCaps() {
   assert(caps.every(c => typeof c === 'string'), 'All caps should be strings');
 }
 
-// TEST334: CartridgeRepoClient.needsSync() returns true when cache is
-// empty / stale, false right after a fresh update.
+// TEST334: needs_sync returns true on an empty cache, false right after a successful update.
 function test334_cartridgeRepoClientNeedsSync() {
   const client = new CartridgeRepoClient(1); // 1 second TTL
   const server = new CartridgeRepoServer(sampleRegistry);
@@ -2405,9 +2378,9 @@ function test334_cartridgeRepoClientNeedsSync() {
   assert(client.needsSync(urls) === false, 'Should not need sync right after update');
 }
 
-// TEST6582: Round-trip: server produces a v5.0 response, client consumes
+// TEST335: Round-trip: server produces a v5.0 response, client consumes
 // it, channel provenance is preserved end-to-end.
-function test6582_cartridgeRepoServerClientIntegration() {
+function test335_cartridgeRepoServerClientIntegration() {
   // Server creates API response
   const server = new CartridgeRepoServer(sampleRegistry);
   const apiResponse = server.getCartridges();
@@ -2489,8 +2462,7 @@ function cartridgeWithVersions(id, versions) {
   });
 }
 
-// TEST1849: latest version has a host build → Compatible, resolving to the
-// latest version and that platform's native-format package.
+// TEST1849: latest version has a host build → Compatible, resolving to the latest version and that platform's native-format package.
 function test1849_resolveForHostCompatibleLatest() {
   const cartridge = cartridgeWithVersions('c', [
     ['1.2.0', [['darwin-arm64', 'pkg', 'c-1.2.0.pkg'], ['linux-x86_64', 'deb', 'c-1.2.0.deb']]],
@@ -2506,9 +2478,7 @@ function test1849_resolveForHostCompatibleLatest() {
   assertEqual(r.hostPlatform, 'linux-x86_64', 'host platform echoed back');
 }
 
-// TEST1850: the latest version lacks a host build but an older version has one
-// → CompatibleOutdated, resolving to the NEWEST older version with a host build
-// (not the oldest), with a reason naming both the latest and the resolved.
+// TEST1850: the latest version lacks a host build but an older version has one → CompatibleOutdated, resolving to the older version with a reason naming both the latest and the resolved version.
 function test1850_resolveForHostCompatibleOutdated() {
   const cartridge = cartridgeWithVersions('c', [
     ['1.3.0', [['darwin-arm64', 'pkg', 'c-1.3.0.pkg']]],
@@ -2525,8 +2495,7 @@ function test1850_resolveForHostCompatibleOutdated() {
   assert(r.reason.includes('1.2.0'), `reason names the resolved: ${r.reason}`);
 }
 
-// TEST1851: no version ships a host build → Incompatible, no resolved
-// version/package, reason states the host platform.
+// TEST1851: no version ships a host build → Incompatible, no resolved version/package, reason states the host platform.
 function test1851_resolveForHostIncompatible() {
   const cartridge = cartridgeWithVersions('c', [
     ['1.2.0', [['darwin-arm64', 'pkg', 'c-1.2.0.pkg']]],
@@ -2540,9 +2509,7 @@ function test1851_resolveForHostIncompatible() {
   assert(r.reason.includes('windows-x86_64'), `reason names the host platform: ${r.reason}`);
 }
 
-// TEST1852: a host build whose packages[] is empty AND has no legacy `package`
-// ships no installer; resolution must SKIP it (not resolve to an un-downloadable
-// version) and fall through to an older usable version.
+// TEST1852: a host build whose packages[] is empty AND has no legacy `package` ships no installer; resolution must SKIP it (not resolve to an un-downloadable version) and fall through to an older usable version.
 function test1852_resolveForHostSkipsBuildWithNoInstaller() {
   const cartridge = cartridgeWithVersions('c', [
     ['2.0.0', [['linux-x86_64', 'deb', 'c-2.0.0.deb']]],
@@ -2560,8 +2527,7 @@ function test1852_resolveForHostSkipsBuildWithNoInstaller() {
   assertEqual(r.resolvedPackage.name, 'c-1.0.0.deb', 'resolves to 1.0.0 deb package');
 }
 
-// TEST1853: hostPlatform() returns a normalized {os}-{arch} string with arch
-// aarch64/arm64 mapped to arm64 — the exact form the registry uses.
+// TEST1853: host_platform() returns a normalized {os}-{arch} string with arch aarch64 mapped to arm64 — the exact form the registry uses.
 function test1853_hostPlatformNormalizedForm() {
   const p = hostPlatform();
   const dash = p.indexOf('-');
@@ -2577,23 +2543,21 @@ function test1853_hostPlatformNormalizedForm() {
 // Build-env registry identity (manifest.rs: TEST1872-TEST1874)
 // ============================================================================
 
-// TEST6738: a non-empty MFR_CARTRIDGE_REGISTRY_URL passes through verbatim —
+// TEST1872: a non-empty MFR_CARTRIDGE_REGISTRY_URL passes through verbatim —
 // a published build reports exactly the URL it was compiled with.
-function test6738_registryUrlFromBuildEnvPassesThroughNonempty() {
+function test1872_registryUrlFromBuildEnvPassesThroughNonempty() {
   const url = 'https://cartridges.machinefabric.com/manifest';
   assertEqual(registryUrlFromBuildEnv(url), url, 'non-empty URL passes through verbatim');
 }
 
-// TEST6740: an unset env (null/undefined) yields null — a dev build has no
+// TEST1873: an unset env (null/undefined) yields null — a dev build has no
 // baked registry and loads only `dev/` cartridges.
-function test6740_registryUrlFromBuildEnvNoneForDev() {
+function test1873_registryUrlFromBuildEnvNoneForDev() {
   assert(registryUrlFromBuildEnv(null) === null, 'null env → null (dev build)');
   assert(registryUrlFromBuildEnv(undefined) === null, 'absent env → null (dev build)');
 }
 
-// TEST1874: an exported-but-empty env ('') is neither a dev build nor a valid
-// identity and MUST fail hard, so the build can never silently hash the empty
-// string into a fake registry slug.
+// TEST1874: an exported-but-empty env (`Some("")`) is neither a dev build nor a valid identity and MUST fail hard at compile time, so the build can never silently hash the empty string into a fake registry slug. We assert the panic rather than letting a bogus empty primary registry ship.
 function test1874_registryUrlFromBuildEnvRejectsEmptyString() {
   let threw = false;
   try {
@@ -2751,8 +2715,8 @@ async function test1878_bundledProviderWithoutBakedHashIsRejected() {
 // media_urn.rs: TEST1294-TEST1302 (MediaUrn predicates)
 // ============================================================================
 
-// TEST1312: is_image returns true only when image marker tag is present
-function test1312_isImage() {
+// TEST546: is_image returns true only when image marker tag is present
+function test546_isImage() {
   assert(MediaUrn.fromString(MEDIA_PNG).isImage(), 'MEDIA_PNG should be image');
   assert(MediaUrn.fromString('media:ext=png;image;thumbnail').isImage(), 'media:ext=png;image;thumbnail should be image');
   assert(MediaUrn.fromString('media:ext=jpg;image').isImage(), 'media:ext=jpg;image should be image');
@@ -2763,8 +2727,8 @@ function test1312_isImage() {
   assert(!MediaUrn.fromString(MEDIA_VIDEO).isImage(), 'MEDIA_VIDEO should not be image');
 }
 
-// TEST1313: is_audio returns true only when audio marker tag is present
-function test1313_isAudio() {
+// TEST547: is_audio returns true only when audio marker tag is present
+function test547_isAudio() {
   assert(MediaUrn.fromString(MEDIA_AUDIO).isAudio(), 'MEDIA_AUDIO should be audio');
   assert(MediaUrn.fromString(MEDIA_AUDIO_SPEECH).isAudio(), 'MEDIA_AUDIO_SPEECH should be audio');
   assert(MediaUrn.fromString('media:audio;ext=mp3').isAudio(), 'media:audio;ext=mp3 should be audio');
@@ -2774,8 +2738,8 @@ function test1313_isAudio() {
   assert(!MediaUrn.fromString(MEDIA_STRING).isAudio(), 'MEDIA_STRING should not be audio');
 }
 
-// TEST1314: is_video returns true only when video marker tag is present
-function test1314_isVideo() {
+// TEST548: is_video returns true only when video marker tag is present
+function test548_isVideo() {
   assert(MediaUrn.fromString(MEDIA_VIDEO).isVideo(), 'MEDIA_VIDEO should be video');
   assert(MediaUrn.fromString('media:ext=mp4;video').isVideo(), 'media:ext=mp4;video should be video');
   // Non-video types
@@ -2784,8 +2748,8 @@ function test1314_isVideo() {
   assert(!MediaUrn.fromString(MEDIA_STRING).isVideo(), 'MEDIA_STRING should not be video');
 }
 
-// TEST1315: is_numeric returns true only when numeric marker tag is present
-function test1315_isNumeric() {
+// TEST549: is_numeric returns true only when numeric marker tag is present
+function test549_isNumeric() {
   assert(MediaUrn.fromString(MEDIA_INTEGER).isNumeric(), 'MEDIA_INTEGER should be numeric');
   assert(MediaUrn.fromString(MEDIA_NUMBER).isNumeric(), 'MEDIA_NUMBER should be numeric');
   assert(MediaUrn.fromString(MEDIA_INTEGER_LIST).isNumeric(), 'MEDIA_INTEGER_LIST should be numeric');
@@ -2796,8 +2760,8 @@ function test1315_isNumeric() {
   assert(!MediaUrn.fromString(MEDIA_IDENTITY).isNumeric(), 'MEDIA_IDENTITY should not be numeric');
 }
 
-// TEST1298: is_bool returns true only when bool marker tag is present
-function test1298_isBool() {
+// TEST550: is_bool returns true only when bool marker tag is present
+function test550_isBool() {
   assert(MediaUrn.fromString(MEDIA_BOOLEAN).isBool(), 'MEDIA_BOOLEAN should be bool');
   assert(MediaUrn.fromString(MEDIA_BOOLEAN_LIST).isBool(), 'MEDIA_BOOLEAN_LIST should be bool');
   // MEDIA_DECISION is now a JSON record type (not bool)
@@ -2808,10 +2772,8 @@ function test1298_isBool() {
   assert(!MediaUrn.fromString(MEDIA_IDENTITY).isBool(), 'MEDIA_IDENTITY should not be bool');
 }
 
-// TEST1299: isFilePath returns true for the single file-path media URN,
-// false for everything else. There is no "array" variant — cardinality is
-// carried by is_sequence on the wire, not by URN tags.
-function test1299_isFilePath() {
+// TEST551: is_file_path returns true for the single file-path media URN, false for everything else. There is no "array" variant — cardinality is carried by is_sequence on the wire, not by URN tags.
+function test551_isFilePath() {
   assert(MediaUrn.fromString(MEDIA_FILE_PATH).isFilePath(), 'MEDIA_FILE_PATH should be file-path');
   assert(!MediaUrn.fromString(MEDIA_STRING).isFilePath(), 'MEDIA_STRING should not be file-path');
   assert(!MediaUrn.fromString(MEDIA_IDENTITY).isFilePath(), 'MEDIA_IDENTITY should not be file-path');
@@ -2829,8 +2791,8 @@ function test6272_isCollection() {
 
 // TEST557: N/A for JS (audio_media_urn_for_ext helper not in JS)
 
-// TEST1302: predicates are consistent with constants — every constant triggers exactly the expected predicates
-function test1302_predicateConstantConsistency() {
+// TEST558: predicates are consistent with constants — every constant triggers exactly the expected predicates
+function test558_predicateConstantConsistency() {
   // MEDIA_INTEGER must be numeric, scalar, NOT enc-bearing/bool/image/list.
   // Integers carry no enc= (a number is not a character-encoded string).
   const intUrn = MediaUrn.fromString(MEDIA_INTEGER);
@@ -2868,8 +2830,8 @@ function test1302_predicateConstantConsistency() {
 // cap_urn.rs: TEST1303-TEST1307 (CapUrn tier tests)
 // ============================================================================
 
-// TEST1303: without_tag removes tag, rejects structural keys, case-insensitive for keys
-function test1303_withoutTag() {
+// TEST559: without_tag removes tag, rejects structural keys, case-insensitive for keys
+function test559_withoutTag() {
   const cap = CapUrn.fromString('cap:in="media:void";test;ext=pdf;out="media:void"');
   const removed = cap.withoutTag('ext');
   assertEqual(removed.getTag('ext'), undefined, 'withoutTag should remove ext');
@@ -2888,8 +2850,8 @@ function test1303_withoutTag() {
   assert(same3.equals(cap), 'Removing non-existent tag is no-op');
 }
 
-// TEST1304: with_in_spec and with_out_spec change direction specs
-function test1304_withInOutSpec() {
+// TEST560: with_in_spec and with_out_spec change direction specs
+function test560_withInOutSpec() {
   const cap = CapUrn.fromString('cap:in="media:void";test;out="media:void"');
 
   const changedIn = cap.withInSpec('media:');
@@ -2918,8 +2880,8 @@ function test1304_withInOutSpec() {
 
 // TEST562: N/A for JS (canonical_option not in JS CapUrn)
 
-// TEST1305: CapMatcher::find_all_matches returns all matching caps sorted by specificity
-function test1305_findAllMatches() {
+// TEST563: CapMatcher::find_all_matches returns all matching caps sorted by specificity
+function test563_findAllMatches() {
   const caps = [
     CapUrn.fromString('cap:in="media:void";test;out="media:void"'),
     CapUrn.fromString('cap:in="media:void";test;ext=pdf;out="media:void"'),
@@ -2936,8 +2898,8 @@ function test1305_findAllMatches() {
   assertEqual(matches[0].getTag('ext'), 'pdf', 'Most specific match should have ext=pdf');
 }
 
-// TEST1306: CapMatcher::are_compatible detects bidirectional overlap
-function test1306_areCompatible() {
+// TEST564: CapMatcher::are_compatible detects bidirectional overlap
+function test564_areCompatible() {
   const caps1 = [
     CapUrn.fromString('cap:in="media:void";test;out="media:void"'),
   ];
@@ -2961,8 +2923,8 @@ function test1306_areCompatible() {
 
 // TEST565: N/A for JS (tags_to_string not in JS CapUrn)
 
-// TEST1307: with_tag rejects structural keys
-function test1307_withTagRejectsStructuralKeys() {
+// TEST566: with_tag rejects structural keys
+function test566_withTagRejectsStructuralKeys() {
   const cap = CapUrn.fromString('cap:in="media:void";test;out="media:void"');
   assertThrows(() => cap.withTag('in', 'media:'), ErrorCodes.INVALID_TAG_FORMAT, 'withTag must reject in');
   assertThrows(() => cap.withTag('out', 'media:'), ErrorCodes.INVALID_TAG_FORMAT, 'withTag must reject out');
@@ -3053,7 +3015,7 @@ function test6201_emptyCapIsIllegal() {
   );
 }
 
-// TEST640: cap:in collapses to the same illegal bare top form
+// TEST640: cap:in defaults to the same illegal bare top form
 function test640_inOnlyIsIllegal() {
   assertThrows(
     () => CapUrn.fromString('cap:in'),
@@ -3062,7 +3024,7 @@ function test640_inOnlyIsIllegal() {
   );
 }
 
-// TEST641: cap:out collapses to the same illegal bare top form
+// TEST641: cap:out defaults to the same illegal bare top form
 function test641_outOnlyIsIllegal() {
   assertThrows(
     () => CapUrn.fromString('cap:out'),
@@ -3071,7 +3033,7 @@ function test641_outOnlyIsIllegal() {
   );
 }
 
-// TEST642: cap:in;out collapses to the same illegal bare top form
+// TEST642: cap:in;out becomes the same illegal bare top form
 function test642_inOutWithoutValuesAreIllegal() {
   assertThrows(
     () => CapUrn.fromString('cap:in;out'),
@@ -3188,7 +3150,7 @@ function test6621_capIdentityConstantWorks() {
   );
 }
 
-// TEST653: invalid effect=none declarations fail at construction.
+// TEST653: invalid effect=none declarations fail at construction
 function test653_invalidEffectNoneDeclarationRejected() {
   assertThrows(
     () => CapUrn.fromString('cap:in="media:ext=pdf";effect=none;out="media:enc=utf-8"'),
@@ -3197,8 +3159,8 @@ function test653_invalidEffectNoneDeclarationRejected() {
   );
 }
 
-// TEST654: effect=none preserves runtime media identity.
-function test654_effectNonePreservesRuntimeMedia() {
+// TEST125: effect=none preserves runtime media identity
+function test125_effectNonePreservesRuntimeMedia() {
   const decimate = CapUrn.fromString('cap:decimate-sequence;effect=none');
   const png = MediaUrn.fromString('media:ext=png;image');
   const pdf = MediaUrn.fromString('media:ext=pdf');
@@ -3206,8 +3168,8 @@ function test654_effectNonePreservesRuntimeMedia() {
   assertEqual(decimate.inferRuntimeOutputMedia(pdf).toString(), pdf.toString(), 'effect=none should preserve pdf');
 }
 
-// TEST655: default effect=declared does not preserve runtime refinements.
-function test655_effectDeclaredUsesDeclaredOutput() {
+// TEST126: default effect=declared uses the declared output
+function test126_effectDeclaredUsesDeclaredOutput() {
   const resize = CapUrn.fromString('cap:in=media:image;out=media:image;resize');
   const png = MediaUrn.fromString('media:ext=png;image;width=4000');
   assertEqual(
@@ -3217,8 +3179,8 @@ function test655_effectDeclaredUsesDeclaredOutput() {
   );
 }
 
-// TEST656: invalid effect=none declarations fail hard at construction.
-function test656_invalidEffectNoneFailsHard() {
+// TEST127: invalid effect=none declarations fail hard
+function test127_invalidEffectNoneFailsHard() {
   assertThrows(
     () => CapUrn.fromString('cap:in="media:ext=pdf";effect=none;out="media:enc=utf-8"'),
     ErrorCodes.ILLEGAL_DECLARATION,
@@ -3226,8 +3188,8 @@ function test656_invalidEffectNoneFailsHard() {
   );
 }
 
-// TEST657: omitted effect means declared; unconstrained effect must be explicit.
-function test657_effectDispatchRequiresExplicitWildcard() {
+// TEST128: omitted effect means declared; unconstrained effect must be explicit
+function test128_effectDispatchRequiresExplicitWildcard() {
   const noneProvider = CapUrn.fromString('cap:effect=none');
   const declaredRequest = CapUrn.fromString('cap:raw');
   const anyRequest = CapUrn.fromString('cap:?effect');
@@ -6010,7 +5972,7 @@ function test6522_Renderer_validateResolvedMachinePayload_rejectsMissingFields()
 // surface, not a per-port detail.
 // ============================================================================
 
-// TEST1800: Identity classifier — only explicit effect=none qualifies.
+// TEST1800: Identity classifier — and only explicit effect=none qualifies.
 function test1800_kindIdentityOnlyForBareCap() {
   const identity = CapUrn.fromString('cap:effect=none');
   assertEqual(identity.kind(), CapKind.IDENTITY, 'cap:effect=none should be Identity');
@@ -6065,8 +6027,7 @@ function test1803_kindEffectWhenBothSidesVoid() {
     'in=void;out=void with empty y is still an Effect');
 }
 
-// TEST1804: Transform classifier — at least one side non-void, and
-// the cap is not the bare identity.
+// TEST1804: Transform classifier — at least one side non-void, and the cap is not the bare identity. The default kind for ordinary data-processing caps.
 function test1804_kindTransformForNormalDataProcessors() {
   const extract = CapUrn.fromString('cap:extract;in="media:ext=pdf";out="media:enc=utf-8;record"');
   assertEqual(extract.kind(), CapKind.TRANSFORM, 'extract is a Transform');
@@ -6076,12 +6037,7 @@ function test1804_kindTransformForNormalDataProcessors() {
     'fully generic in/out with a tag is a Transform, not Identity');
 }
 
-// TEST1810: media:void is atomic — refinements are parse errors.
-//
-// Mirrored across every language port (Rust, Go, Python, Swift/ObjC,
-// JS) under the SAME number. Any divergence is a wire-level
-// inconsistency — the unit type's atomicity is part of the protocol's
-// deepest layer, not a per-port detail.
+// TEST1810: media:void is atomic — refinements are parse errors. Mirrored across every language port (Rust, Go, Python, Swift/ObjC, JS) under the SAME number. Any divergence is a wire-level inconsistency — the unit type's atomicity is part of the protocol's deepest layer, not a per-port detail. The bare `media:void` parses successfully; any combination with another tag (marker or key=value) MUST fail with VoidNotAtomic. This forecloses a fake taxonomy of unit values; reasons or labels for *why* void is used belong on the cap URN's non-directional tags or in cap args.
 function test1810_mediaVoidIsAtomic() {
   // Bare void: must parse successfully.
   const bare = MediaUrn.fromString('media:void');
@@ -6114,9 +6070,7 @@ function test1810_mediaVoidIsAtomic() {
   }
 }
 
-// TEST1805: Kind is invariant under canonicalization. The same
-// morphism written in many surface forms must classify the same way
-// once parsed.
+// TEST1805: Kind is invariant under canonicalization. The same morphism written in many surface forms must classify the same way once parsed. This pins the rule that kind is a property of the cap as a structured object, not of any particular spelling.
 function test1805_kindInvariantUnderCanonicalSpellings() {
   const cases = [
     { a: 'cap:effect=none', b: 'cap:in=media:;out=media:;effect=none', expected: CapKind.IDENTITY },
@@ -6195,8 +6149,7 @@ function test1823_specificityExactValueIsFour() {
     'target=metadata (exact value) must score 4');
 }
 
-// TEST1824: All six forms compose additively on a single cap.
-// y combining 0+1+2+3+4+5 must sum to 15.
+// TEST1824: All six forms compose additively on a single cap. This pins the truth-table sum across the y axis as a whole.
 function test1824_specificityCombinedYAxis() {
   const cap = CapUrn.fromString('cap:!constrained;?target;extract;stage!=alpha;target2=metadata;ver?=draft');
   assertEqual(cap.specificity(), 15,
@@ -6217,10 +6170,7 @@ function test1830_canonicalizeNoConstraint() {
   }
 }
 
-// TEST1831: ?x=v and x?=v both canonicalize to x?=v. The third
-// hypothetical form `x=?v` is NOT recognized as a qualifier — a
-// value starting with `?` is just an exact value beginning with
-// a `?` character.
+// TEST1831: ?x=v and x?=v both canonicalize to x?=v. The third hypothetical form `x=?v` is NOT recognized as a qualifier — a value starting with `?` is just an exact value beginning with a `?` character.
 function test1831_canonicalizeAbsentOrNotValue() {
   const canonical = 'cap:x?=foo';
   for (const input of ['cap:?x=foo', 'cap:x?=foo']) {
@@ -6246,10 +6196,7 @@ function test1832_canonicalizeMustHaveAny() {
   }
 }
 
-// TEST1833: !x=v and x!=v both canonicalize to x!=v. The third
-// hypothetical form `x=!v` is NOT recognized as a qualifier — a
-// value starting with `!` is just an exact value beginning with
-// a `!` character.
+// TEST1833: !x=v and x!=v both canonicalize to x!=v. The third hypothetical form `x=!v` is NOT recognized as a qualifier — a value starting with `!` is just an exact value beginning with a `!` character.
 function test1833_canonicalizePresentNotValue() {
   const canonical = 'cap:x!=foo';
   for (const input of ['cap:!x=foo', 'cap:x!=foo']) {
@@ -6265,7 +6212,7 @@ function test1833_canonicalizePresentNotValue() {
   assertEqual(exact.getTag('x'), '!foo');
 }
 
-// TEST1834: x=v stays as x=v.
+// TEST1834: x=v stays as x=v (the lone exact-value form).
 function test1834_canonicalizeExactValue() {
   const cap = CapUrn.fromString('cap:x=foo');
   assertEqual(cap.toString(), 'cap:x=foo');
@@ -6281,8 +6228,8 @@ function test1835_canonicalizeMustNotHave() {
   }
 }
 
-// TEST6733: Full 6×6 truth table.
-function test6733_truthTableFullCrossProduct() {
+// TEST1842: Full 6×6 truth table.
+function test1842_truthTableFullCrossProduct() {
   const forms = ['', '?x', 'x?=v', 'x', 'x!=v', 'x=v', '!x'];
   // miss   ?x    x?=v   x      x!=v   x=v    !x
   const expected = [
@@ -6309,8 +6256,8 @@ function test6733_truthTableFullCrossProduct() {
   }
 }
 
-// TEST1843: Invalid qualifier combinations must be rejected.
-function test1843_rejectInvalidCombinations() {
+// TEST6734: Invalid qualifier combinations must be rejected.
+function test6734_rejectInvalidCombinations() {
   const invalid = [
     'cap:?x?=v', 'cap:!x!=v', 'cap:?!x', 'cap:!?x',
     'cap:?x=*', 'cap:!x=*',
@@ -6324,8 +6271,8 @@ function test1843_rejectInvalidCombinations() {
   }
 }
 
-// TEST1844: out-axis difference dominates combined in+y differences.
-function test1844_axisWeightingOutDominates() {
+// TEST6735: out-axis difference dominates combined in+y differences.
+function test6735_axisWeightingOutDominates() {
   const bigOut = CapUrn.fromString('cap:in=media:;out="media:enc=utf-8;record"');
   const bigInAndY = CapUrn.fromString(
     'cap:in="media:ext=pdf";out=media:record;!constrained;?target;extract;stage!=alpha;target2=metadata;ver?=draft'
@@ -6334,7 +6281,7 @@ function test1844_axisWeightingOutDominates() {
     'out-axis difference must dominate combined in+y differences');
 }
 
-// TEST1845: With equal out, in-axis dominates over y-axis.
+// TEST1845: With equal out-axis, in-axis dominates over y-axis.
 function test1845_axisWeightingInDominatesY() {
   const bigIn = CapUrn.fromString('cap:in="media:ext=pdf";out=media:record');
   const bigY = CapUrn.fromString(
@@ -6344,8 +6291,8 @@ function test1845_axisWeightingInDominatesY() {
     'in-axis difference must dominate y-axis');
 }
 
-// TEST1846: Decoded layout — 10000*out + 100*in + y.
-function test1846_axisWeightingDecodedLayout() {
+// TEST6736: Decoded layout — 10000*out + 100*in + y.
+function test6736_axisWeightingDecodedLayout() {
   const cap = CapUrn.fromString('cap:in="media:a;b";out="media:a;b;c;d";extract');
   // out=4 markers (8), in=2 markers (4), y=1 marker (2)
   // 10000*8 + 100*4 + 2 = 80402
@@ -6390,8 +6337,7 @@ function test1848_capVersionNonZeroOnWire() {
 // that implement the full registry/resolver pipeline.
 // ===========================================================================
 
-// TEST1880: alias name normalization lowercases and accepts the allowed char
-// class; rejects colon, whitespace, and out-of-class chars.
+// TEST1880: alias name normalization lowercases and accepts the allowed character class; rejects colon, whitespace, and out-of-class chars with the right error. A broken validator would let a URN-shaped or whitespace name through, or mangle a valid name.
 function test1880_aliasNameNormalizationRules() {
   assertEqual(normalizeAliasName('JSONDoc'), 'jsondoc', 'lowercases');
   assertEqual(normalizeAliasName('pdf2text'), 'pdf2text', 'plain name');
@@ -6403,7 +6349,7 @@ function test1880_aliasNameNormalizationRules() {
   }
 }
 
-// TEST1881: URN-vs-alias detection keys purely on the presence of ':'.
+// TEST1881: URN-vs-alias detection keys purely on the presence of ':'. The whole design rests on this discriminator being exact.
 function test1881_tokenUrnVsAliasDetection() {
   assert(tokenIsUrn('cap:in="media:ext=pdf";extract;out="media:enc=utf-8"'), 'cap URN is a URN');
   assert(tokenIsUrn('media:fmt=json;record'), 'media URN is a URN');
@@ -6412,8 +6358,7 @@ function test1881_tokenUrnVsAliasDetection() {
   assert(!isAliasToken('media:enc=utf-8'), 'media URN is not an alias token');
 }
 
-// TEST1882: alias target classification distinguishes cap from media by
-// prefix and rejects a non-URN target.
+// TEST1882: alias target classification distinguishes cap from media by prefix and rejects a non-URN target. The typed-boundary enforcement in the registry depends on this.
 function test1882_classifyAliasTargetByPrefix() {
   assertEqual(classifyAliasTarget('media:fmt=json;record'), ALIAS_TARGET_MEDIA, 'media target');
   assertEqual(
@@ -6532,17 +6477,17 @@ async function runTests() {
   // media_def.rs: TEST088-TEST110
   console.log('\n--- media_def.rs ---');
   console.log('  SKIP TEST088-090: N/A for JS (async registry, Rust-only)');
-  runTest('TEST091: resolve_custom_media_def', test6282_resolveCustomMediaDef);
-  runTest('TEST092: resolve_custom_with_schema', test6283_resolveCustomWithSchema);
-  runTest('TEST093: resolve_unresolvable_fails_hard', test6284_resolveUnresolvableFailsHard);
+  runTest('TEST6282: resolve_custom_media_def', test6282_resolveCustomMediaDef);
+  runTest('TEST6283: resolve_custom_with_schema', test6283_resolveCustomWithSchema);
+  runTest('TEST093: resolve_unresolvable_fails_hard', test93_resolveUnresolvableFailsHard);
   console.log('  SKIP TEST094: N/A for JS (no registry concept)');
   console.log('  SKIP TEST095-098: N/A for JS (Rust serde/validation)');
-  runTest('TEST099: resolved_is_binary', test6297_resolvedIsBinary);
+  runTest('TEST099: resolved_is_binary', test99_resolvedIsBinary);
   runTest('TEST100: resolved_is_record', test100_resolvedIsRecord);
   runTest('TEST101: resolved_is_scalar', test101_resolvedIsScalar);
   runTest('TEST102: resolved_is_list', test102_resolvedIsList);
   runTest('TEST103: resolved_is_json', test103_resolvedIsJson);
-  runTest('TEST104: resolved_is_text', test6298_resolvedIsText);
+  runTest('TEST104: resolved_is_text', test104_resolvedIsText);
   runTest('TEST105: metadata_propagation', test105_metadataPropagation);
   runTest('TEST106: metadata_with_validation', test106_metadataWithValidation);
   runTest('TEST107: extensions_propagation', test107_extensionsPropagation);
@@ -6608,22 +6553,22 @@ async function runTests() {
 
   // cartridge_repo: CartridgeRepoServer and CartridgeRepoClient tests
   console.log('\n--- cartridge_repo ---');
-  runTest('TEST6550: cartridge_info_construction', test6550_cartridgeInfoConstruction);
+  runTest('TEST320: cartridge_info_construction', test320_cartridgeInfoConstruction);
   runTest('TEST321: cartridge_info_is_signed', test321_cartridgeInfoIsSigned);
   runTest('TEST322: cartridge_info_build_for_platform', test322_cartridgeInfoBuildForPlatform);
   runTest('TEST323: cartridge_repo_server_validate_registry', test323_cartridgeRepoServerValidateRegistry);
-  runTest('TEST324: cartridge_repo_server_transform_to_array', test6557_cartridgeRepoServerTransformToArray);
+  runTest('TEST324: cartridge_repo_server_transform_to_array', test324_cartridgeRepoServerTransformToArray);
   runTest('TEST325: cartridge_repo_server_get_cartridges', test325_cartridgeRepoServerGetCartridges);
   runTest('TEST326: cartridge_repo_server_get_cartridge_by_id', test326_cartridgeRepoServerGetCartridgeById);
-  runTest('TEST327: cartridge_repo_server_search_cartridges', test6563_cartridgeRepoServerSearchCartridges);
-  runTest('TEST328: cartridge_repo_server_get_by_category', test6565_cartridgeRepoServerGetByCategory);
-  runTest('TEST329: cartridge_repo_server_get_by_cap', test6568_cartridgeRepoServerGetByCap);
-  runTest('TEST330: cartridge_repo_client_update_cache', test6570_cartridgeRepoClientUpdateCache);
-  runTest('TEST331: cartridge_repo_client_get_suggestions', test6572_cartridgeRepoClientGetSuggestions);
-  runTest('TEST332: cartridge_repo_client_get_cartridge', test6575_cartridgeRepoClientGetCartridge);
-  runTest('TEST333: cartridge_repo_client_get_all_caps', test6577_cartridgeRepoClientGetAllCaps);
+  runTest('TEST327: cartridge_repo_server_search_cartridges', test327_cartridgeRepoServerSearchCartridges);
+  runTest('TEST328: cartridge_repo_server_get_by_category', test328_cartridgeRepoServerGetByCategory);
+  runTest('TEST329: cartridge_repo_server_get_by_cap', test329_cartridgeRepoServerGetByCap);
+  runTest('TEST330: cartridge_repo_client_update_cache', test330_cartridgeRepoClientUpdateCache);
+  runTest('TEST331: cartridge_repo_client_get_suggestions', test331_cartridgeRepoClientGetSuggestions);
+  runTest('TEST332: cartridge_repo_client_get_cartridge', test332_cartridgeRepoClientGetCartridge);
+  runTest('TEST333: cartridge_repo_client_get_all_caps', test333_cartridgeRepoClientGetAllCaps);
   runTest('TEST334: cartridge_repo_client_needs_sync', test334_cartridgeRepoClientNeedsSync);
-  runTest('TEST335: cartridge_repo_server_client_integration', test6582_cartridgeRepoServerClientIntegration);
+  runTest('TEST335: cartridge_repo_server_client_integration', test335_cartridgeRepoServerClientIntegration);
 
   // cartridge_repo.rs: TEST1849-TEST1853 (host-compatibility resolution)
   console.log('\n--- cartridge_repo.rs (resolve_for_host) ---');
@@ -6635,8 +6580,8 @@ async function runTests() {
 
   // manifest.rs: TEST1872-TEST1874 (registry_url_from_build_env)
   console.log('\n--- manifest.rs (registry_url_from_build_env) ---');
-  runTest('TEST1872: registry_url_from_build_env_passes_through_nonempty', test6738_registryUrlFromBuildEnvPassesThroughNonempty);
-  runTest('TEST1873: registry_url_from_build_env_none_for_dev', test6740_registryUrlFromBuildEnvNoneForDev);
+  runTest('TEST1872: registry_url_from_build_env_passes_through_nonempty', test1872_registryUrlFromBuildEnvPassesThroughNonempty);
+  runTest('TEST1873: registry_url_from_build_env_none_for_dev', test1873_registryUrlFromBuildEnvNoneForDev);
   runTest('TEST1874: registry_url_from_build_env_rejects_empty_string', test1874_registryUrlFromBuildEnvRejectsEmptyString);
 
   // cartridge_discovery.rs: TEST1875-TEST1878 (scan-all discovery)
@@ -6648,21 +6593,21 @@ async function runTests() {
 
   // media_urn.rs: TEST1312-TEST1315, TEST1298-TEST1302 (MediaUrn predicates)
   console.log('\n--- media_urn.rs (predicates) ---');
-  runTest('TEST1312: is_image', test1312_isImage);
-  runTest('TEST1313: is_audio', test1313_isAudio);
-  runTest('TEST1314: is_video', test1314_isVideo);
-  runTest('TEST1315: is_numeric', test1315_isNumeric);
-  runTest('TEST1298: is_bool', test1298_isBool);
-  runTest('TEST1299: is_file_path', test1299_isFilePath);
-  runTest('TEST1302: predicate_constant_consistency', test1302_predicateConstantConsistency);
+  runTest('TEST1312: is_image', test546_isImage);
+  runTest('TEST1313: is_audio', test547_isAudio);
+  runTest('TEST1314: is_video', test548_isVideo);
+  runTest('TEST1315: is_numeric', test549_isNumeric);
+  runTest('TEST1298: is_bool', test550_isBool);
+  runTest('TEST1299: is_file_path', test551_isFilePath);
+  runTest('TEST1302: predicate_constant_consistency', test558_predicateConstantConsistency);
 
   // cap_urn.rs: TEST1303-TEST1307 (CapUrn tier tests)
   console.log('\n--- cap_urn.rs (tier tests) ---');
-  runTest('TEST1303: without_tag', test1303_withoutTag);
-  runTest('TEST1304: with_in_out_spec', test1304_withInOutSpec);
-  runTest('TEST1305: find_all_matches', test1305_findAllMatches);
-  runTest('TEST1306: are_compatible', test1306_areCompatible);
-  runTest('TEST1307: with_tag_rejects_structural_keys', test1307_withTagRejectsStructuralKeys);
+  runTest('TEST1303: without_tag', test559_withoutTag);
+  runTest('TEST1304: with_in_out_spec', test560_withInOutSpec);
+  runTest('TEST1305: find_all_matches', test563_findAllMatches);
+  runTest('TEST1306: are_compatible', test564_areCompatible);
+  runTest('TEST1307: with_tag_rejects_structural_keys', test566_withTagRejectsStructuralKeys);
   runTest('TEST1308: builder_rejects_structural_keys', test6544_builderRejectsStructuralKeys);
   runTest('TEST1294: rule11_void_input_with_stdin_rejected', test1294_rule11VoidInputWithStdinRejected);
   runTest('TEST1295: rule11_non_void_input_without_stdin_rejected', test1295_rule11NonVoidInputWithoutStdinRejected);
@@ -6686,10 +6631,10 @@ async function runTests() {
   runTest('TEST651: wildcard_generic_forms_rejected', test6620_wildcardGenericFormsRejected);
   runTest('TEST652: cap_identity_constant_works', test6621_capIdentityConstantWorks);
   runTest('TEST653: invalid_effect_none_declaration_rejected', test653_invalidEffectNoneDeclarationRejected);
-  runTest('TEST654: effect_none_preserves_runtime_media', test654_effectNonePreservesRuntimeMedia);
-  runTest('TEST655: effect_declared_uses_declared_output', test655_effectDeclaredUsesDeclaredOutput);
-  runTest('TEST656: invalid_effect_none_fails_hard', test656_invalidEffectNoneFailsHard);
-  runTest('TEST657: effect_dispatch_requires_explicit_wildcard', test657_effectDispatchRequiresExplicitWildcard);
+  runTest('TEST654: effect_none_preserves_runtime_media', test125_effectNonePreservesRuntimeMedia);
+  runTest('TEST655: effect_declared_uses_declared_output', test126_effectDeclaredUsesDeclaredOutput);
+  runTest('TEST656: invalid_effect_none_fails_hard', test127_invalidEffectNoneFailsHard);
+  runTest('TEST657: effect_dispatch_requires_explicit_wildcard', test128_effectDispatchRequiresExplicitWildcard);
 
   // machine module: parser tests (mirrors parser.rs)
   console.log('\n--- machine/parser.rs ---');
@@ -6889,11 +6834,11 @@ async function runTests() {
   runTest('TEST1835: canonicalize_must_not_have',           test1835_canonicalizeMustNotHave);
 
   console.log('\n--- Truth-table cross-product + axis weighting (test1842–test1846) ---');
-  runTest('TEST1842: truth_table_full_cross_product',       test6733_truthTableFullCrossProduct);
-  runTest('TEST1843: reject_invalid_combinations',          test1843_rejectInvalidCombinations);
-  runTest('TEST1844: axis_weighting_out_dominates',         test1844_axisWeightingOutDominates);
+  runTest('TEST1842: truth_table_full_cross_product',       test1842_truthTableFullCrossProduct);
+  runTest('TEST1843: reject_invalid_combinations',          test6734_rejectInvalidCombinations);
+  runTest('TEST1844: axis_weighting_out_dominates',         test6735_axisWeightingOutDominates);
   runTest('TEST1845: axis_weighting_in_dominates_y',        test1845_axisWeightingInDominatesY);
-  runTest('TEST1846: axis_weighting_decoded_layout',        test1846_axisWeightingDecodedLayout);
+  runTest('TEST1846: axis_weighting_decoded_layout',        test6736_axisWeightingDecodedLayout);
 
   // Cap.version round-trip tests
   runTest('TEST1847: cap_version_zero_omitted_on_wire',     test6737_capVersionZeroOmittedOnWire);
