@@ -1,4 +1,4 @@
-# CapDag-JS Test Catalog
+# JS Test Catalog
 
 **Total Tests:** 348
 
@@ -12,7 +12,7 @@
 
 All numbered test numbers are unique.
 
-This catalog lists all tests in the CapDag-JS codebase.
+This catalog lists all tests in the JS codebase.
 
 | Test # | Function Name | Description | File |
 |--------|---------------|-------------|------|
@@ -366,7 +366,7 @@ This catalog lists all tests in the CapDag-JS codebase.
 | test1887 | `test1887_manifestSerdeRoundTripsAliases` | TEST1887: the Manifest type round-trips an `aliases` map. | capdag.test.js:6426 |
 ---
 
-*Generated from CapDag-JS source tree*
+*Generated from JS source tree*
 *Total tests: 348*
 *Total numbered tests: 348*
 *Total unnumbered tests: 0*
