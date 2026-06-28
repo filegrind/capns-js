@@ -36,6 +36,7 @@ const {
   CAP_IDENTITY,
   ALIAS_TARGET_CAP, ALIAS_TARGET_MEDIA,
   tokenIsUrn, isAliasToken, normalizeAliasName, classifyAliasTarget,
+  selectDisplayAlias,
   StoredAlias, Manifest
 } = require('./capdag.js');
 
@@ -6383,6 +6384,107 @@ function test1887_manifestSerdeRoundTripsAliases() {
   assertEqual(JSON.stringify(a.toJSON()), '{"name":"pdf2text","target":"cap:effect=none","version":3}', 'alias wire shape');
 }
 
+// TEST1894: selectDisplayAlias picks the SHORTEST name, ties broken
+// alphabetically. This is the deterministic ordering every aliased-display
+// surface relies on; a regression here silently changes which alias the whole
+// UI renders.
+function test1894_selectDisplayAliasOrdering() {
+  // Shorter wins over longer regardless of alphabetical order.
+  assertEqual(selectDisplayAlias(['png-image', 'png', 'image-png']), 'png', 'shortest wins');
+  // Equal length → alphabetical (a09 < a16).
+  assertEqual(selectDisplayAlias(['a16', 'a09', 'a12']), 'a09', 'tie → alphabetical');
+  // Single candidate returns itself.
+  assertEqual(selectDisplayAlias(['solo']), 'solo', 'single candidate');
+  // Empty set → null.
+  assertEqual(selectDisplayAlias([]), null, 'empty → null');
+}
+
+// TEST1895: displayAliasForUrn reverse-resolves a URN to its display alias.
+// Proves: (1) the shortest-then-alphabetical winner among multiple aliases on
+// the same target, (2) a NON-canonical query URN (different tag order) still
+// resolves because the query is canonicalised before matching, (3) a URN with
+// no alias returns null, (4) a non-URN string returns null.
+function test1895_displayAliasForUrn() {
+  const registry = new FabricRegistryClient();
+  const capTarget = CapUrn.fromString('cap:coerce;in="media:integer;numeric";out="media:enc=utf-8"').toString();
+  // Two aliases on the same cap target; "i2s" is shorter than "int2str".
+  registry.insertCachedAliasForTest(new StoredAlias('int2str', capTarget, 1));
+  registry.insertCachedAliasForTest(new StoredAlias('i2s', capTarget, 1));
+  // A media alias too. Stored canonically.
+  const jsonTarget = MediaUrn.fromString('media:fmt=json;record').toString();
+  registry.insertCachedAliasForTest(new StoredAlias('json', jsonTarget, 1));
+
+  // Canonical query → shortest alias wins.
+  assertEqual(
+    registry.displayAliasForUrn('cap:coerce;in="media:integer;numeric";out="media:enc=utf-8"'),
+    'i2s', 'shortest cap alias wins');
+  // NON-canonical query (media tags reordered) must still resolve via
+  // canonicalisation.
+  assertEqual(registry.displayAliasForUrn('media:record;fmt=json'), 'json',
+    'non-canonical media query canonicalises');
+  // A real URN with no alias → null.
+  assertEqual(registry.displayAliasForUrn('media:enc=utf-8;ext=pdf'), null, 'no alias → null');
+  // A non-URN (no cap:/media: prefix) → null, never a throw.
+  assertEqual(registry.displayAliasForUrn('int2str'), null, 'non-URN → null');
+}
+
+// TEST1896: cachedCapAliases returns only CAP-targeted aliases as [name,
+// target] pairs — media aliases are excluded. Drives the notation editor's
+// registered-alias completions.
+function test1896_cachedCapAliasesFiltersToCapTargets() {
+  const registry = new FabricRegistryClient();
+  const capTarget = CapUrn.fromString('cap:coerce;in="media:integer;numeric";out="media:enc=utf-8"').toString();
+  registry.insertCachedAliasForTest(new StoredAlias('int2str', capTarget, 1));
+  registry.insertCachedAliasForTest(new StoredAlias('json', MediaUrn.fromString('media:fmt=json;record').toString(), 1));
+  const capAliases = registry.cachedCapAliases();
+  assertEqual(capAliases.length, 1, 'only the cap alias is returned');
+  assertEqual(capAliases[0][0], 'int2str', 'pair name');
+  assertEqual(capAliases[0][1], capTarget, 'pair target');
+}
+
+// TEST1196: toMachineNotationAliased references an aliased cap DIRECTLY in the
+// wiring by its display alias (shortest, then alphabetical) with NO header, and
+// keeps the synthetic `edge_N` token + header for a cap that has no alias.
+function test1196_aliasedSerializationUsesAliasAndDropsHeader() {
+  const registry = new FabricRegistryClient();
+  const m = Machine.fromString(
+    '[extract cap:in="media:ext=pdf";extract;out="media:enc=utf-8;ext=txt"]' +
+    '[embed cap:in="media:enc=utf-8;ext=txt";embed;out="media:embedding-vector;enc=utf-8;record"]' +
+    '[doc -> extract -> text]' +
+    '[text -> embed -> vectors]'
+  );
+  // Canonical target strings for the two caps, exactly as the serializer keys.
+  const extractTarget = m.edges().find(e => e.capUrn.toString().includes('extract')).capUrn.toString();
+  // Two aliases on the extract cap; "ex" is shorter than "extract-pdf".
+  registry.insertCachedAliasForTest(new StoredAlias('extract-pdf', extractTarget, 1));
+  registry.insertCachedAliasForTest(new StoredAlias('ex', extractTarget, 1));
+  // No alias for the embed cap → it must stay a raw URN with a header.
+
+  const aliased = m.toMachineNotationAliased(registry, 'bracketed');
+
+  // The extract cap is aliased: referenced directly in the wiring by its
+  // SHORTER alias `ex`, with NO header, and its URN must not appear.
+  assert(aliased.includes('-> ex ->'),
+    `extract cap must be referenced by shortest alias 'ex', got: ${aliased}`);
+  assert(!aliased.includes('extract;out'),
+    `the aliased extract cap URN must not appear, got: ${aliased}`);
+  // The longer alias must not be chosen.
+  assert(!aliased.includes('extract-pdf'),
+    `the longer alias must not be used, got: ${aliased}`);
+  // The un-aliased embed cap keeps its synthetic header binding `edge_N` to the
+  // canonical embed URN.
+  assert(/\[edge_\d+ cap:.*embed/.test(aliased),
+    `the un-aliased embed cap must keep its header URN, got: ${aliased}`);
+
+  // An un-aliased machine (empty registry) is byte-identical to the canonical
+  // formatted form — the aliased path adds nothing when no alias exists.
+  const empty = new FabricRegistryClient();
+  assertEqual(
+    m.toMachineNotationAliased(empty, 'bracketed'),
+    m.toMachineNotationFormatted('bracketed'),
+    'no aliases → identical to canonical bracketed form');
+}
+
 // ============================================================================
 // Test runner
 // ============================================================================
@@ -6848,6 +6950,12 @@ async function runTests() {
   runTest('TEST1881: token_urn_vs_alias_detection',         test1881_tokenUrnVsAliasDetection);
   runTest('TEST1882: classify_alias_target_by_prefix',      test1882_classifyAliasTargetByPrefix);
   runTest('TEST1887: manifest_serde_round_trips_aliases',   test1887_manifestSerdeRoundTripsAliases);
+
+  console.log('\n--- URN→alias display + aliased serialization (test1894–test1896, test1196) ---');
+  runTest('TEST1894: select_display_alias_ordering',         test1894_selectDisplayAliasOrdering);
+  runTest('TEST1895: display_alias_for_urn',                 test1895_displayAliasForUrn);
+  runTest('TEST1896: cached_cap_aliases_filters_to_cap',     test1896_cachedCapAliasesFiltersToCapTargets);
+  runTest('TEST1196: aliased_serialization_uses_alias',      test1196_aliasedSerializationUsesAliasAndDropsHeader);
 
   // Summary
   console.log(`\n${passCount + failCount} tests: ${passCount} passed, ${failCount} failed`);

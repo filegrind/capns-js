@@ -6826,6 +6826,88 @@ class Machine {
   }
 
   /**
+   * Serialize to machine notation rendering each cap by its registered display
+   * alias (shortest name, ties alphabetical) when one exists, falling back to
+   * the canonical-URN `edge_N` header form otherwise. This is the "store
+   * aliased" form: generated and persisted machines use it so the saved
+   * notation reads in terms of aliases.
+   *
+   * Semantics (mirrors Rust Machine::to_machine_notation_aliased):
+   *  - A cap WITH a display alias is referenced DIRECTLY in the wiring's
+   *    cap-position by its alias name, with NO `[edge_N cap:...]` header (the
+   *    grammar forbids an alias in a header's cap position anyway, and a header
+   *    would be redundant).
+   *  - A cap WITHOUT an alias keeps the synthetic `edge_N` wiring token plus its
+   *    `[edge_N cap:...]` header binding it to the canonical cap URN.
+   *
+   * The canonical `edge_N` numbering and node naming are inherited unchanged
+   * from the canonical serializer, so an un-aliased machine produces byte-
+   * identical output to toMachineNotationFormatted.
+   *
+   * @param {FabricRegistryClient} registry - resolves URN → display alias
+   * @param {'bracketed' | 'line-based'} format
+   * @returns {string}
+   */
+  toMachineNotationAliased(registry, format) {
+    if (this._edges.length === 0) {
+      return '';
+    }
+
+    const { aliases, nodeNames, edgeOrder } = this._buildSerializationMaps();
+    const bracketed = format === 'bracketed';
+    const open = bracketed ? '[' : '';
+    const close = bracketed ? ']' : '';
+
+    // Resolve, per edge index, the cap-position token and whether it needs a
+    // header. An aliased cap uses its display alias directly (no header); an
+    // un-aliased cap keeps its synthetic `edge_N` token (with a header).
+    const edgeToken = new Map();   // edgeIdx → token used in the wiring
+    const edgeNeedsHeader = new Map(); // edgeIdx → bool
+    for (const [edgeAlias, info] of aliases) {
+      const edge = this._edges[info.edgeIdx];
+      const displayAlias = registry.displayAliasForUrn(edge.capUrn.toString());
+      if (displayAlias !== null && displayAlias !== undefined) {
+        edgeToken.set(info.edgeIdx, displayAlias);
+        edgeNeedsHeader.set(info.edgeIdx, false);
+      } else {
+        edgeToken.set(info.edgeIdx, edgeAlias);
+        edgeNeedsHeader.set(info.edgeIdx, true);
+      }
+    }
+
+    const lines = [];
+
+    // Headers only for edges that kept a synthetic `edge_N` token (un-aliased
+    // caps). Emit in alias-sorted order to match the canonical serializer.
+    const sortedAliases = Array.from(aliases.entries()).sort((a, b) => a[0] < b[0] ? -1 : a[0] > b[0] ? 1 : 0);
+    for (const [, info] of sortedAliases) {
+      if (edgeNeedsHeader.get(info.edgeIdx)) {
+        const edge = this._edges[info.edgeIdx];
+        lines.push(`${open}${edgeToken.get(info.edgeIdx)} ${edge.capUrn}${close}`);
+      }
+    }
+
+    // Wirings in canonical edge order, using the resolved cap-position token.
+    for (const edgeIdx of edgeOrder) {
+      const edge = this._edges[edgeIdx];
+      const token = edgeToken.get(edgeIdx);
+
+      const sources = edge.sources.map(s => nodeNames.get(s.toString()));
+      const targetName = nodeNames.get(edge.target.toString());
+      const loopPrefix = edge.isLoop ? 'LOOP ' : '';
+
+      if (sources.length === 1) {
+        lines.push(`${open}${sources[0]} -> ${loopPrefix}${token} -> ${targetName}${close}`);
+      } else {
+        const group = sources.join(', ');
+        lines.push(`${open}(${group}) -> ${loopPrefix}${token} -> ${targetName}${close}`);
+      }
+    }
+
+    return bracketed ? lines.join('') : lines.join('\n');
+  }
+
+  /**
    * Build the alias map, node name map, and edge ordering for serialization.
    *
    * Returns:
@@ -7413,6 +7495,12 @@ class FabricRegistryClient {
     // canonical key only needs to be unique per equivalence class; we
     // store one entry per equivalence class.
     this._mediaCache = new Map();
+    // Normalized alias name → StoredAlias. Mirrors Rust
+    // FabricRegistry::cached_aliases. The display/serialization surfaces
+    // read this synchronously; it is warmed by insertCachedAliasForTest (and,
+    // in the heavier mirrors, a background prefetch this lightweight client
+    // does not implement).
+    this._cachedAliases = new Map();
   }
 
   /**
@@ -7543,11 +7631,87 @@ class FabricRegistryClient {
   }
 
   /**
+   * Insert an alias directly into the in-memory cache, keyed by its
+   * normalized name. Mirrors Rust
+   * FabricRegistry::insert_cached_alias_for_test — it is the warm-cache seam
+   * the display/serialization primitives read from. The lightweight JS client
+   * has no background alias prefetch, so callers seed the cache through here.
+   *
+   * @param {StoredAlias} alias
+   */
+  insertCachedAliasForTest(alias) {
+    const normalized = normalizeAliasName(alias.name);
+    this._cachedAliases.set(normalized, alias);
+  }
+
+  /**
+   * Reverse lookup: the display alias for a `cap:`/`media:` URN, or null if no
+   * cached alias points at it. This is the canonical primitive every UI surface
+   * and notation generator uses to render an aliased name in place of a raw URN.
+   *
+   * The query URN is canonicalised through its own parser (cap vs media by
+   * prefix) before matching, because alias targets are stored canonically — a
+   * non-canonical query (different tag order, redundant whitespace) would
+   * otherwise miss. A URN that is neither a cap nor a media URN, or that fails
+   * to parse, returns null (it cannot have an alias).
+   *
+   * When multiple aliases target the same URN, the winner is the SHORTEST name,
+   * ties broken alphabetically (see selectDisplayAlias). This is deterministic
+   * and stable across processes for a given alias set.
+   *
+   * Mirrors Rust FabricRegistry::display_alias_for_urn.
+   * @param {string} urn
+   * @returns {string|null}
+   */
+  displayAliasForUrn(urn) {
+    // Canonicalise by kind. classifyAliasTarget keys off the parser (cap vs
+    // media), the same classifier the alias publisher uses for targets, so a
+    // query and a stored target canonicalise identically.
+    const kind = classifyAliasTarget(urn);
+    let canonical;
+    if (kind === ALIAS_TARGET_CAP) {
+      canonical = CapUrn.fromString(urn).toString();
+    } else if (kind === ALIAS_TARGET_MEDIA) {
+      canonical = MediaUrn.fromString(urn).toString();
+    } else {
+      return null;
+    }
+
+    const names = [];
+    for (const alias of this._cachedAliases.values()) {
+      if (alias.target === canonical) {
+        names.push(alias.name);
+      }
+    }
+    return selectDisplayAlias(names);
+  }
+
+  /**
+   * All cached aliases whose target is a CAP URN, as [name, capUrn] pairs.
+   * Used by the notation editor to offer registered cap aliases as wiring
+   * completions. Order is unspecified (the caller sorts/filters). Synchronous,
+   * cache-only — relies on the alias cache having been warmed.
+   *
+   * Mirrors Rust FabricRegistry::cached_cap_aliases.
+   * @returns {Array<[string, string]>}
+   */
+  cachedCapAliases() {
+    const pairs = [];
+    for (const alias of this._cachedAliases.values()) {
+      if (classifyAliasTarget(alias.target) === ALIAS_TARGET_CAP) {
+        pairs.push([alias.name, alias.target]);
+      }
+    }
+    return pairs;
+  }
+
+  /**
    * Invalidate all caches. Next call to any method fetches fresh data.
    */
   invalidate() {
     this._capCache = null;
     this._mediaCache.clear();
+    this._cachedAliases.clear();
   }
 }
 
@@ -7621,6 +7785,34 @@ function classifyAliasTarget(target) {
 }
 
 /**
+ * Pick the display alias from a set of alias names that all target the same
+ * URN: the SHORTEST name, ties broken alphabetically. Returns null for an
+ * empty set.
+ *
+ * The ordering is total and deterministic: (length, name) lexicographic. So
+ * `png` beats `png-image` (shorter), and between equal-length `a16` / `a09`
+ * the alphabetical-smaller `a09` wins. Stable across processes for a given
+ * alias set, which is what makes aliased UI/notation reproducible.
+ *
+ * Mirrors Rust select_display_alias.
+ * @param {Iterable<string>} names
+ * @returns {string|null}
+ */
+function selectDisplayAlias(names) {
+  let best = null;
+  for (const name of names) {
+    if (
+      best === null ||
+      name.length < best.length ||
+      (name.length === best.length && name < best)
+    ) {
+      best = name;
+    }
+  }
+  return best;
+}
+
+/**
  * The published wire/cache shape of a single fabric alias. Mirrors
  * fabric/alias.schema.json: { name, target, version }.
  */
@@ -7682,6 +7874,7 @@ module.exports = {
   isAliasToken,
   normalizeAliasName,
   classifyAliasTarget,
+  selectDisplayAlias,
   StoredAlias,
   Manifest,
   CapUrn,
