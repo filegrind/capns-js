@@ -5876,10 +5876,11 @@ function unixSecondsNow() {
 }
 
 // Default protocol limits / version, mirroring capdag::bifaci::frame.
-const BIFACI_PROTOCOL_VERSION = 2;
+const BIFACI_PROTOCOL_VERSION = 3;
 const BIFACI_DEFAULT_MAX_FRAME = 3670016;
 const BIFACI_DEFAULT_MAX_CHUNK = 262144;
 const BIFACI_DEFAULT_MAX_REORDER_BUFFER = 64;
+const BIFACI_DEFAULT_INITIAL_CREDIT = 32;
 const BIFACI_FRAME_TYPE_HELLO = 0;
 // Frame CBOR integer keys (capdag::bifaci::frame::keys).
 const BIFACI_KEY_VERSION = 0;
@@ -6008,6 +6009,7 @@ function encodeHelloFrame() {
       ['max_frame', BIFACI_DEFAULT_MAX_FRAME],
       ['max_chunk', BIFACI_DEFAULT_MAX_CHUNK],
       ['max_reorder_buffer', BIFACI_DEFAULT_MAX_REORDER_BUFFER],
+      ['initial_credit', BIFACI_DEFAULT_INITIAL_CREDIT],
       ['version', BIFACI_PROTOCOL_VERSION],
     ],
   };
