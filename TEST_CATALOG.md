@@ -237,7 +237,7 @@ This catalog lists all tests in the JS codebase.
 | test6290 | `test6290_Machine_fanOut` | TEST0096: Machine fan out | capdag.test.js:3268 |
 | test6292 | `test6292_Machine_fanInSecondaryAssignedByPriorWiring` | TEST0097: Machine fan in secondary assigned by prior wiring | capdag.test.js:3286 |
 | test6294 | `test6294_Machine_fanInSecondaryUnassignedGetsWildcard` | TEST0098: Machine fan in secondary unassigned gets wildcard | capdag.test.js:3300 |
-| test6306 | `test6306_Machine_loopEdge` | TEST6306: Machine loop edge | capdag.test.js:3312 |
+| test6306 | `test6306_Machine_loopKeywordIsNotGrammar` | TEST6306: The retired LOOP keyword is no longer grammar | capdag.test.js:3312 |
 | test6308 | `test6308_Machine_undefinedAliasFails` | TEST6308: Machine undefined alias fails | capdag.test.js:3322 |
 | test6310 | `test6310_Machine_nodeAliasCollision` | TEST6310: Machine node alias collision | capdag.test.js:3330 |
 | test6312 | `test6312_Machine_conflictingMediaTypesFail` | TEST6312: Machine conflicting media types fail | capdag.test.js:3341 |
@@ -247,7 +247,7 @@ This catalog lists all tests in the JS codebase.
 | test6323 | `test6323_Machine_unterminatedBracketFails` | TEST6323: Machine unterminated bracket fails | capdag.test.js:3386 |
 | test6327 | `test6327_Machine_lineBasedSimpleChain` | --- Machine parser line-based mode tests --- | capdag.test.js:3395 |
 | test6331 | `test6331_Machine_lineBasedTwoStepChain` | TEST6331: Machine line based two step chain | capdag.test.js:3409 |
-| test6334 | `test6334_Machine_lineBasedLoop` | TEST6334: Machine line based loop | capdag.test.js:3420 |
+| test6334 | `test6334_Machine_lineBasedLoopKeywordIsNotGrammar` | TEST6334: The retired LOOP keyword is not grammar in line-based mode | capdag.test.js:3420 |
 | test6337 | `test6337_Machine_lineBasedFanIn` | TEST6337: Machine line based fan in | capdag.test.js:3430 |
 | test6341 | `test6341_Machine_mixedBracketedAndLineBased` | TEST6341: Machine mixed bracketed and line based | capdag.test.js:3444 |
 | test6345 | `test6345_Machine_lineBasedEquivalentToBracketed` | TEST6345: Machine line based equivalent to bracketed | capdag.test.js:3453 |
@@ -276,7 +276,7 @@ This catalog lists all tests in the JS codebase.
 | test6410 | `test6410_Machine_roundtripSingleEdge` | TEST6410: Machine roundtrip single edge | capdag.test.js:3794 |
 | test6413 | `test6413_Machine_roundtripTwoEdgeChain` | TEST6413: Machine roundtrip two edge chain | capdag.test.js:3808 |
 | test6415 | `test6415_Machine_roundtripFanOut` | TEST6415: Machine roundtrip fan out | capdag.test.js:3823 |
-| test6417 | `test6417_Machine_roundtripLoopEdge` | TEST6417: Machine roundtrip loop edge | capdag.test.js:3839 |
+| test6417 | `test6417_Machine_loopEdgeSerializesWithoutLoopText` | TEST6417: A per-item map edge serializes without any LOOP marker | capdag.test.js:3839 |
 | test6419 | `test6419_Machine_serializationIsDeterministic` | TEST6419: Machine serialization is deterministic | capdag.test.js:3853 |
 | test6421 | `test6421_Machine_reorderedEdgesProduceSameNotation` | TEST6421: Machine reordered edges produce same notation | capdag.test.js:3867 |
 | test6429 | `test6429_Machine_multilineSerializeFormat` | TEST6429: Machine multiline serialize format | capdag.test.js:3884 |

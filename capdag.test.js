@@ -3308,14 +3308,25 @@ function test6294_Machine_fanInSecondaryUnassignedGetsWildcard() {
   assertEqual(g.edges()[0].sources[1].toString(), 'media:');
 }
 
-// TEST6306: Machine loop edge
-function test6306_Machine_loopEdge() {
-  const g = Machine.fromString(
-    '[p2t cap:in="media:disbound-page;enc=utf-8";page-to-text;out="media:enc=utf-8;ext=txt"]' +
-    '[pages -> LOOP p2t -> texts]'
+// TEST6306: The retired LOOP keyword is no longer grammar. A wiring that still
+// writes `LOOP <cap>` before the cap alias no longer parses — `LOOP` is now an
+// ordinary alias, so `pages -> LOOP p2t -> texts` is two aliases in the cap
+// position with no arrow between them, which is a syntax error.
+function test6306_Machine_loopKeywordIsNotGrammar() {
+  assertThrowsWithCode(
+    () => Machine.fromString(
+      '[p2t cap:in="media:disbound-page;enc=utf-8";page-to-text;out="media:enc=utf-8;ext=txt"]' +
+      '[pages -> LOOP p2t -> texts]'
+    ),
+    MachineSyntaxErrorCodes.PARSE_ERROR
   );
-  assertEqual(g.edgeCount(), 1);
-  assertEqual(g.edges()[0].isLoop, true);
+
+  // `LOOP` on its own in the cap position parses fine — it is just an alias —
+  // but resolves to nothing, proving it carries no special meaning.
+  assertThrowsWithCode(
+    () => Machine.fromString('[pages -> LOOP -> texts]'),
+    MachineSyntaxErrorCodes.UNDEFINED_ALIAS
+  );
 }
 
 // TEST6308: Machine undefined alias fails
@@ -3416,14 +3427,16 @@ function test6331_Machine_lineBasedTwoStepChain() {
   assertEqual(g.edgeCount(), 2);
 }
 
-// TEST6334: Machine line based loop
-function test6334_Machine_lineBasedLoop() {
-  const g = Machine.fromString(
-    'p2t cap:in="media:disbound-page;enc=utf-8";page-to-text;out="media:enc=utf-8;ext=txt"\n' +
-    'pages -> LOOP p2t -> texts'
+// TEST6334: The retired LOOP keyword is not grammar in line-based mode either —
+// `pages -> LOOP p2t -> texts` is a syntax error, same as the bracketed form.
+function test6334_Machine_lineBasedLoopKeywordIsNotGrammar() {
+  assertThrowsWithCode(
+    () => Machine.fromString(
+      'p2t cap:in="media:disbound-page;enc=utf-8";page-to-text;out="media:enc=utf-8;ext=txt"\n' +
+      'pages -> LOOP p2t -> texts'
+    ),
+    MachineSyntaxErrorCodes.PARSE_ERROR
   );
-  assertEqual(g.edgeCount(), 1);
-  assertEqual(g.edges()[0].isLoop, true);
 }
 
 // TEST6337: Machine line based fan in
@@ -3835,8 +3848,12 @@ function test6415_Machine_roundtripFanOut() {
     'Fan-out round-trip failed: ' + notation);
 }
 
-// TEST6417: Machine roundtrip loop edge
-function test6417_Machine_roundtripLoopEdge() {
+// TEST6417: A per-item map (`is_loop`) edge serializes WITHOUT any LOOP marker —
+// `is_loop` is a derived cardinality property, not authored notation text. The
+// pure-JS parse path has no cap definitions to re-derive cardinality, so the
+// reparsed edge has `isLoop === false`; editors get the derived value from the
+// engine, not from re-parsing.
+function test6417_Machine_loopEdgeSerializesWithoutLoopText() {
   const original = new Machine([new MachineEdge(
     [MediaUrn.fromString('media:disbound-page;enc=utf-8')],
     CapUrn.fromString('cap:in="media:disbound-page;enc=utf-8";page-to-text;out="media:enc=utf-8;ext=txt"'),
@@ -3844,9 +3861,17 @@ function test6417_Machine_roundtripLoopEdge() {
     true
   )]);
   const notation = original.toMachineNotation();
+  assert(!notation.includes('LOOP'), 'serialized notation must not contain the retired LOOP keyword');
+
   const reparsed = Machine.fromString(notation);
-  assert(original.isEquivalent(reparsed), 'Loop round-trip failed');
-  assertEqual(reparsed.edges()[0].isLoop, true, 'isLoop must be preserved');
+  assertEqual(reparsed.edgeCount(), 1);
+  assertEqual(reparsed.edges()[0].isLoop, false,
+    'pure-JS parse path cannot derive cardinality — isLoop defaults to false');
+  // The structural payload (sources, cap, target) round-trips intact.
+  assert(reparsed.edges()[0].capUrn.isEquivalent(original.edges()[0].capUrn),
+    'cap URN must round-trip');
+  assert(reparsed.edges()[0].target.isEquivalent(original.edges()[0].target),
+    'target media must round-trip');
 }
 
 // TEST6419: Machine serialization is deterministic
@@ -4203,16 +4228,21 @@ function test6462_Machine_toMermaid_linearChain() {
   assert(mermaid.includes('(['), 'Should have stadium shape nodes');
 }
 
-// TEST6463: Machine to mermaid loop edge
+// TEST6463: Mermaid renders a per-item map (`is_loop`) edge with a dotted line
+// — `is_loop` is a kept render property — but emits NO "LOOP" text, since that
+// keyword is retired. The loop edge is built programmatically because the
+// grammar no longer has any way to author one.
 function test6463_Machine_toMermaid_loopEdge() {
-  const machine = Machine.fromString(
-    '[p2t cap:in="media:disbound-page;enc=utf-8";page-to-text;out="media:enc=utf-8;ext=txt"]' +
-    '[pages -> LOOP p2t -> texts]'
-  );
+  const machine = new Machine([new MachineEdge(
+    [MediaUrn.fromString('media:disbound-page;enc=utf-8')],
+    CapUrn.fromString('cap:in="media:disbound-page;enc=utf-8";page-to-text;out="media:enc=utf-8;ext=txt"'),
+    MediaUrn.fromString('media:enc=utf-8;ext=txt'),
+    true
+  )]);
   const mermaid = machine.toMermaid();
-  assert(mermaid.includes('LOOP'), 'Should include LOOP label');
-  assert(mermaid.includes('-.'), 'Should use dotted line for LOOP');
-  assert(mermaid.includes('.->'), 'Should use dotted arrow for LOOP');
+  assert(!mermaid.includes('LOOP'), 'Must not emit the retired LOOP label');
+  assert(mermaid.includes('-.'), 'Should use dotted line for the per-item map edge');
+  assert(mermaid.includes('.->'), 'Should use dotted arrow for the per-item map edge');
 }
 
 // TEST6464: Machine to mermaid empty graph
@@ -6749,7 +6779,7 @@ async function runTests() {
   runTest('MACHINE:fan_out', test6290_Machine_fanOut);
   runTest('MACHINE:fan_in_secondary_assigned_by_prior_wiring', test6292_Machine_fanInSecondaryAssignedByPriorWiring);
   runTest('MACHINE:fan_in_secondary_unassigned_gets_wildcard', test6294_Machine_fanInSecondaryUnassignedGetsWildcard);
-  runTest('MACHINE:loop_edge', test6306_Machine_loopEdge);
+  runTest('MACHINE:loop_keyword_is_not_grammar', test6306_Machine_loopKeywordIsNotGrammar);
   runTest('MACHINE:undefined_alias_fails', test6308_Machine_undefinedAliasFails);
   runTest('MACHINE:node_alias_collision', test6310_Machine_nodeAliasCollision);
   runTest('MACHINE:conflicting_media_types_fail', test6312_Machine_conflictingMediaTypesFail);
@@ -6762,7 +6792,7 @@ async function runTests() {
   console.log('\n--- machine/parser.rs (line-based) ---');
   runTest('MACHINE:line_based_simple_chain', test6327_Machine_lineBasedSimpleChain);
   runTest('MACHINE:line_based_two_step_chain', test6331_Machine_lineBasedTwoStepChain);
-  runTest('MACHINE:line_based_loop', test6334_Machine_lineBasedLoop);
+  runTest('MACHINE:line_based_loop_keyword_is_not_grammar', test6334_Machine_lineBasedLoopKeywordIsNotGrammar);
   runTest('MACHINE:line_based_fan_in', test6337_Machine_lineBasedFanIn);
   runTest('MACHINE:mixed_bracketed_and_line_based', test6341_Machine_mixedBracketedAndLineBased);
   runTest('MACHINE:line_based_equivalent_to_bracketed', test6345_Machine_lineBasedEquivalentToBracketed);
@@ -6797,7 +6827,7 @@ async function runTests() {
   runTest('MACHINE:roundtrip_single_edge', test6410_Machine_roundtripSingleEdge);
   runTest('MACHINE:roundtrip_two_edge_chain', test6413_Machine_roundtripTwoEdgeChain);
   runTest('MACHINE:roundtrip_fan_out', test6415_Machine_roundtripFanOut);
-  runTest('MACHINE:roundtrip_loop_edge', test6417_Machine_roundtripLoopEdge);
+  runTest('MACHINE:loop_edge_serializes_without_loop_text', test6417_Machine_loopEdgeSerializesWithoutLoopText);
   runTest('MACHINE:serialization_is_deterministic', test6419_Machine_serializationIsDeterministic);
   runTest('MACHINE:reordered_edges_produce_same_notation', test6421_Machine_reorderedEdgesProduceSameNotation);
   runTest('MACHINE:multiline_serialize_format', test6429_Machine_multilineSerializeFormat);

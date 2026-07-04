@@ -13,7 +13,6 @@
 //   extract cap:in="media:ext=pdf";extract;out="media:txt;textable"
 //   doc -> extract -> text
 //   (thumbnail, model_spec) -> describe -> description
-//   pages -> LOOP p2t -> texts
 //
 // Both forms can be freely mixed in the same program.
 
@@ -29,9 +28,12 @@ header = a:alias_loc __ c:cap_urn_loc {
   return { type: 'header', alias: a.value, capUrn: c.value, location: location(), aliasLocation: a.location, capUrnLocation: c.location };
 }
 
-// Wiring: source -> loop_cap -> target
-wiring = s:source_loc _ arrow _ lc:loop_cap_loc _ arrow _ t:alias_loc {
-  return { type: 'wiring', sources: s.values, capAlias: lc.alias, isLoop: lc.isLoop, target: t.value, location: location(), sourceLocations: s.locations, capAliasLocation: lc.location, targetLocation: t.location };
+// Wiring: source -> cap -> target
+//
+// The cap position is a plain alias. There is no LOOP marker: per-item map
+// (`is_loop`) is a derived cardinality property, never authored syntax.
+wiring = s:source_loc _ arrow _ c:alias_loc _ arrow _ t:alias_loc {
+  return { type: 'wiring', sources: s.values, capAlias: c.value, target: t.value, location: location(), sourceLocations: s.locations, capAliasLocation: c.location, targetLocation: t.location };
 }
 
 source_loc = group_loc / single_alias_loc
@@ -41,9 +43,6 @@ single_alias_loc = a:alias_loc { return { values: [a.value], locations: [a.locat
 group_loc = "(" _ first:alias_loc rest:("," _ a:alias_loc { return a; })+ _ ")" {
   return { values: [first.value, ...rest.map(r => r.value)], locations: [first.location, ...rest.map(r => r.location)] };
 }
-
-loop_cap_loc = "LOOP" __ a:alias_loc { return { alias: a.value, isLoop: true, location: a.location }; }
-            / a:alias_loc { return { alias: a.value, isLoop: false, location: a.location }; }
 
 arrow = "-"+ ">"
 
