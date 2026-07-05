@@ -591,6 +591,18 @@ function buildStylesheet() {
       },
     },
     {
+      // A convergence (fan-in) edge: a second producer feeding a cap's
+      // non-main argument. Dotted + diamond-tail to read as a merging
+      // side-input distinct from the solid main backbone edge.
+      selector: 'edge.strand-convergence',
+      style: {
+        'line-style': 'dotted',
+        'width': 2,
+        'source-arrow-shape': 'diamond',
+        'source-arrow-color': machineEdgeColor || 'data(color)',
+      },
+    },
+    {
       selector: 'edge.faded',
       style: { 'opacity': fadedEdgeOpacity },
     },
@@ -761,6 +773,28 @@ function validateStrandStep(step, path) {
     }
     if (typeof body.output_is_sequence !== 'boolean') {
       throw new Error(`CapFabRenderer: ${path}.step_type.Cap.output_is_sequence must be a boolean`);
+    }
+    // `inputs` (capdag CapInput list) carries the data-flow graph: the main
+    // input plus any convergence inputs. Optional on legacy payloads, but
+    // when present it must be well-formed — the fan-in edges are drawn from
+    // it, so a malformed entry is a hard error, not a silent skip.
+    if (body.inputs !== undefined) {
+      assertArray(body.inputs, `${path}.step_type.Cap.inputs`);
+      body.inputs.forEach((input, inputIdx) => {
+        const inputPath = `${path}.step_type.Cap.inputs[${inputIdx}]`;
+        assertObject(input, inputPath);
+        assertString(input.arg_urn, `${inputPath}.arg_urn`);
+        // serde: unit variant → the string "StrandInput"; struct variant →
+        // { Step: { token_id } }. Anything else is malformed.
+        if (input.source === 'StrandInput') return;
+        if (input.source && typeof input.source === 'object' && input.source.Step) {
+          assertString(input.source.Step.token_id, `${inputPath}.source.Step.token_id`);
+          return;
+        }
+        throw new Error(
+          `CapFabRenderer: ${inputPath}.source must be "StrandInput" or { Step: { token_id } }`
+        );
+      });
     }
   } else {
     assertString(body.media_def, `${path}.step_type.${variant}.media_def`);
@@ -1309,6 +1343,17 @@ function buildStrandGraphData(data) {
     return outerExit;
   }
 
+  // Map every step's stable token_id to its output node id. A cap
+  // step's node (`step_${i}`) IS its `to_spec` output, so a convergence
+  // input naming a producer by token resolves to that producer's output
+  // node — the value flowing into the fan-in arg.
+  const tokenToNodeId = new Map();
+  data.steps.forEach((step, i) => {
+    if (step && typeof step.token_id === 'string' && step.token_id.length > 0) {
+      tokenToNodeId.set(step.token_id, `step_${i}`);
+    }
+  });
+
   data.steps.forEach((step, i) => {
     const variant = Object.keys(step.step_type)[0];
     const nodeId = `step_${i}`;
@@ -1330,8 +1375,43 @@ function buildStrandGraphData(data) {
       if (cardinality !== '1\u21921') {
         label = `${label} (${cardinality})`;
       }
+      // Resolve this cap's actual data-flow producers from `body.inputs`
+      // (capdag CapInput serde shape): each `source` is the string
+      // "StrandInput" (fed by the strand's input anchor → the input slot
+      // node) or `{ Step: { token_id } }` (fed by a producing cap → that
+      // step's output node). This is the authoritative topology; step
+      // ORDER is not — the realizer emits edges greedily in dependency
+      // order, so `prevNodeId` (the previously-emitted step) need not be
+      // one of this cap's inputs at all.
+      const capInputs = Array.isArray(body.inputs) ? body.inputs : [];
+      const producerNodeIds = [];
+      for (const input of capInputs) {
+        const src = input && input.source;
+        if (src === 'StrandInput') {
+          producerNodeIds.push(inputSlotId);
+          continue;
+        }
+        const producerToken = src && typeof src === 'object' && src.Step && src.Step.token_id;
+        if (typeof producerToken !== 'string' || producerToken.length === 0) continue;
+        const producerNodeId = tokenToNodeId.get(producerToken);
+        if (producerNodeId) producerNodeIds.push(producerNodeId);
+      }
+
+      // Pick the source of the single labeled "backbone" edge (the one
+      // carrying the cap title + cardinality). Inside a ForEach body — or
+      // when the cap declares no inputs — keep the linear `prevNodeId`
+      // thread so the ForEach boundary handling and its (1→n) entry marker
+      // are preserved exactly. Otherwise anchor the backbone on a REAL
+      // input: `prevNodeId` if it is genuinely one, else the first actual
+      // producer — so a non-input step ordered just before this cap can
+      // never become a spurious backbone edge.
+      const isForeachContext = isForeachEntry || insideForEachBody !== null;
+      let backboneSource = prevNodeId;
+      if (!isForeachContext && producerNodeIds.length > 0 && !producerNodeIds.includes(prevNodeId)) {
+        backboneSource = producerNodeIds[0];
+      }
       addEdge(
-        prevNodeId,
+        backboneSource,
         nodeId,
         label,
         body.title,
@@ -1339,6 +1419,25 @@ function buildStrandGraphData(data) {
         'strand-cap-edge',
         { foreachEntry: isForeachEntry }
       );
+
+      // Convergence (fan-in): draw an edge from every other producer that
+      // isn't the backbone source, so a cap fed by several producers renders
+      // as a DAG, not a chain. Deduplicated against the backbone edge and
+      // against a self-loop.
+      const drawnSources = new Set([backboneSource, nodeId]);
+      for (const producerNodeId of producerNodeIds) {
+        if (drawnSources.has(producerNodeId)) continue;
+        drawnSources.add(producerNodeId);
+        addEdge(
+          producerNodeId,
+          nodeId,
+          '',
+          body.title,
+          body.cap_urn,
+          'strand-convergence',
+          {}
+        );
+      }
 
       if (insideForEachBody !== null) {
         if (bodyEntry === null) bodyEntry = nodeId;
