@@ -2530,21 +2530,22 @@ class Cap {
    * @param {Object|null} metadataJson - Optional arbitrary metadata as JSON object
    * @param {string|null} documentation - Optional long-form markdown documentation. Rendered in capability info panels, the cap navigator, capdag-dot-com, and anywhere else a rich-text explanation of the cap is useful.
    */
-  constructor(urn, title, command, capDescription = null, metadata = {}, metadataJson = null, documentation = null) {
+  constructor(urn, title, aliases, capDescription = null, metadata = {}, metadataJson = null, documentation = null) {
     if (!(urn instanceof CapUrn)) {
       throw new Error('URN must be a CapUrn instance');
     }
     if (!title || typeof title !== 'string') {
       throw new Error('Title is required and must be a string');
     }
-    if (!command || typeof command !== 'string') {
-      throw new Error('Command is required and must be a string');
+    if (!Array.isArray(aliases) || aliases.length === 0) {
+      throw new Error('Aliases are required and must be a non-empty array');
     }
 
     this.urn = urn;
     this.version = 0;
     this.title = title;
-    this.command = command;
+    this.aliases = aliases;
+    this.is_abstract = false;
     this.cap_description = capDescription;
     this.documentation = documentation;
     this.metadata = metadata || {};
@@ -2752,7 +2753,8 @@ class Cap {
 
     return this.urn.equals(other.urn) &&
            this.title === other.title &&
-           this.command === other.command &&
+           JSON.stringify([...this.aliases].sort()) === JSON.stringify([...other.aliases].sort()) &&
+           this.is_abstract === other.is_abstract &&
            this.cap_description === other.cap_description &&
            this.documentation === other.documentation &&
            JSON.stringify(this.metadata) === JSON.stringify(other.metadata) &&
@@ -2772,7 +2774,7 @@ class Cap {
     const result = {
       urn: this.urn.toString(),
       title: this.title,
-      command: this.command,
+      aliases: this.aliases,
       cap_description: this.cap_description,
       metadata: this.metadata,
       args: this.args.map(a => a.toJSON()),
@@ -2781,6 +2783,10 @@ class Cap {
 
     if (this.version !== 0) {
       result.version = this.version;
+    }
+
+    if (this.is_abstract) {
+      result.abstract = true;
     }
 
     // Long-form markdown documentation. Only emitted when set, to match
@@ -2821,7 +2827,11 @@ class Cap {
     const documentation = (typeof json.documentation === 'string' && json.documentation.length > 0)
       ? json.documentation
       : null;
-    const cap = new Cap(urn, json.title, json.command, json.cap_description, json.metadata, json.metadata_json, documentation);
+    if (!Array.isArray(json.aliases) || json.aliases.length === 0) {
+      throw new Error(`cap '${json.urn}' must declare at least one alias (the 'aliases' field is required and non-empty)`);
+    }
+    const cap = new Cap(urn, json.title, json.aliases, json.cap_description, json.metadata, json.metadata_json, documentation);
+    cap.is_abstract = json.abstract === true;
     cap.version = (typeof json.version === 'number' && json.version !== 0) ? json.version : 0;
     // Parse args (new format)
     if (json.args && Array.isArray(json.args)) {
@@ -3046,20 +3056,20 @@ class CapManifest {
 /**
  * Helper functions for creating capabilities
  */
-function createCap(urn, title, command) {
-  return new Cap(urn, title, command);
+function createCap(urn, title, aliases) {
+  return new Cap(urn, title, aliases);
 }
 
-function createCapWithDescription(urn, title, command, description) {
-  return new Cap(urn, title, command, description);
+function createCapWithDescription(urn, title, aliases, description) {
+  return new Cap(urn, title, aliases, description);
 }
 
-function createCapWithMetadata(urn, title, command, metadata) {
-  return new Cap(urn, title, command, null, metadata);
+function createCapWithMetadata(urn, title, aliases, metadata) {
+  return new Cap(urn, title, aliases, null, metadata);
 }
 
-function createCapWithDescriptionAndMetadata(urn, title, command, description, metadata) {
-  return new Cap(urn, title, command, description, metadata);
+function createCapWithDescriptionAndMetadata(urn, title, aliases, description, metadata) {
+  return new Cap(urn, title, aliases, description, metadata);
 }
 
 // ============================================================================
@@ -3747,9 +3757,9 @@ class CapValidator {
       });
     }
 
-    if (!cap.command || typeof cap.command !== 'string') {
+    if (!Array.isArray(cap.aliases) || cap.aliases.length === 0) {
       throw new ValidationError('InvalidCapSchema', capUrn, {
-        issue: 'Cap must have a valid command'
+        issue: 'Cap must have at least one alias'
       });
     }
 
@@ -7425,7 +7435,8 @@ class FabricRegistryEntry {
   constructor(data) {
     this.urn = data.urn;
     this.title = data.title || '';
-    this.command = data.command || '';
+    this.aliases = data.aliases || [];
+    this.isAbstract = data.abstract === true;
     this.description = data.cap_description || '';
     this.args = data.args || [];
     this.output = data.output || null;

@@ -1125,7 +1125,7 @@ function buildBrowseGraphData(capabilities) {
     // Parsing the URN canonicalizes it and validates it — fail hard on
     // malformed registry data.
     const parsedUrn = CapUrn.fromString(capData.urn);
-    const cap = createCap(parsedUrn, title, capData.command || '');
+    const cap = createCap(parsedUrn, title, capData.aliases || []);
     const capFabEdgeIndex = capFab.edges.length;
     capFab.addCap(cap, 'registry');
 
