@@ -4754,6 +4754,12 @@ class CartridgeRepoClient {
     if (data.schemaVersion !== '5.0') {
       throw new Error(`Cartridge registry from ${repoUrl} has schemaVersion '${data.schemaVersion}'; required: 5.0`);
     }
+    // Cartridge registry regime version. v0 was the pre-versioning legacy at
+    // the bare /manifest path; this speaks only v1 at /v1/manifest. A manifest
+    // from a different regime version is rejected, not reinterpreted.
+    if (data.registryVersion !== 1) {
+      throw new Error(`Cartridge registry from ${repoUrl} has registryVersion '${data.registryVersion}'; this build speaks v1`);
+    }
     // Self-referential check: the manifest declares its own URL via
     // `registryUrl`. It must match the URL we just fetched from
     // byte-for-byte — a mismatch is a manifest-corruption signal
@@ -5030,6 +5036,9 @@ class CartridgeRepoServer {
     }
     if (this.registry.schemaVersion !== '5.0') {
       throw new Error(`Unsupported registry schema version: ${this.registry.schemaVersion}. Required: 5.0`);
+    }
+    if (this.registry.registryVersion !== 1) {
+      throw new Error(`Unsupported cartridge registry version: ${this.registry.registryVersion}. This build speaks v1.`);
     }
     if (typeof this.registry.registryUrl !== 'string' || this.registry.registryUrl.length === 0) {
       throw new Error('Registry must have a non-empty top-level `registryUrl` field (self-referential URL)');
