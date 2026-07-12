@@ -126,14 +126,14 @@ function test6204_Urn(tags) {
 // Helper to create a Cap for testing
 function makeCap(urnString, title) {
   const capUrn = CapUrn.fromString(urnString);
-  return new Cap(capUrn, title, 'test', title);
+  return new Cap(capUrn, title, ['test'], title);
 }
 
 // Helper to create caps with specific in/out media URNs for graph testing
 function makeGraphCap(inUrn, outUrn, title) {
   const urnString = `cap:in="${inUrn}";convert;out="${outUrn}"`;
   const capUrn = CapUrn.fromString(urnString);
-  return new Cap(capUrn, title, 'convert', title);
+  return new Cap(capUrn, title, ['convert'], title);
 }
 
 // ============================================================================
@@ -1271,7 +1271,7 @@ function test116_capArgConstructors() {
 // TEST150: JSON roundtrip
 function test150_capManifestJsonSerialization() {
   const capUrn = CapUrn.fromString(test6204_Urn('extract;target=metadata'));
-  const cap = new Cap(capUrn, 'Extract Metadata', 'extract-metadata');
+  const cap = new Cap(capUrn, 'Extract Metadata', ['extract-metadata']);
   cap.addArg(new CapArg('media:ext=pdf', true, [new ArgSource({ stdin: 'media:ext=pdf' })]));
   cap.addArg(new CapArg(
     'media:chunk-size;enc=utf-8;numeric',
@@ -1719,7 +1719,7 @@ function test6242_JS_resolveMediaUrnFromSpecs() {
 // TEST6246: J s cap j s o n serialization
 function test6246_JS_capJSONSerialization() {
   const urn = CapUrn.fromString(test6204_Urn('test'));
-  const cap = new Cap(urn, 'Test Cap', 'test_command');
+  const cap = new Cap(urn, 'Test Cap', ['test_command']);
   cap.arguments = {
     required: [{ name: 'input', media_urn: MEDIA_STRING }],
     optional: []
@@ -1742,7 +1742,7 @@ function test6246_JS_capJSONSerialization() {
 // surface as failures here.
 function test6249_JS_capDocumentationRoundTrip() {
   const urn = CapUrn.fromString(test6204_Urn('documented'));
-  const cap = new Cap(urn, 'Documented Cap', 'documented');
+  const cap = new Cap(urn, 'Documented Cap', ['documented']);
   const body = '# Documented Cap\r\n\nDoes the thing.\n\n```bash\necho "hi"\n```\n\nSee also: \u2605\n';
   cap.setDocumentation(body);
   assertEqual(cap.getDocumentation(), body, 'Setter must store the body verbatim');
@@ -1764,7 +1764,7 @@ function test6249_JS_capDocumentationRoundTrip() {
 // (which has no null sentinel) and pollute generated JSON.
 function test6253_JS_capDocumentationOmittedWhenNull() {
   const urn = CapUrn.fromString(test6204_Urn('undocumented'));
-  const cap = new Cap(urn, 'Undocumented Cap', 'undocumented');
+  const cap = new Cap(urn, 'Undocumented Cap', ['undocumented']);
   assertEqual(cap.getDocumentation(), null, 'Default documentation must be null');
 
   const json = cap.toJSON();
@@ -1854,8 +1854,10 @@ function test6269_JS_mediaDefConstruction() {
 // to assert on. Tests that need an empty channel use literals inline.
 const sampleRegistry = {
   schemaVersion: '5.0',
+  registryVersion: 1,
   lastUpdated: '2026-02-07T16:48:28Z',
   registryUrl: 'https://test.example/manifest',
+  fabricRegistryUrl: 'https://fabric.test',
   channels: {
     release: { cartridges: {
     pdfcartridge: {
@@ -2089,7 +2091,7 @@ function test323_cartridgeRepoServerValidateRegistry() {
   // Missing channels object
   threw = false;
   try {
-    new CartridgeRepoServer({schemaVersion: '5.0', registryUrl: 'https://test.example/manifest'});
+    new CartridgeRepoServer({schemaVersion: '5.0', registryVersion: 1, fabricRegistryUrl: 'https://fabric.test', registryUrl: 'https://test.example/manifest'});
   } catch (e) {
     threw = true;
     assert(e.message.includes('channels'), 'Should reject missing channels');
@@ -2099,7 +2101,7 @@ function test323_cartridgeRepoServerValidateRegistry() {
   // Missing one of the two required channels
   threw = false;
   try {
-    new CartridgeRepoServer({schemaVersion: '5.0', registryUrl: 'https://test.example/manifest', channels: {release: {cartridges: {}}}});
+    new CartridgeRepoServer({schemaVersion: '5.0', registryVersion: 1, fabricRegistryUrl: 'https://fabric.test', registryUrl: 'https://test.example/manifest', channels: {release: {cartridges: {}}}});
   } catch (e) {
     threw = true;
     assert(e.message.includes('nightly'), 'Should require nightly channel');
@@ -2956,7 +2958,7 @@ function test6544_builderRejectsStructuralKeys() {
 // TEST1294: RULE11 - void-input cap with stdin source rejected
 function test1294_rule11VoidInputWithStdinRejected() {
   const urn = CapUrn.fromString('cap:in="media:void";test;out="media:string"');
-  const cap = new Cap(urn, 'Test', 'test-cmd');
+  const cap = new Cap(urn, 'Test', ['test-cmd']);
   const stdinSource = ArgSource.fromJSON({ stdin: 'media:string' });
   cap.args = [new CapArg('media:string', true, [stdinSource])];
   try {
@@ -2971,7 +2973,7 @@ function test1294_rule11VoidInputWithStdinRejected() {
 // TEST1295: RULE11 - non-void-input cap without stdin source rejected
 function test1295_rule11NonVoidInputWithoutStdinRejected() {
   const urn = CapUrn.fromString('cap:in="media:string";test;out="media:string"');
-  const cap = new Cap(urn, 'Test', 'test-cmd');
+  const cap = new Cap(urn, 'Test', ['test-cmd']);
   const posSource = ArgSource.fromJSON({ cli_flag: '--name' });
   cap.args = [new CapArg('media:string', true, [posSource])];
   try {
@@ -2986,7 +2988,7 @@ function test1295_rule11NonVoidInputWithoutStdinRejected() {
 // TEST1296: RULE11 - void-input cap with only cli_flag sources passes
 function test1296_rule11VoidInputCliFlagOnly() {
   const urn = CapUrn.fromString('cap:in="media:void";test;out="media:string"');
-  const cap = new Cap(urn, 'Test', 'test-cmd');
+  const cap = new Cap(urn, 'Test', ['test-cmd']);
   const flagSource = ArgSource.fromJSON({ cli_flag: '--name' });
   cap.args = [new CapArg('media:string', true, [flagSource])];
   // Should not throw
@@ -2996,7 +2998,7 @@ function test1296_rule11VoidInputCliFlagOnly() {
 // TEST1297: RULE11 - non-void-input cap with stdin source passes
 function test1297_rule11NonVoidInputWithStdin() {
   const urn = CapUrn.fromString('cap:in="media:string";test;out="media:string"');
-  const cap = new Cap(urn, 'Test', 'test-cmd');
+  const cap = new Cap(urn, 'Test', ['test-cmd']);
   const stdinSource = ArgSource.fromJSON({ stdin: 'media:string' });
   cap.args = [new CapArg('media:string', true, [stdinSource])];
   // Should not throw
@@ -4339,7 +4341,7 @@ function test6470_Machine_capRegistryEntry_defaults() {
   assertEqual(entry.urn, 'cap:in=media:;test;out=media:', 'URN should match');
   assertEqual(entry.title, '', 'Title should default to empty');
   assertEqual(entry.description, '', 'Description should default to empty');
-  assertEqual(entry.command, '', 'Command should default to empty');
+  assert(Array.isArray(entry.aliases) && entry.aliases.length === 0, 'Aliases should default to an empty array');
   assert(Array.isArray(entry.args), 'Args should default to array');
   assertEqual(entry.args.length, 0, 'Args should be empty');
 }
@@ -6339,7 +6341,7 @@ function test6736_axisWeightingDecodedLayout() {
 // TEST6737: Cap with version=0 round-trips with no `version` key on wire
 function test6737_capVersionZeroOmittedOnWire() {
   const urn = CapUrn.fromString('cap:in="media:void";test-op;out="media:enc=utf-8;record"');
-  const cap = new Cap(urn, 'Test Cap', 'test-op');
+  const cap = new Cap(urn, 'Test Cap', ['test-op']);
   // version defaults to 0
   assertEqual(cap.version, 0, 'Default version should be 0');
   const json = cap.toJSON();
@@ -6351,7 +6353,7 @@ function test6737_capVersionZeroOmittedOnWire() {
 // TEST1848: Cap with version=N round-trips with `version: N` on wire
 function test1848_capVersionNonZeroOnWire() {
   const urn = CapUrn.fromString('cap:in="media:void";versioned-op;out="media:enc=utf-8;record"');
-  const cap = new Cap(urn, 'Versioned Cap', 'versioned-op');
+  const cap = new Cap(urn, 'Versioned Cap', ['versioned-op']);
   cap.version = 42;
   const json = cap.toJSON();
   assert('version' in json, 'version!=0 must appear on wire');
