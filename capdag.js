@@ -4778,6 +4778,12 @@ class CartridgeRepoClient {
     if (data.registryVersion !== 1) {
       throw new Error(`Cartridge registry from ${repoUrl} has registryVersion '${data.registryVersion}'; this build speaks v1`);
     }
+    // A cartridge registry must declare the fabric its caps resolve against. The
+    // client cross-checks this equals its own fabric (so every registry it uses
+    // shares one fabric); here we require it is at least present.
+    if (typeof data.fabricRegistryUrl !== 'string' || data.fabricRegistryUrl.length === 0) {
+      throw new Error(`Cartridge registry from ${repoUrl}: missing required 'fabricRegistryUrl' (the fabric its caps resolve against)`);
+    }
     // Self-referential check: the manifest declares its own URL via
     // `registryUrl`. It must match the URL we just fetched from
     // byte-for-byte — a mismatch is a manifest-corruption signal
@@ -5057,6 +5063,9 @@ class CartridgeRepoServer {
     }
     if (this.registry.registryVersion !== 1) {
       throw new Error(`Unsupported cartridge registry version: ${this.registry.registryVersion}. This build speaks v1.`);
+    }
+    if (typeof this.registry.fabricRegistryUrl !== 'string' || this.registry.fabricRegistryUrl.length === 0) {
+      throw new Error('Registry must declare a non-empty `fabricRegistryUrl` (the fabric its caps resolve against)');
     }
     if (typeof this.registry.registryUrl !== 'string' || this.registry.registryUrl.length === 0) {
       throw new Error('Registry must have a non-empty top-level `registryUrl` field (self-referential URL)');
