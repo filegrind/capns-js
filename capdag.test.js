@@ -2581,7 +2581,9 @@ function test1874_registryUrlFromBuildEnvRejectsEmptyString() {
 function discoveryInstallFixture(root, slug, channelFolder, name, version, cartridgeJson, entry) {
   const fs = require('fs');
   const path = require('path');
-  const dir = path.join(root, slug, channelFolder, name, version);
+  // {slug}/v1/{channel}/{name}/{version} — the version level pins to the host
+  // registry version (the tests construct identities at cartridgeRegistryVersion 1).
+  const dir = path.join(root, slug, 'v1', channelFolder, name, version);
   fs.mkdirSync(dir, { recursive: true });
   if (cartridgeJson !== null && cartridgeJson !== undefined) {
     fs.writeFileSync(path.join(dir, 'cartridge.json'), cartridgeJson);
@@ -2634,7 +2636,7 @@ async function test1875_scanAllReachesBothDevAndRegistrySlugs() {
     const url = 'https://cartridges.example.com/manifest';
     const rslug = slugForSync(url);
     // Host baked for a DIFFERENT registry than the on-disk registry cartridge.
-    const host = new DiscoveryIdentity({ channel: 'nightly', registryUrl: 'https://other.example.com/manifest', fabricManifestVersion: 1 });
+    const host = new DiscoveryIdentity({ channel: 'nightly', registryUrl: 'https://other.example.com/manifest', fabricManifestVersion: 1, cartridgeRegistryVersion: 1 });
     discoveryInstallFixture(root, 'dev', 'nightly', 'devcart', '1.0.0', discoveryDevCartridgeJson('nightly', 1), 'cart');
     discoveryInstallFixture(root, rslug, 'nightly', 'regcart', '1.0.0', discoveryRegistryCartridgeJson(url, 'nightly', 1), 'cart');
     const out = await discoverCartridges(root, host);
@@ -2658,7 +2660,7 @@ async function test1876_otherChannelSubtreeIsSkipped() {
     const url = 'https://cartridges.example.com/manifest';
     const rslug = slugForSync(url);
     discoveryInstallFixture(root, rslug, 'release', 'regcart', '1.0.0', discoveryRegistryCartridgeJson(url, 'release', 1), 'cart');
-    const out = await discoverCartridges(root, new DiscoveryIdentity({ channel: 'nightly', registryUrl: null, fabricManifestVersion: 1 }));
+    const out = await discoverCartridges(root, new DiscoveryIdentity({ channel: 'nightly', registryUrl: null, fabricManifestVersion: 1, cartridgeRegistryVersion: 1 }));
     assertEqual(out.length, 0, 'a release-only slug must be invisible to a nightly host');
   } finally {
     discoveryRemoveRoot(root);
@@ -2675,7 +2677,7 @@ async function test1877_registryCartridgeUnderWrongSlugIsBadInstall() {
     const wrongSlug = slugForSync('https://somewhere-else.example.com/manifest');
     const json = discoveryRegistryCartridgeJson(url, 'nightly', 1);
     discoveryInstallFixture(root, wrongSlug, 'nightly', 'cart', '1.0.0', json, 'cart');
-    const out = await discoverCartridges(root, new DiscoveryIdentity({ channel: 'nightly', registryUrl: null, fabricManifestVersion: 1 }));
+    const out = await discoverCartridges(root, new DiscoveryIdentity({ channel: 'nightly', registryUrl: null, fabricManifestVersion: 1, cartridgeRegistryVersion: 1 }));
     discoveryExpectIncompatible(out, CartridgeAttachmentErrorKind.BAD_INSTALLATION);
   } finally {
     discoveryRemoveRoot(root);
@@ -2703,7 +2705,7 @@ async function test1878_bundledProviderWithoutBakedHashIsRejected() {
       installed_at: '2024-01-01T00:00:00Z', installed_from: 'bundle', fabric_manifest_version: 1,
     });
     discoveryInstallFixture(root, 'dev', 'nightly', 'cart', '1.0.0', json, 'cart');
-    const out = await discoverCartridges(root, new DiscoveryIdentity({ channel: 'nightly', registryUrl: null, fabricManifestVersion: 1 }));
+    const out = await discoverCartridges(root, new DiscoveryIdentity({ channel: 'nightly', registryUrl: null, fabricManifestVersion: 1, cartridgeRegistryVersion: 1 }));
     discoveryExpectIncompatible(out, CartridgeAttachmentErrorKind.BAD_INSTALLATION);
     assert(out[0].error.message.includes('bundled provider integrity'),
       `message should name the bundled-integrity failure: ${out[0].error.message}`);

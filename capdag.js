@@ -4365,37 +4365,55 @@ class CartridgeCapGroup {
 // in synchronous contexts must await.
 
 const DEV_SLUG = "dev";
-const SLUG_HEX_LEN = 16;
 
 /**
- * Compute the on-disk slug for a registry URL.
- *
- * @param {string|null|undefined} registryUrl - The registry URL, or
- *   null/undefined for dev installs.
- * @returns {Promise<string>} The slug — `DEV_SLUG` for null,
- *   otherwise the first 16 lowercase-hex characters of
- *   sha256(registryUrl).
+ * The authority (host[:port]) of a registry URL: after `://` up to the next
+ * `/`, `?`, or `#` (path/query/fragment discarded).
  */
-async function slugForRegistryUrl(registryUrl) {
+function authorityOfRegistryUrl(url) {
+  const i = url.indexOf("://");
+  const afterScheme = i >= 0 ? url.slice(i + 3) : url;
+  const m = afterScheme.search(/[/?#]/);
+  return m >= 0 ? afterScheme.slice(0, m) : afterScheme;
+}
+
+/**
+ * Compute the on-disk slug for a registry URL. Mirrors
+ * capdag::cartridge_slug::slug_for byte-for-byte: `DEV_SLUG` for null/undefined,
+ * otherwise a path-safe transform of the URL's authority (host[:port]) —
+ * ASCII-lowercased, every character outside `[a-z0-9.-]` replaced by `-`.
+ * Depends ONLY on the authority; path/version/query/trailing-slash/host-case
+ * do not change it.
+ *
+ * @param {string|null|undefined} registryUrl
+ * @returns {string}
+ */
+function slugForRegistryUrlSync(registryUrl) {
   if (registryUrl === null || registryUrl === undefined) {
     return DEV_SLUG;
   }
-  const bytes = new TextEncoder().encode(registryUrl);
-  // Web Crypto exposes SHA-256 via crypto.subtle. Node 16+ exposes
-  // it through globalThis.crypto.subtle.
-  const digestBuffer = await crypto.subtle.digest("SHA-256", bytes);
-  const digestBytes = new Uint8Array(digestBuffer);
-  let hex = "";
-  for (const b of digestBytes) {
-    hex += b.toString(16).padStart(2, "0");
+  let out = "";
+  for (const ch of authorityOfRegistryUrl(registryUrl)) {
+    const lc = ch >= "A" && ch <= "Z" ? ch.toLowerCase() : ch;
+    out += (lc >= "a" && lc <= "z") || (lc >= "0" && lc <= "9") || lc === "." || lc === "-" ? lc : "-";
   }
-  return hex.slice(0, SLUG_HEX_LEN);
+  return out;
+}
+
+/**
+ * Async wrapper retained for callers that `await` the slug. The computation is
+ * synchronous (no hashing) — the authority transform needs no crypto.
+ * @returns {Promise<string>}
+ */
+async function slugForRegistryUrl(registryUrl) {
+  return slugForRegistryUrlSync(registryUrl);
 }
 
 function isRegistrySlug(s) {
   return typeof s === "string"
-      && s.length === SLUG_HEX_LEN
-      && /^[0-9a-f]+$/.test(s);
+      && s.length > 0
+      && s !== DEV_SLUG
+      && /^[a-z0-9.-]+$/.test(s);
 }
 
 // =============================================================================
@@ -5469,24 +5487,15 @@ class InstalledCartridgeRecord {
 /**
  * Synchronous on-disk slug for a registry URL. Mirrors
  * capdag::bifaci::cartridge_slug::slug_for byte-for-byte: `null`/`undefined`
- * (a dev cartridge) → the literal `DEV_SLUG`; otherwise the first
- * SLUG_HEX_LEN lowercase-hex characters of sha256(url bytes).
- *
- * The async `slugForRegistryUrl` above uses Web Crypto for browser parity;
- * discovery runs only under Node and needs a synchronous slug in tight
- * per-file loops, so this uses Node's synchronous `crypto.createHash`. Both
- * produce identical output.
+ * (a dev cartridge) → the literal `DEV_SLUG`; otherwise a path-safe transform
+ * of the URL's authority (host[:port]). Identical output to the async
+ * `slugForRegistryUrl` above — no hashing, so both are trivially in sync.
  *
  * @param {string|null|undefined} registryUrl
  * @returns {string}
  */
 function slugForSync(registryUrl) {
-  if (registryUrl === null || registryUrl === undefined) {
-    return DEV_SLUG;
-  }
-  const crypto = require('crypto');
-  const hex = crypto.createHash('sha256').update(registryUrl, 'utf8').digest('hex');
-  return hex.slice(0, SLUG_HEX_LEN);
+  return slugForRegistryUrlSync(registryUrl);
 }
 
 /**
@@ -5857,14 +5866,21 @@ class DiscoveryIdentity {
    * @param {string|null} opts.registryUrl - Some(url) for release/nightly
    *   hosts, null for dev hosts.
    * @param {number} opts.fabricManifestVersion
+   * @param {number} opts.cartridgeRegistryVersion - The registry regime version
+   *   this host speaks; an on-disk PATH level ({slug}/v{N}/{channel}/…), pinned
+   *   like the channel so a v1 host never scans a v2 tree.
    */
-  constructor({ channel, registryUrl, fabricManifestVersion }) {
+  constructor({ channel, registryUrl, fabricManifestVersion, cartridgeRegistryVersion }) {
     if (channel !== CartridgeChannel.Release && channel !== CartridgeChannel.Nightly) {
       throw new Error(`DiscoveryIdentity: invalid channel '${channel}'`);
+    }
+    if (!Number.isInteger(cartridgeRegistryVersion) || cartridgeRegistryVersion < 1) {
+      throw new Error(`DiscoveryIdentity: cartridgeRegistryVersion must be an integer >= 1, got '${cartridgeRegistryVersion}'`);
     }
     this.channel = channel;
     this.registryUrl = registryUrl !== undefined ? registryUrl : null;
     this.fabricManifestVersion = fabricManifestVersion;
+    this.cartridgeRegistryVersion = cartridgeRegistryVersion;
   }
 
   /** This host's own baked-registry slug (`dev` when registryUrl is null). */
@@ -6194,7 +6210,9 @@ async function discoverCartridges(cartridgesRoot, identity) {
       continue;
     }
     const expectedSlug = slugEntry.name;
-    const scanRoot = path.join(slugDir, identity.channel);
+    // {slug}/v{cartridgeRegistryVersion}/{channel}/… — the registry regime
+    // version is a path level pinned to the host's version (like the channel).
+    const scanRoot = path.join(slugDir, `v${identity.cartridgeRegistryVersion}`, identity.channel);
     let scanStat;
     try { scanStat = fs.statSync(scanRoot); } catch (_e) { continue; }
     if (!scanStat.isDirectory()) continue;
@@ -8107,7 +8125,7 @@ module.exports = {
   discoverCartridges,
   // Registry slug
   DEV_SLUG,
-  SLUG_HEX_LEN,
+  slugForRegistryUrlSync,
   slugForRegistryUrl,
   isRegistrySlug,
   // Machine notation
