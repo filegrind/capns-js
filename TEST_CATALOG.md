@@ -1,4 +1,4 @@
-# JS Test Catalog
+# CapDag-JS Test Catalog
 
 **Total Tests:** 352
 
@@ -12,7 +12,7 @@
 
 All numbered test numbers are unique.
 
-This catalog lists all tests in the JS codebase.
+This catalog lists all tests in the CapDag-JS codebase.
 
 | Test # | Function Name | Description | File |
 |--------|---------------|-------------|------|
@@ -96,10 +96,10 @@ This catalog lists all tests in the JS codebase.
 | test110 | `test110_multipleExtensions` | TEST110: Test cap matching with subset semantics for request fulfillment | capdag.test.js:1195 |
 | test115 | `test115_capArgSerialization` | TEST115: Test CapArg serialization and deserialization with multiple sources | capdag.test.js:1211 |
 | test116 | `test116_capArgConstructors` | TEST116: Test CapArg constructor methods basic and with_description create args correctly | capdag.test.js:1244 |
-| test125 | `test125_effectNonePreservesRuntimeMedia` | TEST125: effect=none preserves runtime media identity | capdag.test.js:3164 |
-| test126 | `test126_effectDeclaredUsesDeclaredOutput` | TEST126: default effect=declared uses the declared output | capdag.test.js:3173 |
-| test127 | `test127_invalidEffectNoneFailsHard` | TEST127: invalid effect=none declarations fail hard | capdag.test.js:3184 |
-| test128 | `test128_effectDispatchRequiresExplicitWildcard` | TEST128: omitted effect means declared; unconstrained effect must be explicit | capdag.test.js:3193 |
+| test125 | `test125_effectNonePreservesRuntimeMedia` | TEST125: effect=none preserves runtime media identity | capdag.test.js:3168 |
+| test126 | `test126_effectDeclaredUsesDeclaredOutput` | TEST126: default effect=declared uses the declared output | capdag.test.js:3177 |
+| test127 | `test127_invalidEffectNoneFailsHard` | TEST127: invalid effect=none declarations fail hard | capdag.test.js:3188 |
+| test128 | `test128_effectDispatchRequiresExplicitWildcard` | TEST128: omitted effect means declared; unconstrained effect must be explicit | capdag.test.js:3197 |
 | test150 | `test150_capManifestJsonSerialization` | TEST150: JSON roundtrip | capdag.test.js:1272 |
 | test156 | `test156_stdinSourceFromData` | TEST156: Test creating StdinSource Data variant with byte vector | capdag.test.js:1428 |
 | test157 | `test157_stdinSourceFromFileReference` | TEST157: Test creating StdinSource FileReference variant with all required fields | capdag.test.js:1439 |
@@ -120,92 +120,92 @@ This catalog lists all tests in the JS codebase.
 | test309 | `test309_modelAvailabilityAndPathAreDistinct` | TEST309: Test model_availability_urn and model_path_urn produce distinct URNs | capdag.test.js:1600 |
 | test310 | `test310_llmGenerateTextUrn` | TEST310: llm_generate_text_urn() produces a valid cap URN with a UTF-8 text input and plain-text terminal output. | capdag.test.js:1607 |
 | test312 | `test312_allUrnBuildersProduceValidUrns` | TEST312: Test all URN builders produce parseable cap URNs | capdag.test.js:1630 |
-| test320 | `test320_cartridgeInfoConstruction` | TEST320-335: CartridgeRepoServer and CartridgeRepoClient tests | capdag.test.js:1994 |
-| test321 | `test321_cartridgeInfoIsSigned` | TEST321: CartridgeInfo.is_signed() returns true when signature (team_id + signed_at) is present, false when either is empty. | capdag.test.js:2028 |
-| test322 | `test322_cartridgeInfoBuildForPlatform` | TEST322: CartridgeInfo.build_for_platform() returns the build that matches the requested platform string and None otherwise. | capdag.test.js:2040 |
-| test323 | `test323_cartridgeRepoServerValidateRegistry` | TEST323: CartridgeRepoServer requires schema 5.0 and rejects older. | capdag.test.js:2074 |
-| test324 | `test324_cartridgeRepoServerTransformToArray` | TEST324: CartridgeRepoServer transforms a v4.0 entry into a flat CartridgeInfo, preserving cap_groups verbatim. | capdag.test.js:2111 |
-| test325 | `test325_cartridgeRepoServerGetCartridges` | TEST325: get_cartridges() wraps the transformed array in the response envelope. | capdag.test.js:2148 |
-| test326 | `test326_cartridgeRepoServerGetCartridgeById` | TEST326: get_cartridge_by_id requires a channel and returns Some for a known (channel, id), None otherwise. The same id looked up in the wrong channel must miss — channels are independent namespaces. | capdag.test.js:2160 |
-| test327 | `test327_cartridgeRepoServerSearchCartridges` | TEST327: search_cartridges matches against name/description/tags and cap titles, but never against cap URN strings. | capdag.test.js:2190 |
-| test328 | `test328_cartridgeRepoServerGetByCategory` | TEST328: CartridgeRepoServer.getCartridgesByCategory() filters cartridges by category across both channels. | capdag.test.js:2212 |
-| test329 | `test329_cartridgeRepoServerGetByCap` | TEST329: CartridgeRepoServer.getCartridgesByCap() parses the input URN and matches each declared cap via `conformsTo`. Tag-order differences resolve because matching is order-theoretic, not string. | capdag.test.js:2231 |
-| test330 | `test330_cartridgeRepoClientUpdateCache` | TEST330: CartridgeRepoClient updates its local cache keyed by "<channel>:<id>". The cache holds release and nightly entries independently — the same id is allowed in both. | capdag.test.js:2248 |
-| test331 | `test331_cartridgeRepoClientGetSuggestions` | TEST331: CartridgeRepoClient.getSuggestionsForCap() returns cartridge suggestions with channel propagated onto each suggestion. | capdag.test.js:2276 |
-| test332 | `test332_cartridgeRepoClientGetCartridge` | TEST332: get_cartridge requires a (channel, id) pair and returns the cached entry for known pairs, None otherwise. The same id in the wrong channel must miss. | capdag.test.js:2305 |
-| test333 | `test333_cartridgeRepoClientGetAllCaps` | TEST333: get_all_available_caps returns the deduplicated set of normalized URNs across cartridges. | capdag.test.js:2349 |
-| test334 | `test334_cartridgeRepoClientNeedsSync` | TEST334: needs_sync returns true on an empty cache, false right after a successful update. | capdag.test.js:2365 |
-| test335 | `test335_cartridgeRepoServerClientIntegration` | TEST335: Round-trip: server produces a v5.0 response, client consumes it, channel provenance is preserved end-to-end. | capdag.test.js:2384 |
-| test546 | `test546_isImage` | TEST546: is_image returns true only when image marker tag is present | capdag.test.js:2720 |
-| test547 | `test547_isAudio` | TEST547: is_audio returns true only when audio marker tag is present | capdag.test.js:2732 |
-| test548 | `test548_isVideo` | TEST548: is_video returns true only when video marker tag is present | capdag.test.js:2743 |
-| test549 | `test549_isNumeric` | TEST549: is_numeric returns true only when numeric marker tag is present | capdag.test.js:2753 |
-| test550 | `test550_isBool` | TEST550: is_bool returns true only when bool marker tag is present | capdag.test.js:2765 |
-| test551 | `test551_isFilePath` | TEST551: is_file_path returns true for the single file-path media URN, false for everything else. There is no "array" variant — cardinality is carried by is_sequence on the wire, not by URN tags. | capdag.test.js:2777 |
-| test558 | `test558_predicateConstantConsistency` | TEST558: predicates are consistent with constants — every constant triggers exactly the expected predicates | capdag.test.js:2796 |
-| test559 | `test559_withoutTag` | TEST559: without_tag removes tag, rejects structural keys, case-insensitive for keys | capdag.test.js:2835 |
-| test560 | `test560_withInOutSpec` | TEST560: with_in_spec and with_out_spec change direction specs | capdag.test.js:2855 |
-| test563 | `test563_findAllMatches` | TEST563: CapMatcher::find_all_matches returns all matching caps sorted by specificity | capdag.test.js:2885 |
-| test564 | `test564_areCompatible` | TEST564: CapMatcher::are_compatible detects bidirectional overlap | capdag.test.js:2903 |
-| test566 | `test566_withTagRejectsStructuralKeys` | TEST566: with_tag rejects structural keys | capdag.test.js:2928 |
+| test320 | `test320_cartridgeInfoConstruction` | TEST320-335: CartridgeRepoServer and CartridgeRepoClient tests | capdag.test.js:1996 |
+| test321 | `test321_cartridgeInfoIsSigned` | TEST321: CartridgeInfo.is_signed() returns true when signature (team_id + signed_at) is present, false when either is empty. | capdag.test.js:2030 |
+| test322 | `test322_cartridgeInfoBuildForPlatform` | TEST322: CartridgeInfo.build_for_platform() returns the build that matches the requested platform string and None otherwise. | capdag.test.js:2042 |
+| test323 | `test323_cartridgeRepoServerValidateRegistry` | TEST323: CartridgeRepoServer requires schema 5.0 and rejects older. | capdag.test.js:2076 |
+| test324 | `test324_cartridgeRepoServerTransformToArray` | TEST324: CartridgeRepoServer transforms a v4.0 entry into a flat CartridgeInfo, preserving cap_groups verbatim. | capdag.test.js:2113 |
+| test325 | `test325_cartridgeRepoServerGetCartridges` | TEST325: get_cartridges() wraps the transformed array in the response envelope. | capdag.test.js:2150 |
+| test326 | `test326_cartridgeRepoServerGetCartridgeById` | TEST326: get_cartridge_by_id requires a channel and returns Some for a known (channel, id), None otherwise. The same id looked up in the wrong channel must miss — channels are independent namespaces. | capdag.test.js:2162 |
+| test327 | `test327_cartridgeRepoServerSearchCartridges` | TEST327: search_cartridges matches against name/description/tags and cap titles, but never against cap URN strings. | capdag.test.js:2192 |
+| test328 | `test328_cartridgeRepoServerGetByCategory` | TEST328: CartridgeRepoServer.getCartridgesByCategory() filters cartridges by category across both channels. | capdag.test.js:2214 |
+| test329 | `test329_cartridgeRepoServerGetByCap` | TEST329: CartridgeRepoServer.getCartridgesByCap() parses the input URN and matches each declared cap via `conformsTo`. Tag-order differences resolve because matching is order-theoretic, not string. | capdag.test.js:2233 |
+| test330 | `test330_cartridgeRepoClientUpdateCache` | TEST330: CartridgeRepoClient updates its local cache keyed by "<channel>:<id>". The cache holds release and nightly entries independently — the same id is allowed in both. | capdag.test.js:2250 |
+| test331 | `test331_cartridgeRepoClientGetSuggestions` | TEST331: CartridgeRepoClient.getSuggestionsForCap() returns cartridge suggestions with channel propagated onto each suggestion. | capdag.test.js:2278 |
+| test332 | `test332_cartridgeRepoClientGetCartridge` | TEST332: get_cartridge requires a (channel, id) pair and returns the cached entry for known pairs, None otherwise. The same id in the wrong channel must miss. | capdag.test.js:2307 |
+| test333 | `test333_cartridgeRepoClientGetAllCaps` | TEST333: get_all_available_caps returns the deduplicated set of normalized URNs across cartridges. | capdag.test.js:2351 |
+| test334 | `test334_cartridgeRepoClientNeedsSync` | TEST334: needs_sync returns true on an empty cache, false right after a successful update. | capdag.test.js:2367 |
+| test335 | `test335_cartridgeRepoServerClientIntegration` | TEST335: Round-trip: server produces a v5.0 response, client consumes it, channel provenance is preserved end-to-end. | capdag.test.js:2386 |
+| test546 | `test546_isImage` | TEST546: is_image returns true only when image marker tag is present | capdag.test.js:2724 |
+| test547 | `test547_isAudio` | TEST547: is_audio returns true only when audio marker tag is present | capdag.test.js:2736 |
+| test548 | `test548_isVideo` | TEST548: is_video returns true only when video marker tag is present | capdag.test.js:2747 |
+| test549 | `test549_isNumeric` | TEST549: is_numeric returns true only when numeric marker tag is present | capdag.test.js:2757 |
+| test550 | `test550_isBool` | TEST550: is_bool returns true only when bool marker tag is present | capdag.test.js:2769 |
+| test551 | `test551_isFilePath` | TEST551: is_file_path returns true for the single file-path media URN, false for everything else. There is no "array" variant — cardinality is carried by is_sequence on the wire, not by URN tags. | capdag.test.js:2781 |
+| test558 | `test558_predicateConstantConsistency` | TEST558: predicates are consistent with constants — every constant triggers exactly the expected predicates | capdag.test.js:2800 |
+| test559 | `test559_withoutTag` | TEST559: without_tag removes tag, rejects structural keys, case-insensitive for keys | capdag.test.js:2839 |
+| test560 | `test560_withInOutSpec` | TEST560: with_in_spec and with_out_spec change direction specs | capdag.test.js:2859 |
+| test563 | `test563_findAllMatches` | TEST563: CapMatcher::find_all_matches returns all matching caps sorted by specificity | capdag.test.js:2889 |
+| test564 | `test564_areCompatible` | TEST564: CapMatcher::are_compatible detects bidirectional overlap | capdag.test.js:2907 |
+| test566 | `test566_withTagRejectsStructuralKeys` | TEST566: with_tag rejects structural keys | capdag.test.js:2932 |
 | test597 | `test597_capArgWithFullDefinition` | TEST597: CapArg::with_full_definition stores all fields including optional ones | capdag.test.js:1328 |
-| test640 | `test640_inOnlyIsIllegal` | TEST640: cap:in defaults to the same illegal bare top form | capdag.test.js:3020 |
-| test641 | `test641_outOnlyIsIllegal` | TEST641: cap:out defaults to the same illegal bare top form | capdag.test.js:3029 |
-| test642 | `test642_inOutWithoutValuesAreIllegal` | TEST642: cap:in;out becomes the same illegal bare top form | capdag.test.js:3038 |
-| test643 | `test643_explicitAsteriskIsIllegal` | TEST643: cap:in=*;out=* is the same illegal bare top form | capdag.test.js:3047 |
-| test644 | `test644_specificInWildcardOutIsIllegal` | TEST644: cap:in=media:;out=* is the same illegal bare top form | capdag.test.js:3056 |
-| test645 | `test645_wildcardInSpecificOut` | TEST645: cap:in=*;out=media:text has wildcard in, specific out | capdag.test.js:3065 |
-| test646 | `test646_invalidInSpecFails` | TEST646: cap:in=foo fails (invalid media URN) | capdag.test.js:3072 |
-| test647 | `test647_invalidOutSpecFails` | TEST647: cap:in=media:;out=bar fails (invalid media URN) | capdag.test.js:3081 |
-| test648 | `test648_wildcardAcceptsSpecific` | TEST648: Wildcard in/out match specific caps | capdag.test.js:3090 |
-| test649 | `test649_specificityScoring` | TEST649: Specificity - wildcard has 0, specific has tag count | capdag.test.js:3099 |
-| test650 | `test650_wildcardPreserveOtherTags` | TEST650: cap:in=media:;out=media:;test preserves other tags | capdag.test.js:3108 |
-| test653 | `test653_invalidEffectNoneDeclarationRejected` | TEST653: invalid effect=none declarations fail at construction | capdag.test.js:3155 |
+| test640 | `test640_inOnlyIsIllegal` | TEST640: cap:in defaults to the same illegal bare top form | capdag.test.js:3024 |
+| test641 | `test641_outOnlyIsIllegal` | TEST641: cap:out defaults to the same illegal bare top form | capdag.test.js:3033 |
+| test642 | `test642_inOutWithoutValuesAreIllegal` | TEST642: cap:in;out becomes the same illegal bare top form | capdag.test.js:3042 |
+| test643 | `test643_explicitAsteriskIsIllegal` | TEST643: cap:in=*;out=* is the same illegal bare top form | capdag.test.js:3051 |
+| test644 | `test644_specificInWildcardOutIsIllegal` | TEST644: cap:in=media:;out=* is the same illegal bare top form | capdag.test.js:3060 |
+| test645 | `test645_wildcardInSpecificOut` | TEST645: cap:in=*;out=media:text has wildcard in, specific out | capdag.test.js:3069 |
+| test646 | `test646_invalidInSpecFails` | TEST646: cap:in=foo fails (invalid media URN) | capdag.test.js:3076 |
+| test647 | `test647_invalidOutSpecFails` | TEST647: cap:in=media:;out=bar fails (invalid media URN) | capdag.test.js:3085 |
+| test648 | `test648_wildcardAcceptsSpecific` | TEST648: Wildcard in/out match specific caps | capdag.test.js:3094 |
+| test649 | `test649_specificityScoring` | TEST649: Specificity - wildcard has 0, specific has tag count | capdag.test.js:3103 |
+| test650 | `test650_wildcardPreserveOtherTags` | TEST650: cap:in=media:;out=media:;test preserves other tags | capdag.test.js:3112 |
+| test653 | `test653_invalidEffectNoneDeclarationRejected` | TEST653: invalid effect=none declarations fail at construction | capdag.test.js:3159 |
 | test890 | `test890_directionSemanticMatching` | TEST890: Semantic direction matching - generic provider matches specific request | capdag.test.js:719 |
 | test891 | `test891_directionSemanticSpecificity` | TEST891: Semantic direction specificity — more constraints in either axis means a higher score under the truth-table-driven sum. media: (top, no tags) scores 0; each marker tag scores 2; each exact tag scores 3. | capdag.test.js:769 |
 | test939 | `test939_capUrnCanonicalFormDropsWildcardInOut` | TEST939: The canonical form drops `in=media:` and `out=media:` segments. Every spelling of "the same cap with wildcard in/out" collapses to one byte-identical canonical string. This is the contract that makes registry lookups work: the cap-publisher hashes `<canonical-urn>` to compute the cache key, and every language port (Rust, Go, Python, JS, ObjC) must agree on the canonical form for cross-language lookups to land on the same key. A regression that emitted the wildcard segments would silently move the published cap to a different SHA-256 bucket, 404'ing every reader that hashes the canonical form. | capdag.test.js:297 |
-| test1196 | `test1196_aliasedSerializationUsesAliasAndDropsHeader` | TEST1196: toMachineNotationAliased references an aliased cap DIRECTLY in the wiring by its display alias (shortest, then alphabetical) with NO header, and keeps the synthetic `edge_N` token + header for a cap that has no alias. | capdag.test.js:6478 |
-| test1294 | `test1294_rule11VoidInputWithStdinRejected` | TEST1294: RULE11 - void-input cap with stdin source rejected | capdag.test.js:2955 |
-| test1295 | `test1295_rule11NonVoidInputWithoutStdinRejected` | TEST1295: RULE11 - non-void-input cap without stdin source rejected | capdag.test.js:2970 |
-| test1296 | `test1296_rule11VoidInputCliFlagOnly` | TEST1296: RULE11 - void-input cap with only cli_flag sources passes | capdag.test.js:2985 |
-| test1297 | `test1297_rule11NonVoidInputWithStdin` | TEST1297: RULE11 - non-void-input cap with stdin source passes | capdag.test.js:2995 |
-| test1800 | `test1800_kindIdentityOnlyForBareCap` | TEST1800: Identity classifier — and only explicit effect=none qualifies. | capdag.test.js:6007 |
-| test1801 | `test1801_kindSourceWhenInputIsVoid` | TEST1801: Source classifier — in=media:void, out non-void. | capdag.test.js:6034 |
-| test1802 | `test1802_kindSinkWhenOutputIsVoid` | TEST1802: Sink classifier — out=media:void, in non-void. | capdag.test.js:6043 |
-| test1803 | `test1803_kindEffectWhenBothSidesVoid` | TEST1803: Effect classifier — both sides void. Reads as `() → ()`. | capdag.test.js:6052 |
-| test1804 | `test1804_kindTransformForNormalDataProcessors` | TEST1804: Transform classifier — at least one side non-void, and the cap is not the bare identity. The default kind for ordinary data-processing caps. | capdag.test.js:6062 |
-| test1805 | `test1805_kindInvariantUnderCanonicalSpellings` | TEST1805: Kind is invariant under canonicalization. The same morphism written in many surface forms must classify the same way once parsed. This pins the rule that kind is a property of the cap as a structured object, not of any particular spelling. | capdag.test.js:6105 |
-| test1810 | `test1810_mediaVoidIsAtomic` | TEST1810: media:void is atomic — refinements are parse errors. Mirrored across every language port (Rust, Go, Python, Swift/ObjC, JS) under the SAME number. Any divergence is a wire-level inconsistency — the unit type's atomicity is part of the protocol's deepest layer, not a per-port detail. The bare `media:void` parses successfully; any combination with another tag (marker or key=value) MUST fail with VoidNotAtomic. This forecloses a fake taxonomy of unit values; reasons or labels for *why* void is used belong on the cap URN's non-directional tags or in cap args. | capdag.test.js:6072 |
-| test1820 | `test1820_specificityQuestionIsZero` | TEST1820: A `?`-valued cap-tag scores 0. Same as missing. | capdag.test.js:6146 |
-| test1821 | `test1821_specificityMustNotHaveIsFive` | TEST1821: A `!`-valued cap-tag scores 5 (top of negative chain). | capdag.test.js:6156 |
-| test1822 | `test1822_specificityMustHaveAnyIsTwo` | TEST1822: A `*`-valued cap-tag (including bare markers) scores 2. | capdag.test.js:6163 |
-| test1823 | `test1823_specificityExactValueIsFour` | TEST1823: An exact-valued cap-tag scores 4. | capdag.test.js:6177 |
-| test1824 | `test1824_specificityCombinedYAxis` | TEST1824: All six forms compose additively on a single cap. This pins the truth-table sum across the y axis as a whole. | capdag.test.js:6184 |
-| test1830 | `test1830_canonicalizeNoConstraint` | TEST1830: ?x ≡ x? ≡ x=? all canonicalize to ?x. | capdag.test.js:6195 |
-| test1831 | `test1831_canonicalizeAbsentOrNotValue` | TEST1831: ?x=v and x?=v both canonicalize to x?=v. The third hypothetical form `x=?v` is NOT recognized as a qualifier — a value starting with `?` is just an exact value beginning with a `?` character. | capdag.test.js:6205 |
-| test1832 | `test1832_canonicalizeMustHaveAny` | TEST1832: x ≡ x=* both canonicalize to bare x. | capdag.test.js:6221 |
-| test1833 | `test1833_canonicalizePresentNotValue` | TEST1833: !x=v and x!=v both canonicalize to x!=v. The third hypothetical form `x=!v` is NOT recognized as a qualifier — a value starting with `!` is just an exact value beginning with a `!` character. | capdag.test.js:6231 |
-| test1834 | `test1834_canonicalizeExactValue` | TEST1834: x=v stays as x=v (the lone exact-value form). | capdag.test.js:6247 |
-| test1835 | `test1835_canonicalizeMustNotHave` | TEST1835: !x ≡ x! ≡ x=! all canonicalize to !x. | capdag.test.js:6253 |
-| test1842 | `test1842_truthTableFullCrossProduct` | TEST1842: Full 6×6 truth table. | capdag.test.js:6263 |
-| test1845 | `test1845_axisWeightingInDominatesY` | TEST1845: With equal out-axis, in-axis dominates over y-axis. | capdag.test.js:6316 |
-| test1848 | `test1848_capVersionNonZeroOnWire` | TEST1848: Cap with version=N round-trips with `version: N` on wire | capdag.test.js:6350 |
-| test1849 | `test1849_resolveForHostCompatibleLatest` | TEST1849: latest version has a host build → Compatible, resolving to the latest version and that platform's native-format package. | capdag.test.js:2467 |
-| test1850 | `test1850_resolveForHostCompatibleOutdated` | TEST1850: the latest version lacks a host build but an older version has one → CompatibleOutdated, resolving to the older version with a reason naming both the latest and the resolved version. | capdag.test.js:2483 |
-| test1851 | `test1851_resolveForHostIncompatible` | TEST1851: no version ships a host build → Incompatible, no resolved version/package, reason states the host platform. | capdag.test.js:2500 |
-| test1852 | `test1852_resolveForHostSkipsBuildWithNoInstaller` | TEST1852: a host build whose packages[] is empty AND has no legacy `package` ships no installer; resolution must SKIP it (not resolve to an un-downloadable version) and fall through to an older usable version. | capdag.test.js:2514 |
-| test1853 | `test1853_hostPlatformNormalizedForm` | TEST1853: host_platform() returns a normalized {os}-{arch} string with arch aarch64 mapped to arm64 — the exact form the registry uses. | capdag.test.js:2532 |
-| test1872 | `test1872_registryUrlFromBuildEnvPassesThroughNonempty` | TEST1872: a non-empty MFR_CARTRIDGE_REGISTRY_URL passes through verbatim — a published build reports exactly the URL it was compiled with. | capdag.test.js:2549 |
-| test1873 | `test1873_registryUrlFromBuildEnvNoneForDev` | TEST1873: an unset env (null/undefined) yields null — a dev build has no baked registry and loads only `dev/` cartridges. | capdag.test.js:2556 |
-| test1874 | `test1874_registryUrlFromBuildEnvRejectsEmptyString` | TEST1874: an exported-but-empty env (`Some("")`) is neither a dev build nor a valid identity and MUST fail hard at compile time, so the build can never silently hash the empty string into a fake registry slug. We assert the panic rather than letting a bogus empty primary registry ship. | capdag.test.js:2562 |
-| test1880 | `test1880_aliasNameNormalizationRules` | TEST1880: alias name normalization lowercases and accepts the allowed character class; rejects colon, whitespace, and out-of-class chars with the right error. A broken validator would let a URN-shaped or whitespace name through, or mangle a valid name. | capdag.test.js:6372 |
-| test1881 | `test1881_tokenUrnVsAliasDetection` | TEST1881: URN-vs-alias detection keys purely on the presence of ':'. The whole design rests on this discriminator being exact. | capdag.test.js:6384 |
-| test1882 | `test1882_classifyAliasTargetByPrefix` | TEST1882: alias target classification distinguishes cap from media by prefix and rejects a non-URN target. The typed-boundary enforcement in the registry depends on this. | capdag.test.js:6393 |
-| test1887 | `test1887_manifestSerdeRoundTripsAliases` | TEST1887: the Manifest type round-trips an `aliases` map. | capdag.test.js:6402 |
-| test1894 | `test1894_selectDisplayAliasOrdering` | TEST1894: selectDisplayAlias picks the SHORTEST name, ties broken alphabetically. This is the deterministic ordering every aliased-display surface relies on; a regression here silently changes which alias the whole UI renders. | capdag.test.js:6421 |
-| test1895 | `test1895_displayAliasForUrn` | TEST1895: displayAliasForUrn reverse-resolves a URN to its display alias. Proves: (1) the shortest-then-alphabetical winner among multiple aliases on the same target, (2) a NON-canonical query URN (different tag order) still resolves because the query is canonicalised before matching, (3) a URN with no alias returns null, (4) a non-URN string returns null. | capdag.test.js:6437 |
-| test1896 | `test1896_cachedCapAliasesFiltersToCapTargets` | TEST1896: cachedCapAliases returns only CAP-targeted aliases as [name, target] pairs — media aliases are excluded. Drives the notation editor's registered-alias completions. | capdag.test.js:6464 |
-| test6201 | `test6201_emptyCapIsIllegal` | TEST6201: cap: (empty) is the illegal bare top form | capdag.test.js:3011 |
+| test1196 | `test1196_aliasedSerializationUsesAliasAndDropsHeader` | TEST1196: toMachineNotationAliased references an aliased cap DIRECTLY in the wiring by its display alias (shortest, then alphabetical) with NO header, and keeps the synthetic `edge_N` token + header for a cap that has no alias. | capdag.test.js:6482 |
+| test1294 | `test1294_rule11VoidInputWithStdinRejected` | TEST1294: RULE11 - void-input cap with stdin source rejected | capdag.test.js:2959 |
+| test1295 | `test1295_rule11NonVoidInputWithoutStdinRejected` | TEST1295: RULE11 - non-void-input cap without stdin source rejected | capdag.test.js:2974 |
+| test1296 | `test1296_rule11VoidInputCliFlagOnly` | TEST1296: RULE11 - void-input cap with only cli_flag sources passes | capdag.test.js:2989 |
+| test1297 | `test1297_rule11NonVoidInputWithStdin` | TEST1297: RULE11 - non-void-input cap with stdin source passes | capdag.test.js:2999 |
+| test1800 | `test1800_kindIdentityOnlyForBareCap` | TEST1800: Identity classifier — and only explicit effect=none qualifies. | capdag.test.js:6011 |
+| test1801 | `test1801_kindSourceWhenInputIsVoid` | TEST1801: Source classifier — in=media:void, out non-void. | capdag.test.js:6038 |
+| test1802 | `test1802_kindSinkWhenOutputIsVoid` | TEST1802: Sink classifier — out=media:void, in non-void. | capdag.test.js:6047 |
+| test1803 | `test1803_kindEffectWhenBothSidesVoid` | TEST1803: Effect classifier — both sides void. Reads as `() → ()`. | capdag.test.js:6056 |
+| test1804 | `test1804_kindTransformForNormalDataProcessors` | TEST1804: Transform classifier — at least one side non-void, and the cap is not the bare identity. The default kind for ordinary data-processing caps. | capdag.test.js:6066 |
+| test1805 | `test1805_kindInvariantUnderCanonicalSpellings` | TEST1805: Kind is invariant under canonicalization. The same morphism written in many surface forms must classify the same way once parsed. This pins the rule that kind is a property of the cap as a structured object, not of any particular spelling. | capdag.test.js:6109 |
+| test1810 | `test1810_mediaVoidIsAtomic` | TEST1810: media:void is atomic — refinements are parse errors. Mirrored across every language port (Rust, Go, Python, Swift/ObjC, JS) under the SAME number. Any divergence is a wire-level inconsistency — the unit type's atomicity is part of the protocol's deepest layer, not a per-port detail. The bare `media:void` parses successfully; any combination with another tag (marker or key=value) MUST fail with VoidNotAtomic. This forecloses a fake taxonomy of unit values; reasons or labels for *why* void is used belong on the cap URN's non-directional tags or in cap args. | capdag.test.js:6076 |
+| test1820 | `test1820_specificityQuestionIsZero` | TEST1820: A `?`-valued cap-tag scores 0. Same as missing. | capdag.test.js:6150 |
+| test1821 | `test1821_specificityMustNotHaveIsFive` | TEST1821: A `!`-valued cap-tag scores 5 (top of negative chain). | capdag.test.js:6160 |
+| test1822 | `test1822_specificityMustHaveAnyIsTwo` | TEST1822: A `*`-valued cap-tag (including bare markers) scores 2. | capdag.test.js:6167 |
+| test1823 | `test1823_specificityExactValueIsFour` | TEST1823: An exact-valued cap-tag scores 4. | capdag.test.js:6181 |
+| test1824 | `test1824_specificityCombinedYAxis` | TEST1824: All six forms compose additively on a single cap. This pins the truth-table sum across the y axis as a whole. | capdag.test.js:6188 |
+| test1830 | `test1830_canonicalizeNoConstraint` | TEST1830: ?x ≡ x? ≡ x=? all canonicalize to ?x. | capdag.test.js:6199 |
+| test1831 | `test1831_canonicalizeAbsentOrNotValue` | TEST1831: ?x=v and x?=v both canonicalize to x?=v. The third hypothetical form `x=?v` is NOT recognized as a qualifier — a value starting with `?` is just an exact value beginning with a `?` character. | capdag.test.js:6209 |
+| test1832 | `test1832_canonicalizeMustHaveAny` | TEST1832: x ≡ x=* both canonicalize to bare x. | capdag.test.js:6225 |
+| test1833 | `test1833_canonicalizePresentNotValue` | TEST1833: !x=v and x!=v both canonicalize to x!=v. The third hypothetical form `x=!v` is NOT recognized as a qualifier — a value starting with `!` is just an exact value beginning with a `!` character. | capdag.test.js:6235 |
+| test1834 | `test1834_canonicalizeExactValue` | TEST1834: x=v stays as x=v (the lone exact-value form). | capdag.test.js:6251 |
+| test1835 | `test1835_canonicalizeMustNotHave` | TEST1835: !x ≡ x! ≡ x=! all canonicalize to !x. | capdag.test.js:6257 |
+| test1842 | `test1842_truthTableFullCrossProduct` | TEST1842: Full 6×6 truth table. | capdag.test.js:6267 |
+| test1845 | `test1845_axisWeightingInDominatesY` | TEST1845: With equal out-axis, in-axis dominates over y-axis. | capdag.test.js:6320 |
+| test1848 | `test1848_capVersionNonZeroOnWire` | TEST1848: Cap with version=N round-trips with `version: N` on wire | capdag.test.js:6354 |
+| test1849 | `test1849_resolveForHostCompatibleLatest` | TEST1849: latest version has a host build → Compatible, resolving to the latest version and that platform's native-format package. | capdag.test.js:2469 |
+| test1850 | `test1850_resolveForHostCompatibleOutdated` | TEST1850: the latest version lacks a host build but an older version has one → CompatibleOutdated, resolving to the older version with a reason naming both the latest and the resolved version. | capdag.test.js:2485 |
+| test1851 | `test1851_resolveForHostIncompatible` | TEST1851: no version ships a host build → Incompatible, no resolved version/package, reason states the host platform. | capdag.test.js:2502 |
+| test1852 | `test1852_resolveForHostSkipsBuildWithNoInstaller` | TEST1852: a host build whose packages[] is empty AND has no legacy `package` ships no installer; resolution must SKIP it (not resolve to an un-downloadable version) and fall through to an older usable version. | capdag.test.js:2516 |
+| test1853 | `test1853_hostPlatformNormalizedForm` | TEST1853: host_platform() returns a normalized {os}-{arch} string with arch aarch64 mapped to arm64 — the exact form the registry uses. | capdag.test.js:2534 |
+| test1872 | `test1872_registryUrlFromBuildEnvPassesThroughNonempty` | TEST1872: a non-empty MFR_CARTRIDGE_REGISTRY_URL passes through verbatim — a published build reports exactly the URL it was compiled with. | capdag.test.js:2551 |
+| test1873 | `test1873_registryUrlFromBuildEnvNoneForDev` | TEST1873: an unset env (null/undefined) yields null — a dev build has no baked registry and loads only `dev/` cartridges. | capdag.test.js:2558 |
+| test1874 | `test1874_registryUrlFromBuildEnvRejectsEmptyString` | TEST1874: an exported-but-empty env (`Some("")`) is neither a dev build nor a valid identity and MUST fail hard at compile time, so the build can never silently hash the empty string into a fake registry slug. We assert the panic rather than letting a bogus empty primary registry ship. | capdag.test.js:2564 |
+| test1880 | `test1880_aliasNameNormalizationRules` | TEST1880: alias name normalization lowercases and accepts the allowed character class; rejects colon, whitespace, and out-of-class chars with the right error. A broken validator would let a URN-shaped or whitespace name through, or mangle a valid name. | capdag.test.js:6376 |
+| test1881 | `test1881_tokenUrnVsAliasDetection` | TEST1881: URN-vs-alias detection keys purely on the presence of ':'. The whole design rests on this discriminator being exact. | capdag.test.js:6388 |
+| test1882 | `test1882_classifyAliasTargetByPrefix` | TEST1882: alias target classification distinguishes cap from media by prefix and rejects a non-URN target. The typed-boundary enforcement in the registry depends on this. | capdag.test.js:6397 |
+| test1887 | `test1887_manifestSerdeRoundTripsAliases` | TEST1887: the Manifest type round-trips an `aliases` map. | capdag.test.js:6406 |
+| test1894 | `test1894_selectDisplayAliasOrdering` | TEST1894: selectDisplayAlias picks the SHORTEST name, ties broken alphabetically. This is the deterministic ordering every aliased-display surface relies on; a regression here silently changes which alias the whole UI renders. | capdag.test.js:6425 |
+| test1895 | `test1895_displayAliasForUrn` | TEST1895: displayAliasForUrn reverse-resolves a URN to its display alias. Proves: (1) the shortest-then-alphabetical winner among multiple aliases on the same target, (2) a NON-canonical query URN (different tag order) still resolves because the query is canonicalised before matching, (3) a URN with no alias returns null, (4) a non-URN string returns null. | capdag.test.js:6441 |
+| test1896 | `test1896_cachedCapAliasesFiltersToCapTargets` | TEST1896: cachedCapAliases returns only CAP-targeted aliases as [name, target] pairs — media aliases are excluded. Drives the notation editor's registered-alias completions. | capdag.test.js:6468 |
+| test6201 | `test6201_emptyCapIsIllegal` | TEST6201: cap: (empty) is the illegal bare top form | capdag.test.js:3015 |
 | test6204 | `test6204_Urn` | TEST6204: Urn | capdag.test.js:119 |
 | test6206 | `test6206_CapFabAddCapPopulatesEdgesAndNodes` | Add a cap and check it becomes an edge with from/to nodes and carries the registry name we passed. This is exactly the shape the renderer depends on. | capdag.test.js:1371 |
 | test6208 | `test6208_CapFabGetOutgoingConformsToMatching` | getOutgoing takes a concrete source URN and returns edges whose from_spec the source conforms to. It must NOT be a plain string lookup. | capdag.test.js:1389 |
@@ -225,149 +225,149 @@ This catalog lists all tests in the JS codebase.
 | test6261 | `test6261_JS_stdinSourceKindConstants` | TEST6261: J s stdin source kind constants | capdag.test.js:1819 |
 | test6265 | `test6265_JS_stdinSourceNullData` | TEST6265: J s stdin source null data | capdag.test.js:1826 |
 | test6269 | `test6269_JS_mediaDefConstruction` | TEST6269: J s media def construction | capdag.test.js:1834 |
-| test6272 | `test6272_isCollection` | Mirror-specific coverage: isCollection returns true when collection marker tag is present Mirror-specific coverage: N/A for JS (MEDIA_COLLECTION constants removed - no longer exists) | capdag.test.js:2785 |
-| test6275 | `test6275_Machine_emptyInput` | --- Machine parser tests (mirrors parser.rs tests) --- | capdag.test.js:3207 |
-| test6277 | `test6277_Machine_whitespaceOnly` | TEST0088: Machine whitespace only | capdag.test.js:3212 |
-| test6279 | `test6279_Machine_headerOnlyNoWirings` | TEST0089: Machine header only no wirings | capdag.test.js:3217 |
-| test6280 | `test6280_Machine_duplicateAlias` | TEST0090: Machine duplicate alias | capdag.test.js:3225 |
+| test6272 | `test6272_isCollection` | Mirror-specific coverage: isCollection returns true when collection marker tag is present Mirror-specific coverage: N/A for JS (MEDIA_COLLECTION constants removed - no longer exists) | capdag.test.js:2789 |
+| test6275 | `test6275_Machine_emptyInput` | --- Machine parser tests (mirrors parser.rs tests) --- | capdag.test.js:3211 |
+| test6277 | `test6277_Machine_whitespaceOnly` | TEST0088: Machine whitespace only | capdag.test.js:3216 |
+| test6279 | `test6279_Machine_headerOnlyNoWirings` | TEST0089: Machine header only no wirings | capdag.test.js:3221 |
+| test6280 | `test6280_Machine_duplicateAlias` | TEST0090: Machine duplicate alias | capdag.test.js:3229 |
 | test6282 | `test6282_resolveCustomMediaDef` | TEST6282: Test resolving a custom media URN from a registry-seeded media def | capdag.test.js:1028 |
 | test6283 | `test6283_resolveCustomWithSchema` | TEST6283: Test resolving a custom record media def carrying a schema from a registry-seeded media def | capdag.test.js:1038 |
-| test6286 | `test6286_Machine_simpleLinearChain` | TEST0094: Machine simple linear chain | capdag.test.js:3237 |
-| test6288 | `test6288_Machine_twoStepChain` | TEST0095: Machine two step chain | capdag.test.js:3253 |
-| test6290 | `test6290_Machine_fanOut` | TEST0096: Machine fan out | capdag.test.js:3268 |
-| test6292 | `test6292_Machine_fanInSecondaryAssignedByPriorWiring` | TEST0097: Machine fan in secondary assigned by prior wiring | capdag.test.js:3286 |
-| test6294 | `test6294_Machine_fanInSecondaryUnassignedGetsWildcard` | TEST0098: Machine fan in secondary unassigned gets wildcard | capdag.test.js:3300 |
-| test6306 | `test6306_Machine_loopKeywordIsNotGrammar` | TEST6306: The retired LOOP keyword is no longer grammar. A wiring that still writes `LOOP <cap>` before the cap alias no longer parses — `LOOP` is now an ordinary alias, so `pages -> LOOP p2t -> texts` is two aliases in the cap position with no arrow between them, which is a syntax error. | capdag.test.js:3315 |
-| test6308 | `test6308_Machine_undefinedAliasFails` | TEST6308: Machine undefined alias fails | capdag.test.js:3333 |
-| test6310 | `test6310_Machine_nodeAliasCollision` | TEST6310: Machine node alias collision | capdag.test.js:3341 |
-| test6312 | `test6312_Machine_conflictingMediaTypesFail` | TEST6312: Machine conflicting media types fail | capdag.test.js:3352 |
-| test6315 | `test6315_Machine_multilineFormat` | TEST6315: Machine multiline format | capdag.test.js:3365 |
-| test6318 | `test6318_Machine_differentAliasesSameGraph` | TEST6318: Machine different aliases same graph | capdag.test.js:3376 |
-| test6321 | `test6321_Machine_malformedInputFails` | TEST6321: Machine malformed input fails | capdag.test.js:3389 |
-| test6323 | `test6323_Machine_unterminatedBracketFails` | TEST6323: Machine unterminated bracket fails | capdag.test.js:3397 |
-| test6327 | `test6327_Machine_lineBasedSimpleChain` | --- Machine parser line-based mode tests --- | capdag.test.js:3406 |
-| test6331 | `test6331_Machine_lineBasedTwoStepChain` | TEST6331: Machine line based two step chain | capdag.test.js:3420 |
-| test6334 | `test6334_Machine_lineBasedLoopKeywordIsNotGrammar` | TEST6334: The retired LOOP keyword is not grammar in line-based mode either — `pages -> LOOP p2t -> texts` is a syntax error, same as the bracketed form. | capdag.test.js:3432 |
-| test6337 | `test6337_Machine_lineBasedFanIn` | TEST6337: Machine line based fan in | capdag.test.js:3443 |
-| test6341 | `test6341_Machine_mixedBracketedAndLineBased` | TEST6341: Machine mixed bracketed and line based | capdag.test.js:3457 |
-| test6345 | `test6345_Machine_lineBasedEquivalentToBracketed` | TEST6345: Machine line based equivalent to bracketed | capdag.test.js:3466 |
-| test6349 | `test6349_Machine_lineBasedFormatSerialization` | TEST6349: Machine line based format serialization | capdag.test.js:3479 |
-| test6353 | `test6353_Machine_lineBasedAndBracketedParseSameGraph` | TEST6353: Machine line based and bracketed parse same graph | capdag.test.js:3501 |
-| test6357 | `test6357_Machine_edgeEquivalenceSameUrns` | --- Machine graph tests (mirrors graph.rs tests) --- | capdag.test.js:3527 |
-| test6361 | `test6361_Machine_edgeEquivalenceDifferentCapUrns` | TEST6361: Machine edge equivalence different cap urns | capdag.test.js:3544 |
-| test6365 | `test6365_Machine_edgeEquivalenceDifferentTargets` | TEST6365: Machine edge equivalence different targets | capdag.test.js:3561 |
-| test6369 | `test6369_Machine_edgeEquivalenceDifferentLoopFlag` | TEST6369: Machine edge equivalence different loop flag | capdag.test.js:3578 |
-| test6372 | `test6372_Machine_edgeEquivalenceSourceOrderIndependent` | TEST6372: Machine edge equivalence source order independent | capdag.test.js:3595 |
-| test6375 | `test6375_Machine_edgeEquivalenceDifferentSourceCount` | TEST6375: Machine edge equivalence different source count | capdag.test.js:3612 |
-| test6377 | `test6377_Machine_graphEquivalenceSameEdges` | TEST6377: Machine graph equivalence same edges | capdag.test.js:3629 |
-| test6380 | `test6380_Machine_graphEquivalenceReorderedEdges` | TEST6380: Machine graph equivalence reordered edges | capdag.test.js:3645 |
-| test6383 | `test6383_Machine_graphNotEquivalentDifferentEdgeCount` | TEST6383: Machine graph not equivalent different edge count | capdag.test.js:3661 |
-| test6386 | `test6386_Machine_graphNotEquivalentDifferentCap` | TEST6386: Machine graph not equivalent different cap | capdag.test.js:3676 |
-| test6389 | `test6389_Machine_graphEmpty` | TEST6389: Machine graph empty | capdag.test.js:3690 |
-| test6392 | `test6392_Machine_graphEmptyEquivalence` | TEST6392: Machine graph empty equivalence | capdag.test.js:3697 |
-| test6395 | `test6395_Machine_rootSourcesLinearChain` | TEST6395: Machine root sources linear chain | capdag.test.js:3704 |
-| test6397 | `test6397_Machine_leafTargetsLinearChain` | TEST6397: Machine leaf targets linear chain | capdag.test.js:3719 |
-| test6398 | `test6398_Machine_rootSourcesFanIn` | TEST6398: Machine root sources fan in | capdag.test.js:3734 |
-| test6400 | `test6400_Machine_displayEdge` | TEST6400: Machine display edge | capdag.test.js:3747 |
-| test6402 | `test6402_Machine_displayGraph` | TEST6402: Machine display graph | capdag.test.js:3759 |
-| test6404 | `test6404_Machine_serializeSingleEdge` | --- Machine serializer tests (mirrors serializer.rs tests) --- | capdag.test.js:3772 |
-| test6406 | `test6406_Machine_serializeTwoEdgeChain` | TEST6406: Machine serialize two edge chain | capdag.test.js:3788 |
-| test6408 | `test6408_Machine_serializeEmptyGraph` | TEST6408: Machine serialize empty graph | capdag.test.js:3802 |
-| test6410 | `test6410_Machine_roundtripSingleEdge` | TEST6410: Machine roundtrip single edge | capdag.test.js:3807 |
-| test6413 | `test6413_Machine_roundtripTwoEdgeChain` | TEST6413: Machine roundtrip two edge chain | capdag.test.js:3821 |
-| test6415 | `test6415_Machine_roundtripFanOut` | TEST6415: Machine roundtrip fan out | capdag.test.js:3836 |
-| test6417 | `test6417_Machine_loopEdgeSerializesWithoutLoopText` | TEST6417: A per-item map (`is_loop`) edge serializes WITHOUT any LOOP marker — `is_loop` is a derived cardinality property, not authored notation text. The pure-JS parse path has no cap definitions to re-derive cardinality, so the reparsed edge has `isLoop === false`; editors get the derived value from the engine, not from re-parsing. | capdag.test.js:3856 |
-| test6419 | `test6419_Machine_serializationIsDeterministic` | TEST6419: Machine serialization is deterministic | capdag.test.js:3878 |
-| test6421 | `test6421_Machine_reorderedEdgesProduceSameNotation` | TEST6421: Machine reordered edges produce same notation | capdag.test.js:3892 |
-| test6429 | `test6429_Machine_multilineSerializeFormat` | TEST6429: Machine multiline serialize format | capdag.test.js:3909 |
-| test6432 | `test6432_Machine_aliasFromOpTag` | Aliases are pure-index `edge_<N>` regardless of the cap's tags; there is no privileged `op` tag to derive a friendlier name from. | capdag.test.js:3925 |
-| test6434 | `test6434_Machine_aliasFallbackWithoutOpTag` | TEST6434: Machine alias fallback without op tag | capdag.test.js:3937 |
-| test6436 | `test6436_Machine_duplicateOpTagsDisambiguated` | Pure-index aliases inherently disambiguate edges that share a marker tag. | capdag.test.js:3949 |
-| test6437 | `test6437_Machine_builderSingleEdge` | --- Machine builder tests --- | capdag.test.js:3971 |
-| test6438 | `test6438_Machine_builderWithLoop` | TEST6438: Machine builder with loop | capdag.test.js:3984 |
-| test6439 | `test6439_Machine_builderChaining` | TEST6439: Machine builder chaining | capdag.test.js:3997 |
-| test6440 | `test6440_Machine_builderEquivalentToParsed` | TEST6440: Machine builder equivalent to parsed | capdag.test.js:4006 |
-| test6442 | `test6442_Machine_builderRoundTrip` | TEST6442: Machine builder round trip | capdag.test.js:4019 |
-| test6444 | `test6444_Machine_capUrnIsEquivalent` | --- CapUrn.isEquivalent/isComparable tests --- | capdag.test.js:4031 |
-| test6446 | `test6446_Machine_capUrnIsComparable` | TEST6446: Machine cap urn is comparable | capdag.test.js:4040 |
-| test6448 | `test6448_Machine_capUrnInMediaUrn` | TEST6448: Machine cap urn in media urn | capdag.test.js:4048 |
-| test6449 | `test6449_Machine_capUrnOutMediaUrn` | TEST6449: Machine cap urn out media urn | capdag.test.js:4056 |
-| test6450 | `test6450_Machine_mediaUrnIsEquivalent` | --- MediaUrn.isEquivalent/isComparable tests --- | capdag.test.js:4065 |
-| test6451 | `test6451_Machine_mediaUrnIsComparable` | TEST6451: Machine media urn is comparable | capdag.test.js:4074 |
-| test6452 | `test6452_Machine_parseMachineWithAST_headerLocation` | Phase 0A: Position tracking tests | capdag.test.js:4087 |
-| test6453 | `test6453_Machine_parseMachineWithAST_wiringLocation` | TEST6453: Machine parse machine with a s t wiring location | capdag.test.js:4104 |
-| test6454 | `test6454_Machine_parseMachineWithAST_multilinePositions` | TEST6454: Machine parse machine with a s t multiline positions | capdag.test.js:4119 |
-| test6455 | `test6455_Machine_parseMachineWithAST_fanInSourceLocations` | TEST6455: Machine parse machine with a s t fan in source locations | capdag.test.js:4129 |
-| test6456 | `test6456_Machine_parseMachineWithAST_aliasMap` | TEST6456: Machine parse machine with a s t alias map | capdag.test.js:4141 |
-| test6457 | `test6457_Machine_parseMachineWithAST_nodeMedia` | TEST6457: Machine parse machine with a s t node media | capdag.test.js:4160 |
-| test6458 | `test6458_Machine_errorLocation_parseError` | TEST6458: Machine error location parse error | capdag.test.js:4173 |
-| test6459 | `test6459_Machine_errorLocation_duplicateAlias` | TEST6459: Machine error location duplicate alias | capdag.test.js:4184 |
-| test6460 | `test6460_Machine_errorLocation_undefinedAlias` | TEST6460: Machine error location undefined alias | capdag.test.js:4199 |
-| test6462 | `test6462_Machine_toMermaid_linearChain` | Phase 0C: Machine.toMermaid() tests | capdag.test.js:4213 |
-| test6463 | `test6463_Machine_toMermaid_loopEdge` | TEST6463: Mermaid renders a per-item map (`is_loop`) edge with a dotted line — `is_loop` is a kept render property — but emits NO "LOOP" text, since that keyword is retired. The loop edge is built programmatically because the grammar no longer has any way to author one. | capdag.test.js:4235 |
-| test6464 | `test6464_Machine_toMermaid_emptyGraph` | TEST6464: Machine to mermaid empty graph | capdag.test.js:4249 |
-| test6465 | `test6465_Machine_toMermaid_fanIn` | TEST6465: Machine to mermaid fan in | capdag.test.js:4256 |
-| test6466 | `test6466_Machine_toMermaid_fanOut` | TEST6466: Machine to mermaid fan out | capdag.test.js:4268 |
-| test6467 | `test6467_Machine_capRegistryEntry_construction` | Phase 0B: FabricRegistryClient tests | capdag.test.js:4288 |
-| test6468 | `test6468_Machine_mediaRegistryEntry_construction` | TEST6468: Machine media registry entry construction | capdag.test.js:4312 |
-| test6469 | `test6469_Machine_capRegistryClient_construction` | TEST6469: Machine cap registry client construction | capdag.test.js:4326 |
-| test6470 | `test6470_Machine_capRegistryEntry_defaults` | TEST6470: Machine cap registry entry defaults | capdag.test.js:4334 |
-| test6471 | `test6471_Renderer_cardinalityLabel_allFourCases` | TEST6471: Renderer cardinality label all four cases | capdag.test.js:4400 |
-| test6472 | `test6472_Renderer_cardinalityLabel_usesUnicodeArrow` | TEST6472: Renderer cardinality label uses unicode arrow | capdag.test.js:4408 |
-| test6473 | `test6473_Renderer_cardinalityFromCap_findsStdinArgNotFirstArg` | TEST6473: Renderer cardinality from cap finds stdin arg not first arg | capdag.test.js:4417 |
-| test6474 | `test6474_Renderer_cardinalityFromCap_scalarDefaultsWhenFieldsMissing` | TEST6474: Renderer cardinality from cap scalar defaults when fields missing | capdag.test.js:4442 |
-| test6475 | `test6475_Renderer_cardinalityFromCap_outputOnlySequence` | TEST6475: Renderer cardinality from cap output only sequence | capdag.test.js:4451 |
-| test6476 | `test6476_Renderer_cardinalityFromCap_rejectsStringIsSequence` | TEST6476: Renderer cardinality from cap rejects string is sequence | capdag.test.js:4463 |
-| test6478 | `test6478_Renderer_cardinalityFromCap_throwsOnNonObject` | TEST6478: Renderer cardinality from cap throws on non object | capdag.test.js:4477 |
-| test6479 | `test6479_Renderer_canonicalMediaUrn_normalizesTagOrder` | TEST6479: Renderer canonical media urn normalizes tag order | capdag.test.js:4497 |
-| test6480 | `test6480_Renderer_canonicalMediaUrn_preservesValueTags` | TEST6480: Renderer canonical media urn preserves value tags | capdag.test.js:4507 |
-| test6481 | `test6481_Renderer_canonicalMediaUrn_rejectsCapUrn` | TEST6481: Renderer canonical media urn rejects cap urn | capdag.test.js:4513 |
-| test6482 | `test6482_Renderer_mediaNodeLabel_rejectsUrnDerivedLabels` | TEST6482: Renderer media node label rejects urn derived labels | capdag.test.js:4526 |
-| test6483 | `test6483_Renderer_buildBrowseGraphData_rejectsMissingMediaTitles` | TEST6483: Renderer build browse graph data rejects missing media titles | capdag.test.js:4541 |
-| test6484 | `test6484_Renderer_validateStrandStep_rejectsUnknownVariant` | TEST6484: Renderer validate strand step rejects unknown variant | capdag.test.js:4599 |
-| test6486 | `test6486_Renderer_validateStrandStep_requiresBooleanIsSequence` | TEST6486: Renderer validate strand step requires boolean is sequence | capdag.test.js:4617 |
-| test6487 | `test6487_Renderer_classifyStrandCapSteps_capFlags` | TEST6487: Renderer classify strand cap steps cap flags | capdag.test.js:4640 |
-| test6488 | `test6488_Renderer_classifyStrandCapSteps_nestedForks` | TEST6488: Renderer classify strand cap steps nested forks | capdag.test.js:4662 |
-| test6489 | `test6489_Renderer_buildStrandGraphData_singleCapPlain` | TEST6489: Renderer build strand graph data single cap plain | capdag.test.js:4693 |
-| test6491 | `test6491_Renderer_buildStrandGraphData_sequenceShowsCardinality` | TEST6491: Renderer build strand graph data sequence shows cardinality | capdag.test.js:4721 |
-| test6492 | `test6492_Renderer_buildStrandGraphData_foreachCollectSpan` | TEST6492: Renderer build strand graph data foreach collect span | capdag.test.js:4742 |
-| test6493 | `test6493_Renderer_buildStrandGraphData_standaloneCollect` | TEST6493: Renderer build strand graph data standalone collect | capdag.test.js:4794 |
-| test6494 | `test6494_Renderer_buildStrandGraphData_unclosedForEachBody` | TEST6494: Renderer build strand graph data unclosed for each body | capdag.test.js:4822 |
-| test6495 | `test6495_Renderer_buildStrandGraphData_nestedForEachThrows` | TEST6495: Renderer build strand graph data nested for each throws | capdag.test.js:4860 |
-| test6496 | `test6496_Renderer_collapseStrand_singleCapBodyKeepsCapOwnLabel` | TEST6496: Renderer collapse strand single cap body keeps cap own label | capdag.test.js:4889 |
-| test6497 | `test6497_Renderer_collapseStrand_unclosedForEachBodyCollapses` | TEST6497: Renderer collapse strand unclosed for each body collapses | capdag.test.js:4942 |
-| test6498 | `test6498_Renderer_collapseStrand_standaloneCollectCollapses` | TEST6498: Renderer collapse strand standalone collect collapses | capdag.test.js:4999 |
-| test6499 | `test6499_Renderer_collapseStrand_sequenceProducingCapBeforeForeach` | TEST6499: Renderer collapse strand sequence producing cap before foreach | capdag.test.js:5043 |
-| test6500 | `test6500_Renderer_collapseStrand_plainCapMergesTrailingOutput` | TEST6500: Renderer collapse strand plain cap merges trailing output | capdag.test.js:5108 |
-| test6501 | `test6501_Renderer_collapseStrand_plainCapDistinctTargetNoMerge` | TEST6501: Renderer collapse strand plain cap distinct target no merge | capdag.test.js:5145 |
-| test6502 | `test6502_Renderer_validateStrandPayload_missingSourceMediaUrn` | TEST6502: Renderer validate strand payload missing source media urn | capdag.test.js:5172 |
-| test6503 | `test6503_Renderer_validateBodyOutcome_rejectsNegativeIndex` | ---------------- run builder ---------------- | capdag.test.js:5185 |
-| test6504 | `test6504_Renderer_buildRunGraphData_pagesSuccessesAndFailures` | TEST6504: Renderer build run graph data pages successes and failures | capdag.test.js:5196 |
-| test6505 | `test6505_Renderer_buildRunGraphData_failureWithoutFailedCapRendersFullTrace` | TEST6505: Renderer build run graph data failure without failed cap renders full trace | capdag.test.js:5267 |
-| test6506 | `test6506_Renderer_buildRunGraphData_usesCapUrnIsEquivalentForFailedCap` | TEST6506: Renderer build run graph data uses cap urn is equivalent for failed cap | capdag.test.js:5306 |
-| test6507 | `test6507_Renderer_buildRunGraphData_backboneHasNoForeachNode` | TEST6507: Renderer build run graph data backbone has no foreach node | capdag.test.js:5366 |
-| test6508 | `test6508_Renderer_buildRunGraphData_allFailedDropsTargetPlaceholder` | TEST6508: Renderer build run graph data all failed drops target placeholder | capdag.test.js:5421 |
-| test6509 | `test6509_Renderer_buildRunGraphData_unclosedForeachSuccessNoMerge` | TEST6509: Renderer build run graph data unclosed foreach success no merge | capdag.test.js:5487 |
-| test6510 | `test6510_Renderer_buildRunGraphData_closedForeachSuccessMergesAtCollectTarget` | TEST6510: Renderer build run graph data closed foreach success merges at collect target | capdag.test.js:5549 |
-| test6511 | `test6511_Renderer_validateEditorGraphPayload_rejectsUnknownKind` | ---------------- editor-graph builder ---------------- | capdag.test.js:5604 |
-| test6512 | `test6512_Renderer_buildEditorGraphData_collapsesCapsIntoLabeledEdges` | TEST6512: Renderer build editor graph data collapses caps into labeled edges | capdag.test.js:5619 |
-| test6513 | `test6513_Renderer_buildEditorGraphData_loopMarkedEdgeGetsLoopClass` | TEST6513: Renderer build editor graph data loop marked edge gets loop class | capdag.test.js:5658 |
-| test6514 | `test6514_Renderer_buildEditorGraphData_cardinalityFromDataSlotSequenceFlags` | TEST6514: Renderer build editor graph data cardinality from data slot sequence flags | capdag.test.js:5677 |
-| test6515 | `test6515_Renderer_buildEditorGraphData_capWithoutCompleteArgsIsDropped` | TEST6515: Renderer build editor graph data cap without complete args is dropped | capdag.test.js:5697 |
-| test6516 | `test6516_Renderer_buildEditorGraphData_rejectsEdgeWithMissingSource` | TEST6516: Renderer build editor graph data rejects edge with missing source | capdag.test.js:5715 |
-| test6517 | `test6517_Renderer_buildResolvedMachineGraphData_singleStrandLinearChain` | ---------------- resolved-machine builder ---------------- | capdag.test.js:5731 |
-| test6518 | `test6518_Renderer_buildResolvedMachineGraphData_loopEdgeGetsLoopClass` | TEST6518: Renderer build resolved machine graph data loop edge gets loop class | capdag.test.js:5790 |
-| test6519 | `test6519_Renderer_buildResolvedMachineGraphData_fanInProducesEdgePerAssignment` | TEST6519: Renderer build resolved machine graph data fan in produces edge per assignment | capdag.test.js:5825 |
-| test6520 | `test6520_Renderer_buildResolvedMachineGraphData_multiStrandKeepsStrandsDisjoint` | TEST6520: Renderer build resolved machine graph data multi strand keeps strands disjoint | capdag.test.js:5866 |
-| test6521 | `test6521_Renderer_buildResolvedMachineGraphData_duplicateNodeIdAcrossStrandsFailsHard` | TEST6521: Renderer build resolved machine graph data duplicate node id across strands fails hard | capdag.test.js:5929 |
-| test6522 | `test6522_Renderer_validateResolvedMachinePayload_rejectsMissingFields` | TEST6522: Renderer validate resolved machine payload rejects missing fields | capdag.test.js:5965 |
-| test6544 | `test6544_builderRejectsStructuralKeys` | TEST6544: builder rejects structural keys on tag/marker | capdag.test.js:2936 |
-| test6620 | `test6620_wildcardGenericFormsRejected` | TEST6620: Generic top-to-top spellings are all rejected. | capdag.test.js:3117 |
-| test6621 | `test6621_capIdentityConstantWorks` | TEST6621: CAP_IDENTITY constant names the true identity cap, not bare cap: | capdag.test.js:3138 |
-| test6734 | `test6734_rejectInvalidCombinations` | TEST6734: Invalid qualifier combinations must be rejected. | capdag.test.js:6291 |
-| test6735 | `test6735_axisWeightingOutDominates` | TEST6735: out-axis difference dominates combined in+y differences. | capdag.test.js:6306 |
-| test6736 | `test6736_axisWeightingDecodedLayout` | TEST6736: Decoded layout — 10000*out + 100*in + y. | capdag.test.js:6326 |
-| test6737 | `test6737_capVersionZeroOmittedOnWire` | TEST6737: Cap with version=0 round-trips with no `version` key on wire | capdag.test.js:6338 |
+| test6286 | `test6286_Machine_simpleLinearChain` | TEST0094: Machine simple linear chain | capdag.test.js:3241 |
+| test6288 | `test6288_Machine_twoStepChain` | TEST0095: Machine two step chain | capdag.test.js:3257 |
+| test6290 | `test6290_Machine_fanOut` | TEST0096: Machine fan out | capdag.test.js:3272 |
+| test6292 | `test6292_Machine_fanInSecondaryAssignedByPriorWiring` | TEST0097: Machine fan in secondary assigned by prior wiring | capdag.test.js:3290 |
+| test6294 | `test6294_Machine_fanInSecondaryUnassignedGetsWildcard` | TEST0098: Machine fan in secondary unassigned gets wildcard | capdag.test.js:3304 |
+| test6306 | `test6306_Machine_loopKeywordIsNotGrammar` | TEST6306: The retired LOOP keyword is no longer grammar. A wiring that still writes `LOOP <cap>` before the cap alias no longer parses — `LOOP` is now an ordinary alias, so `pages -> LOOP p2t -> texts` is two aliases in the cap position with no arrow between them, which is a syntax error. | capdag.test.js:3319 |
+| test6308 | `test6308_Machine_undefinedAliasFails` | TEST6308: Machine undefined alias fails | capdag.test.js:3337 |
+| test6310 | `test6310_Machine_nodeAliasCollision` | TEST6310: Machine node alias collision | capdag.test.js:3345 |
+| test6312 | `test6312_Machine_conflictingMediaTypesFail` | TEST6312: Machine conflicting media types fail | capdag.test.js:3356 |
+| test6315 | `test6315_Machine_multilineFormat` | TEST6315: Machine multiline format | capdag.test.js:3369 |
+| test6318 | `test6318_Machine_differentAliasesSameGraph` | TEST6318: Machine different aliases same graph | capdag.test.js:3380 |
+| test6321 | `test6321_Machine_malformedInputFails` | TEST6321: Machine malformed input fails | capdag.test.js:3393 |
+| test6323 | `test6323_Machine_unterminatedBracketFails` | TEST6323: Machine unterminated bracket fails | capdag.test.js:3401 |
+| test6327 | `test6327_Machine_lineBasedSimpleChain` | --- Machine parser line-based mode tests --- | capdag.test.js:3410 |
+| test6331 | `test6331_Machine_lineBasedTwoStepChain` | TEST6331: Machine line based two step chain | capdag.test.js:3424 |
+| test6334 | `test6334_Machine_lineBasedLoopKeywordIsNotGrammar` | TEST6334: The retired LOOP keyword is not grammar in line-based mode either — `pages -> LOOP p2t -> texts` is a syntax error, same as the bracketed form. | capdag.test.js:3436 |
+| test6337 | `test6337_Machine_lineBasedFanIn` | TEST6337: Machine line based fan in | capdag.test.js:3447 |
+| test6341 | `test6341_Machine_mixedBracketedAndLineBased` | TEST6341: Machine mixed bracketed and line based | capdag.test.js:3461 |
+| test6345 | `test6345_Machine_lineBasedEquivalentToBracketed` | TEST6345: Machine line based equivalent to bracketed | capdag.test.js:3470 |
+| test6349 | `test6349_Machine_lineBasedFormatSerialization` | TEST6349: Machine line based format serialization | capdag.test.js:3483 |
+| test6353 | `test6353_Machine_lineBasedAndBracketedParseSameGraph` | TEST6353: Machine line based and bracketed parse same graph | capdag.test.js:3505 |
+| test6357 | `test6357_Machine_edgeEquivalenceSameUrns` | --- Machine graph tests (mirrors graph.rs tests) --- | capdag.test.js:3531 |
+| test6361 | `test6361_Machine_edgeEquivalenceDifferentCapUrns` | TEST6361: Machine edge equivalence different cap urns | capdag.test.js:3548 |
+| test6365 | `test6365_Machine_edgeEquivalenceDifferentTargets` | TEST6365: Machine edge equivalence different targets | capdag.test.js:3565 |
+| test6369 | `test6369_Machine_edgeEquivalenceDifferentLoopFlag` | TEST6369: Machine edge equivalence different loop flag | capdag.test.js:3582 |
+| test6372 | `test6372_Machine_edgeEquivalenceSourceOrderIndependent` | TEST6372: Machine edge equivalence source order independent | capdag.test.js:3599 |
+| test6375 | `test6375_Machine_edgeEquivalenceDifferentSourceCount` | TEST6375: Machine edge equivalence different source count | capdag.test.js:3616 |
+| test6377 | `test6377_Machine_graphEquivalenceSameEdges` | TEST6377: Machine graph equivalence same edges | capdag.test.js:3633 |
+| test6380 | `test6380_Machine_graphEquivalenceReorderedEdges` | TEST6380: Machine graph equivalence reordered edges | capdag.test.js:3649 |
+| test6383 | `test6383_Machine_graphNotEquivalentDifferentEdgeCount` | TEST6383: Machine graph not equivalent different edge count | capdag.test.js:3665 |
+| test6386 | `test6386_Machine_graphNotEquivalentDifferentCap` | TEST6386: Machine graph not equivalent different cap | capdag.test.js:3680 |
+| test6389 | `test6389_Machine_graphEmpty` | TEST6389: Machine graph empty | capdag.test.js:3694 |
+| test6392 | `test6392_Machine_graphEmptyEquivalence` | TEST6392: Machine graph empty equivalence | capdag.test.js:3701 |
+| test6395 | `test6395_Machine_rootSourcesLinearChain` | TEST6395: Machine root sources linear chain | capdag.test.js:3708 |
+| test6397 | `test6397_Machine_leafTargetsLinearChain` | TEST6397: Machine leaf targets linear chain | capdag.test.js:3723 |
+| test6398 | `test6398_Machine_rootSourcesFanIn` | TEST6398: Machine root sources fan in | capdag.test.js:3738 |
+| test6400 | `test6400_Machine_displayEdge` | TEST6400: Machine display edge | capdag.test.js:3751 |
+| test6402 | `test6402_Machine_displayGraph` | TEST6402: Machine display graph | capdag.test.js:3763 |
+| test6404 | `test6404_Machine_serializeSingleEdge` | --- Machine serializer tests (mirrors serializer.rs tests) --- | capdag.test.js:3776 |
+| test6406 | `test6406_Machine_serializeTwoEdgeChain` | TEST6406: Machine serialize two edge chain | capdag.test.js:3792 |
+| test6408 | `test6408_Machine_serializeEmptyGraph` | TEST6408: Machine serialize empty graph | capdag.test.js:3806 |
+| test6410 | `test6410_Machine_roundtripSingleEdge` | TEST6410: Machine roundtrip single edge | capdag.test.js:3811 |
+| test6413 | `test6413_Machine_roundtripTwoEdgeChain` | TEST6413: Machine roundtrip two edge chain | capdag.test.js:3825 |
+| test6415 | `test6415_Machine_roundtripFanOut` | TEST6415: Machine roundtrip fan out | capdag.test.js:3840 |
+| test6417 | `test6417_Machine_loopEdgeSerializesWithoutLoopText` | TEST6417: A per-item map (`is_loop`) edge serializes WITHOUT any LOOP marker — `is_loop` is a derived cardinality property, not authored notation text. The pure-JS parse path has no cap definitions to re-derive cardinality, so the reparsed edge has `isLoop === false`; editors get the derived value from the engine, not from re-parsing. | capdag.test.js:3860 |
+| test6419 | `test6419_Machine_serializationIsDeterministic` | TEST6419: Machine serialization is deterministic | capdag.test.js:3882 |
+| test6421 | `test6421_Machine_reorderedEdgesProduceSameNotation` | TEST6421: Machine reordered edges produce same notation | capdag.test.js:3896 |
+| test6429 | `test6429_Machine_multilineSerializeFormat` | TEST6429: Machine multiline serialize format | capdag.test.js:3913 |
+| test6432 | `test6432_Machine_aliasFromOpTag` | Aliases are pure-index `edge_<N>` regardless of the cap's tags; there is no privileged `op` tag to derive a friendlier name from. | capdag.test.js:3929 |
+| test6434 | `test6434_Machine_aliasFallbackWithoutOpTag` | TEST6434: Machine alias fallback without op tag | capdag.test.js:3941 |
+| test6436 | `test6436_Machine_duplicateOpTagsDisambiguated` | Pure-index aliases inherently disambiguate edges that share a marker tag. | capdag.test.js:3953 |
+| test6437 | `test6437_Machine_builderSingleEdge` | --- Machine builder tests --- | capdag.test.js:3975 |
+| test6438 | `test6438_Machine_builderWithLoop` | TEST6438: Machine builder with loop | capdag.test.js:3988 |
+| test6439 | `test6439_Machine_builderChaining` | TEST6439: Machine builder chaining | capdag.test.js:4001 |
+| test6440 | `test6440_Machine_builderEquivalentToParsed` | TEST6440: Machine builder equivalent to parsed | capdag.test.js:4010 |
+| test6442 | `test6442_Machine_builderRoundTrip` | TEST6442: Machine builder round trip | capdag.test.js:4023 |
+| test6444 | `test6444_Machine_capUrnIsEquivalent` | --- CapUrn.isEquivalent/isComparable tests --- | capdag.test.js:4035 |
+| test6446 | `test6446_Machine_capUrnIsComparable` | TEST6446: Machine cap urn is comparable | capdag.test.js:4044 |
+| test6448 | `test6448_Machine_capUrnInMediaUrn` | TEST6448: Machine cap urn in media urn | capdag.test.js:4052 |
+| test6449 | `test6449_Machine_capUrnOutMediaUrn` | TEST6449: Machine cap urn out media urn | capdag.test.js:4060 |
+| test6450 | `test6450_Machine_mediaUrnIsEquivalent` | --- MediaUrn.isEquivalent/isComparable tests --- | capdag.test.js:4069 |
+| test6451 | `test6451_Machine_mediaUrnIsComparable` | TEST6451: Machine media urn is comparable | capdag.test.js:4078 |
+| test6452 | `test6452_Machine_parseMachineWithAST_headerLocation` | Phase 0A: Position tracking tests | capdag.test.js:4091 |
+| test6453 | `test6453_Machine_parseMachineWithAST_wiringLocation` | TEST6453: Machine parse machine with a s t wiring location | capdag.test.js:4108 |
+| test6454 | `test6454_Machine_parseMachineWithAST_multilinePositions` | TEST6454: Machine parse machine with a s t multiline positions | capdag.test.js:4123 |
+| test6455 | `test6455_Machine_parseMachineWithAST_fanInSourceLocations` | TEST6455: Machine parse machine with a s t fan in source locations | capdag.test.js:4133 |
+| test6456 | `test6456_Machine_parseMachineWithAST_aliasMap` | TEST6456: Machine parse machine with a s t alias map | capdag.test.js:4145 |
+| test6457 | `test6457_Machine_parseMachineWithAST_nodeMedia` | TEST6457: Machine parse machine with a s t node media | capdag.test.js:4164 |
+| test6458 | `test6458_Machine_errorLocation_parseError` | TEST6458: Machine error location parse error | capdag.test.js:4177 |
+| test6459 | `test6459_Machine_errorLocation_duplicateAlias` | TEST6459: Machine error location duplicate alias | capdag.test.js:4188 |
+| test6460 | `test6460_Machine_errorLocation_undefinedAlias` | TEST6460: Machine error location undefined alias | capdag.test.js:4203 |
+| test6462 | `test6462_Machine_toMermaid_linearChain` | Phase 0C: Machine.toMermaid() tests | capdag.test.js:4217 |
+| test6463 | `test6463_Machine_toMermaid_loopEdge` | TEST6463: Mermaid renders a per-item map (`is_loop`) edge with a dotted line — `is_loop` is a kept render property — but emits NO "LOOP" text, since that keyword is retired. The loop edge is built programmatically because the grammar no longer has any way to author one. | capdag.test.js:4239 |
+| test6464 | `test6464_Machine_toMermaid_emptyGraph` | TEST6464: Machine to mermaid empty graph | capdag.test.js:4253 |
+| test6465 | `test6465_Machine_toMermaid_fanIn` | TEST6465: Machine to mermaid fan in | capdag.test.js:4260 |
+| test6466 | `test6466_Machine_toMermaid_fanOut` | TEST6466: Machine to mermaid fan out | capdag.test.js:4272 |
+| test6467 | `test6467_Machine_capRegistryEntry_construction` | Phase 0B: FabricRegistryClient tests | capdag.test.js:4292 |
+| test6468 | `test6468_Machine_mediaRegistryEntry_construction` | TEST6468: Machine media registry entry construction | capdag.test.js:4316 |
+| test6469 | `test6469_Machine_capRegistryClient_construction` | TEST6469: Machine cap registry client construction | capdag.test.js:4330 |
+| test6470 | `test6470_Machine_capRegistryEntry_defaults` | TEST6470: Machine cap registry entry defaults | capdag.test.js:4338 |
+| test6471 | `test6471_Renderer_cardinalityLabel_allFourCases` | TEST6471: Renderer cardinality label all four cases | capdag.test.js:4404 |
+| test6472 | `test6472_Renderer_cardinalityLabel_usesUnicodeArrow` | TEST6472: Renderer cardinality label uses unicode arrow | capdag.test.js:4412 |
+| test6473 | `test6473_Renderer_cardinalityFromCap_findsStdinArgNotFirstArg` | TEST6473: Renderer cardinality from cap finds stdin arg not first arg | capdag.test.js:4421 |
+| test6474 | `test6474_Renderer_cardinalityFromCap_scalarDefaultsWhenFieldsMissing` | TEST6474: Renderer cardinality from cap scalar defaults when fields missing | capdag.test.js:4446 |
+| test6475 | `test6475_Renderer_cardinalityFromCap_outputOnlySequence` | TEST6475: Renderer cardinality from cap output only sequence | capdag.test.js:4455 |
+| test6476 | `test6476_Renderer_cardinalityFromCap_rejectsStringIsSequence` | TEST6476: Renderer cardinality from cap rejects string is sequence | capdag.test.js:4467 |
+| test6478 | `test6478_Renderer_cardinalityFromCap_throwsOnNonObject` | TEST6478: Renderer cardinality from cap throws on non object | capdag.test.js:4481 |
+| test6479 | `test6479_Renderer_canonicalMediaUrn_normalizesTagOrder` | TEST6479: Renderer canonical media urn normalizes tag order | capdag.test.js:4501 |
+| test6480 | `test6480_Renderer_canonicalMediaUrn_preservesValueTags` | TEST6480: Renderer canonical media urn preserves value tags | capdag.test.js:4511 |
+| test6481 | `test6481_Renderer_canonicalMediaUrn_rejectsCapUrn` | TEST6481: Renderer canonical media urn rejects cap urn | capdag.test.js:4517 |
+| test6482 | `test6482_Renderer_mediaNodeLabel_rejectsUrnDerivedLabels` | TEST6482: Renderer media node label rejects urn derived labels | capdag.test.js:4530 |
+| test6483 | `test6483_Renderer_buildBrowseGraphData_rejectsMissingMediaTitles` | TEST6483: Renderer build browse graph data rejects missing media titles | capdag.test.js:4545 |
+| test6484 | `test6484_Renderer_validateStrandStep_rejectsUnknownVariant` | TEST6484: Renderer validate strand step rejects unknown variant | capdag.test.js:4603 |
+| test6486 | `test6486_Renderer_validateStrandStep_requiresBooleanIsSequence` | TEST6486: Renderer validate strand step requires boolean is sequence | capdag.test.js:4621 |
+| test6487 | `test6487_Renderer_classifyStrandCapSteps_capFlags` | TEST6487: Renderer classify strand cap steps cap flags | capdag.test.js:4644 |
+| test6488 | `test6488_Renderer_classifyStrandCapSteps_nestedForks` | TEST6488: Renderer classify strand cap steps nested forks | capdag.test.js:4666 |
+| test6489 | `test6489_Renderer_buildStrandGraphData_singleCapPlain` | TEST6489: Renderer build strand graph data single cap plain | capdag.test.js:4697 |
+| test6491 | `test6491_Renderer_buildStrandGraphData_sequenceShowsCardinality` | TEST6491: Renderer build strand graph data sequence shows cardinality | capdag.test.js:4725 |
+| test6492 | `test6492_Renderer_buildStrandGraphData_foreachCollectSpan` | TEST6492: Renderer build strand graph data foreach collect span | capdag.test.js:4746 |
+| test6493 | `test6493_Renderer_buildStrandGraphData_standaloneCollect` | TEST6493: Renderer build strand graph data standalone collect | capdag.test.js:4798 |
+| test6494 | `test6494_Renderer_buildStrandGraphData_unclosedForEachBody` | TEST6494: Renderer build strand graph data unclosed for each body | capdag.test.js:4826 |
+| test6495 | `test6495_Renderer_buildStrandGraphData_nestedForEachThrows` | TEST6495: Renderer build strand graph data nested for each throws | capdag.test.js:4864 |
+| test6496 | `test6496_Renderer_collapseStrand_singleCapBodyKeepsCapOwnLabel` | TEST6496: Renderer collapse strand single cap body keeps cap own label | capdag.test.js:4893 |
+| test6497 | `test6497_Renderer_collapseStrand_unclosedForEachBodyCollapses` | TEST6497: Renderer collapse strand unclosed for each body collapses | capdag.test.js:4946 |
+| test6498 | `test6498_Renderer_collapseStrand_standaloneCollectCollapses` | TEST6498: Renderer collapse strand standalone collect collapses | capdag.test.js:5003 |
+| test6499 | `test6499_Renderer_collapseStrand_sequenceProducingCapBeforeForeach` | TEST6499: Renderer collapse strand sequence producing cap before foreach | capdag.test.js:5047 |
+| test6500 | `test6500_Renderer_collapseStrand_plainCapMergesTrailingOutput` | TEST6500: Renderer collapse strand plain cap merges trailing output | capdag.test.js:5112 |
+| test6501 | `test6501_Renderer_collapseStrand_plainCapDistinctTargetNoMerge` | TEST6501: Renderer collapse strand plain cap distinct target no merge | capdag.test.js:5149 |
+| test6502 | `test6502_Renderer_validateStrandPayload_missingSourceMediaUrn` | TEST6502: Renderer validate strand payload missing source media urn | capdag.test.js:5176 |
+| test6503 | `test6503_Renderer_validateBodyOutcome_rejectsNegativeIndex` | ---------------- run builder ---------------- | capdag.test.js:5189 |
+| test6504 | `test6504_Renderer_buildRunGraphData_pagesSuccessesAndFailures` | TEST6504: Renderer build run graph data pages successes and failures | capdag.test.js:5200 |
+| test6505 | `test6505_Renderer_buildRunGraphData_failureWithoutFailedCapRendersFullTrace` | TEST6505: Renderer build run graph data failure without failed cap renders full trace | capdag.test.js:5271 |
+| test6506 | `test6506_Renderer_buildRunGraphData_usesCapUrnIsEquivalentForFailedCap` | TEST6506: Renderer build run graph data uses cap urn is equivalent for failed cap | capdag.test.js:5310 |
+| test6507 | `test6507_Renderer_buildRunGraphData_backboneHasNoForeachNode` | TEST6507: Renderer build run graph data backbone has no foreach node | capdag.test.js:5370 |
+| test6508 | `test6508_Renderer_buildRunGraphData_allFailedDropsTargetPlaceholder` | TEST6508: Renderer build run graph data all failed drops target placeholder | capdag.test.js:5425 |
+| test6509 | `test6509_Renderer_buildRunGraphData_unclosedForeachSuccessNoMerge` | TEST6509: Renderer build run graph data unclosed foreach success no merge | capdag.test.js:5491 |
+| test6510 | `test6510_Renderer_buildRunGraphData_closedForeachSuccessMergesAtCollectTarget` | TEST6510: Renderer build run graph data closed foreach success merges at collect target | capdag.test.js:5553 |
+| test6511 | `test6511_Renderer_validateEditorGraphPayload_rejectsUnknownKind` | ---------------- editor-graph builder ---------------- | capdag.test.js:5608 |
+| test6512 | `test6512_Renderer_buildEditorGraphData_collapsesCapsIntoLabeledEdges` | TEST6512: Renderer build editor graph data collapses caps into labeled edges | capdag.test.js:5623 |
+| test6513 | `test6513_Renderer_buildEditorGraphData_loopMarkedEdgeGetsLoopClass` | TEST6513: Renderer build editor graph data loop marked edge gets loop class | capdag.test.js:5662 |
+| test6514 | `test6514_Renderer_buildEditorGraphData_cardinalityFromDataSlotSequenceFlags` | TEST6514: Renderer build editor graph data cardinality from data slot sequence flags | capdag.test.js:5681 |
+| test6515 | `test6515_Renderer_buildEditorGraphData_capWithoutCompleteArgsIsDropped` | TEST6515: Renderer build editor graph data cap without complete args is dropped | capdag.test.js:5701 |
+| test6516 | `test6516_Renderer_buildEditorGraphData_rejectsEdgeWithMissingSource` | TEST6516: Renderer build editor graph data rejects edge with missing source | capdag.test.js:5719 |
+| test6517 | `test6517_Renderer_buildResolvedMachineGraphData_singleStrandLinearChain` | ---------------- resolved-machine builder ---------------- | capdag.test.js:5735 |
+| test6518 | `test6518_Renderer_buildResolvedMachineGraphData_loopEdgeGetsLoopClass` | TEST6518: Renderer build resolved machine graph data loop edge gets loop class | capdag.test.js:5794 |
+| test6519 | `test6519_Renderer_buildResolvedMachineGraphData_fanInProducesEdgePerAssignment` | TEST6519: Renderer build resolved machine graph data fan in produces edge per assignment | capdag.test.js:5829 |
+| test6520 | `test6520_Renderer_buildResolvedMachineGraphData_multiStrandKeepsStrandsDisjoint` | TEST6520: Renderer build resolved machine graph data multi strand keeps strands disjoint | capdag.test.js:5870 |
+| test6521 | `test6521_Renderer_buildResolvedMachineGraphData_duplicateNodeIdAcrossStrandsFailsHard` | TEST6521: Renderer build resolved machine graph data duplicate node id across strands fails hard | capdag.test.js:5933 |
+| test6522 | `test6522_Renderer_validateResolvedMachinePayload_rejectsMissingFields` | TEST6522: Renderer validate resolved machine payload rejects missing fields | capdag.test.js:5969 |
+| test6544 | `test6544_builderRejectsStructuralKeys` | TEST6544: builder rejects structural keys on tag/marker | capdag.test.js:2940 |
+| test6620 | `test6620_wildcardGenericFormsRejected` | TEST6620: Generic top-to-top spellings are all rejected. | capdag.test.js:3121 |
+| test6621 | `test6621_capIdentityConstantWorks` | TEST6621: CAP_IDENTITY constant names the true identity cap, not bare cap: | capdag.test.js:3142 |
+| test6734 | `test6734_rejectInvalidCombinations` | TEST6734: Invalid qualifier combinations must be rejected. | capdag.test.js:6295 |
+| test6735 | `test6735_axisWeightingOutDominates` | TEST6735: out-axis difference dominates combined in+y differences. | capdag.test.js:6310 |
+| test6736 | `test6736_axisWeightingDecodedLayout` | TEST6736: Decoded layout — 10000*out + 100*in + y. | capdag.test.js:6330 |
+| test6737 | `test6737_capVersionZeroOmittedOnWire` | TEST6737: Cap with version=0 round-trips with no `version` key on wire | capdag.test.js:6342 |
 ---
 
 ## Numbering Mismatches
@@ -440,18 +440,18 @@ These tests have a numbering disagreement between the function name and the auth
 - `test078` / `test78` / `test078_debugMatchingBehavior` — capdag.test.js:1013
 - `test6240` / `test0070` / `test6240_JS_getExtensionMappings` — capdag.test.js:1696
 - `test6242` / `test0073` / `test6242_JS_resolveMediaUrnFromSpecs` — capdag.test.js:1707
-- `test6277` / `test0088` / `test6277_Machine_whitespaceOnly` — capdag.test.js:3212
-- `test6279` / `test0089` / `test6279_Machine_headerOnlyNoWirings` — capdag.test.js:3217
-- `test6280` / `test0090` / `test6280_Machine_duplicateAlias` — capdag.test.js:3225
-- `test6286` / `test0094` / `test6286_Machine_simpleLinearChain` — capdag.test.js:3237
-- `test6288` / `test0095` / `test6288_Machine_twoStepChain` — capdag.test.js:3253
-- `test6290` / `test0096` / `test6290_Machine_fanOut` — capdag.test.js:3268
-- `test6292` / `test0097` / `test6292_Machine_fanInSecondaryAssignedByPriorWiring` — capdag.test.js:3286
-- `test6294` / `test0098` / `test6294_Machine_fanInSecondaryUnassignedGetsWildcard` — capdag.test.js:3300
+- `test6277` / `test0088` / `test6277_Machine_whitespaceOnly` — capdag.test.js:3216
+- `test6279` / `test0089` / `test6279_Machine_headerOnlyNoWirings` — capdag.test.js:3221
+- `test6280` / `test0090` / `test6280_Machine_duplicateAlias` — capdag.test.js:3229
+- `test6286` / `test0094` / `test6286_Machine_simpleLinearChain` — capdag.test.js:3241
+- `test6288` / `test0095` / `test6288_Machine_twoStepChain` — capdag.test.js:3257
+- `test6290` / `test0096` / `test6290_Machine_fanOut` — capdag.test.js:3272
+- `test6292` / `test0097` / `test6292_Machine_fanInSecondaryAssignedByPriorWiring` — capdag.test.js:3290
+- `test6294` / `test0098` / `test6294_Machine_fanInSecondaryUnassignedGetsWildcard` — capdag.test.js:3304
 
 ---
 
-*Generated from JS source tree*
+*Generated from CapDag-JS source tree*
 *Total tests: 352*
 *Total numbered tests: 352*
 *Total unnumbered tests: 0*
