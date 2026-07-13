@@ -1,8 +1,8 @@
-# CapDag-JS Test Catalog
+# JS Test Catalog
 
-**Total Tests:** 352
+**Total Tests:** 356
 
-**Numbered Tests:** 352
+**Numbered Tests:** 356
 
 **Unnumbered Tests:** 0
 
@@ -12,7 +12,7 @@
 
 All numbered test numbers are unique.
 
-This catalog lists all tests in the CapDag-JS codebase.
+This catalog lists all tests in the JS codebase.
 
 | Test # | Function Name | Description | File |
 |--------|---------------|-------------|------|
@@ -169,6 +169,10 @@ This catalog lists all tests in the CapDag-JS codebase.
 | test1295 | `test1295_rule11NonVoidInputWithoutStdinRejected` | TEST1295: RULE11 - non-void-input cap without stdin source rejected | capdag.test.js:2974 |
 | test1296 | `test1296_rule11VoidInputCliFlagOnly` | TEST1296: RULE11 - void-input cap with only cli_flag sources passes | capdag.test.js:2989 |
 | test1297 | `test1297_rule11NonVoidInputWithStdin` | TEST1297: RULE11 - non-void-input cap with stdin source passes | capdag.test.js:2999 |
+| test1450 | `test1450_planRequestDefaults` | TEST1450: a defaults-only request is AUTO with every knob at its default, and the proto JSON carries the documented wire shape. | capdag.test.js:6546 |
+| test1451 | `test1451_planRequestKnobValidation` | TEST1451: at-depth REQUIRES a positive depth; a depth anywhere else is invalid; ranking never flips the request to CONFIGURED but any space-constraining knob does (mode is forced to CONFIGURED on the wire). | capdag.test.js:6565 |
+| test1452 | `test1452_knobProtoRoundTrip` | TEST1452: every knob round-trips value → proto number → value, and an unknown value/number fails hard in both directions. | capdag.test.js:6606 |
+| test1453 | `test1453_planResponseParsers` | TEST1453: candidate/target parsers accept realistic proto-JSON and sort candidates by rank; malformed payloads (missing field, wrong type) fail hard with the offending path in the message. | capdag.test.js:6625 |
 | test1800 | `test1800_kindIdentityOnlyForBareCap` | TEST1800: Identity classifier — and only explicit effect=none qualifies. | capdag.test.js:6011 |
 | test1801 | `test1801_kindSourceWhenInputIsVoid` | TEST1801: Source classifier — in=media:void, out non-void. | capdag.test.js:6038 |
 | test1802 | `test1802_kindSinkWhenOutputIsVoid` | TEST1802: Sink classifier — out=media:void, in non-void. | capdag.test.js:6047 |
@@ -451,9 +455,9 @@ These tests have a numbering disagreement between the function name and the auth
 
 ---
 
-*Generated from CapDag-JS source tree*
-*Total tests: 352*
-*Total numbered tests: 352*
+*Generated from JS source tree*
+*Total tests: 356*
+*Total numbered tests: 356*
 *Total unnumbered tests: 0*
 *Total numbered tests missing descriptions: 0*
 *Total numbering mismatches: 74*
