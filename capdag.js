@@ -7927,8 +7927,30 @@ class Manifest {
   }
 }
 
+// Unified configurable planner vocabulary (mirrors Rust plan_space.rs and the
+// PlanMachines/DiscoverConvergentTargets proto surface).
+const planner = require('./planner.js');
+
 // Export for CommonJS
 module.exports = {
+  // Planner plan-space vocabulary
+  PlanStateError: planner.PlanStateError,
+  ConvergencePresence: planner.ConvergencePresence,
+  ConvergenceLocation: planner.ConvergenceLocation,
+  ConvergenceMechanism: planner.ConvergenceMechanism,
+  ConvergenceArity: planner.ConvergenceArity,
+  DivergencePresence: planner.DivergencePresence,
+  DivergenceLocation: planner.DivergenceLocation,
+  RankPolicy: planner.RankPolicy,
+  PlanMode: planner.PlanMode,
+  PlanRequest: planner.PlanRequest,
+  parsePlanApex: planner.parsePlanApex,
+  parsePlanProfile: planner.parsePlanProfile,
+  parsePlanCost: planner.parsePlanCost,
+  parsePlanCandidate: planner.parsePlanCandidate,
+  parsePlanCandidates: planner.parsePlanCandidates,
+  parseConvergentTarget: planner.parseConvergentTarget,
+  parseConvergentTargets: planner.parseConvergentTargets,
   ALIAS_TARGET_CAP,
   ALIAS_TARGET_MEDIA,
   tokenIsUrn,

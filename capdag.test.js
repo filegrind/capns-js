@@ -6523,6 +6523,167 @@ function test1196_aliasedSerializationUsesAliasAndDropsHeader() {
 // Test runner
 // ============================================================================
 
+
+// ============================================================================
+// Unified planner plan-space (planner.js) — TEST1450+
+// ============================================================================
+
+const plannerNS = require('./planner.js');
+
+/** Planner-specific throw assertion: any PlanStateError counts. */
+function assertThrowsPlanState(fn, message) {
+  try {
+    fn();
+  } catch (error) {
+    if (error instanceof plannerNS.PlanStateError) return;
+    throw new Error(`Expected PlanStateError but got ${error.name}: ${error.message} (${message})`);
+  }
+  throw new Error(`Expected PlanStateError but function succeeded: ${message}`);
+}
+
+// TEST1450: a defaults-only request is AUTO with every knob at its default,
+// and the proto JSON carries the documented wire shape.
+function test1450_planRequestDefaults() {
+  const request = new plannerNS.PlanRequest({
+    sources: [{ mediaUrn: 'media:ext=pdf', isSequence: false }],
+    exactTargets: ['media:enc=utf-8;ext=txt'],
+  });
+  assertEqual(request.isConfigured, false, 'defaults are not configured');
+  const wire = request.toProtoJSON();
+  assertEqual(wire.mode, 0, 'AUTO mode');
+  assertEqual(wire.ranking, 0, 'intent ranking');
+  assertEqual(wire.convergence.presence, 0, 'auto presence');
+  assertEqual(wire.convergence.mechanism, 0, 'any mechanism');
+  assertEqual(wire.sources[0].media_urn, 'media:ext=pdf', 'snake_case source field');
+  assertEqual(wire.sources[0].is_sequence, false, 'snake_case sequence field');
+  assertEqual(wire.max_depth, 0, '0 = engine default depth');
+}
+
+// TEST1451: at-depth REQUIRES a positive depth; a depth anywhere else is
+// invalid; ranking never flips the request to CONFIGURED but any
+// space-constraining knob does (mode is forced to CONFIGURED on the wire).
+function test1451_planRequestKnobValidation() {
+  assertThrowsPlanState(() => new plannerNS.PlanRequest({
+    sources: [{ mediaUrn: 'media:ext=pdf', isSequence: false }],
+    exactTargets: ['media:enc=utf-8;ext=txt'],
+    convergenceLocation: 'at-depth',
+  }), 'at-depth without a depth must throw');
+
+  assertThrowsPlanState(() => new plannerNS.PlanRequest({
+    sources: [{ mediaUrn: 'media:ext=pdf', isSequence: false }],
+    exactTargets: ['media:enc=utf-8;ext=txt'],
+    convergenceAtDepth: 2,
+  }), 'a depth without at-depth must throw');
+
+  const ranked = new plannerNS.PlanRequest({
+    sources: [{ mediaUrn: 'media:ext=pdf', isSequence: false }],
+    exactTargets: ['media:enc=utf-8;ext=txt'],
+    ranking: 'shortest',
+  });
+  assertEqual(ranked.isConfigured, false, 'ranking alone never configures');
+  assertEqual(ranked.toProtoJSON().mode, 0, 'ranking alone stays AUTO');
+
+  const constrained = new plannerNS.PlanRequest({
+    sources: [{ mediaUrn: 'media:ext=pdf', isSequence: false }],
+    exactTargets: ['media:enc=utf-8;ext=txt'],
+    convergenceMechanism: 'collect',
+  });
+  assertEqual(constrained.isConfigured, true, 'a mechanism constrains');
+  assertEqual(constrained.toProtoJSON().mode, 1, 'constrained ⇒ CONFIGURED on the wire');
+
+  assertThrowsPlanState(() => new plannerNS.PlanRequest({
+    sources: [],
+    exactTargets: ['media:enc=utf-8;ext=txt'],
+  }), 'no sources must throw');
+  assertThrowsPlanState(() => new plannerNS.PlanRequest({
+    sources: [{ mediaUrn: 'media:ext=pdf', isSequence: false }],
+    exactTargets: [],
+  }), 'no targets must throw');
+}
+
+// TEST1452: every knob round-trips value → proto number → value, and an
+// unknown value/number fails hard in both directions.
+function test1452_knobProtoRoundTrip() {
+  const knobs = [
+    plannerNS.ConvergencePresence, plannerNS.ConvergenceLocation,
+    plannerNS.ConvergenceMechanism, plannerNS.ConvergenceArity,
+    plannerNS.DivergencePresence, plannerNS.DivergenceLocation,
+    plannerNS.RankPolicy, plannerNS.PlanMode,
+  ];
+  for (const knob of knobs) {
+    for (const value of knob.values) {
+      assertEqual(knob.fromProto(knob.toProto(value)), value, `${knob.name} round-trips ${value}`);
+    }
+    assertThrowsPlanState(() => knob.toProto('no-such-value'), `${knob.name} rejects unknown value`);
+    assertThrowsPlanState(() => knob.fromProto(999), `${knob.name} rejects unknown number`);
+  }
+}
+
+// TEST1453: candidate/target parsers accept realistic proto-JSON and sort
+// candidates by rank; malformed payloads (missing field, wrong type) fail
+// hard with the offending path in the message.
+function test1453_planResponseParsers() {
+  const candidates = plannerNS.parsePlanCandidates({
+    candidates: [
+      {
+        notation: '[n0 -> edge_1 -> n1]',
+        label: 'Convert each',
+        rank: 1,
+        profile: { source_media: ['media:ext=pdf'], target_media: ['media:enc=utf-8;ext=txt'], apexes: [], converged: false, diverged: false },
+        cost: { cap_steps: 2, total_steps: 2, max_leg_depth: 0, intent_score: 0.5 },
+      },
+      {
+        notation: '[(n0, n1) -> edge_0 -> n2]',
+        label: 'Combine via text',
+        rank: 0,
+        profile: {
+          source_media: ['media:ext=pdf', 'media:ext=md'],
+          target_media: ['media:enc=utf-8;ext=txt'],
+          apexes: [{ media_urn: 'media:enc=utf-8;page', mechanism: 2, depth: 1 }],
+          converged: true,
+          diverged: false,
+        },
+        cost: { cap_steps: 3, total_steps: 4, max_leg_depth: 1, intent_score: 0.8 },
+      },
+    ],
+  });
+  assertEqual(candidates.length, 2, 'two candidates');
+  assertEqual(candidates[0].rank, 0, 'sorted by rank');
+  assertEqual(candidates[0].profile.apexes[0].mechanism, 'collect', 'proto mechanism decoded to knob value');
+  assertEqual(candidates[0].profile.converged, true, 'converged carried');
+
+  assertThrowsPlanState(
+    () => plannerNS.parsePlanCandidates({ candidates: [{ label: 'missing notation', rank: 0 }] }),
+    'a candidate without notation must fail hard'
+  );
+
+  const targets = plannerNS.parseConvergentTargets({
+    targets: [
+      {
+        media_def: 'media:enc=utf-8;ext=txt',
+        display_name: 'Plain Text',
+        min_total_steps: 3,
+        apex: { media_urn: 'media:enc=utf-8;page', mechanism: 2, depth: 1 },
+        convergent: true,
+        file_extension: 'txt',
+      },
+      {
+        media_def: 'media:ext=png;image',
+        display_name: 'PNG Image',
+        min_total_steps: 2,
+        convergent: false,
+        file_extension: 'png',
+      },
+    ],
+  });
+  assertEqual(targets[0].apex.mediaUrn, 'media:enc=utf-8;page', 'apex carried');
+  assertEqual(targets[1].apex, null, 'independent target has no apex');
+  assertThrowsPlanState(
+    () => plannerNS.parseConvergentTargets({ targets: [{ display_name: 'no media_def' }] }),
+    'a target without media_def must fail hard'
+  );
+}
+
 async function runTests() {
   console.log('Running capdag-js tests...\n');
 
@@ -6990,6 +7151,13 @@ async function runTests() {
   runTest('TEST1895: display_alias_for_urn',                 test1895_displayAliasForUrn);
   runTest('TEST1896: cached_cap_aliases_filters_to_cap',     test1896_cachedCapAliasesFiltersToCapTargets);
   runTest('TEST1196: aliased_serialization_uses_alias',      test1196_aliasedSerializationUsesAliasAndDropsHeader);
+
+  // planner.js: unified plan-space vocabulary
+  console.log('--- planner.js ---');
+  runTest('TEST1450: plan_request_defaults', test1450_planRequestDefaults);
+  runTest('TEST1451: plan_request_knob_validation', test1451_planRequestKnobValidation);
+  runTest('TEST1452: knob_proto_round_trip', test1452_knobProtoRoundTrip);
+  runTest('TEST1453: plan_response_parsers', test1453_planResponseParsers);
 
   // Summary
   console.log(`\n${passCount + failCount} tests: ${passCount} passed, ${failCount} failed`);
