@@ -615,7 +615,7 @@ class CapUrn {
       }
     }
 
-    // Output direction: provider output must conform to requested output.
+    // Output direction: candidate output must conform to requested output.
     // `media:` on the pattern side is wildcard top and skips the check.
     if (this.outSpec !== 'media:' && this.outSpec !== '*') {
       const capOut = MediaUrn.fromString(this.outSpec);
@@ -851,7 +851,7 @@ class CapUrn {
   }
 
   /**
-   * Check if this provider can dispatch the given request.
+   * Check if this candidate can dispatch the given request.
    *
    * @param {CapUrn} request
    * @returns {boolean}
@@ -2920,7 +2920,7 @@ class CapGroup {
 }
 
 /**
- * Unified cap-based manifest for components (providers and cartridges).
+ * Unified cap-based manifest for components (cartridges).
  *
  * `(registry_url, channel, name, version)` is the cartridge's full
  * identity — each (registry, channel) pair is an independent namespace.
@@ -5286,7 +5286,7 @@ const CartridgeAttachmentErrorKind = Object.freeze({
   QUARANTINED: 'quarantined',
   // On-disk install context disagrees with the cartridge.json the cartridge
   // declares — the slug folder doesn't match slug_for(registry_url), the
-  // channel folder doesn't match the manifest's channel, or a bundled-provider
+  // channel folder doesn't match the manifest's channel, or a bundled-cartridge
   // integrity proof failed. Structurally well-formed but cannot be trusted
   // because its placement on disk does not match what it claims to be.
   BAD_INSTALLATION: 'bad_installation',
@@ -5817,49 +5817,49 @@ function hashCartridgeDirectory(dir) {
 }
 
 // ---------------------------------------------------------------------------
-// Bundled-provider integrity (non-macOS).
+// Bundled-cartridge integrity (non-macOS).
 // ---------------------------------------------------------------------------
 //
-// Mirrors capdag::cartridge_discovery::verify_bundled_provider_hash and the
-// BUNDLED_PROVIDER_HASHES const codegen'd by build.rs. Under a plain build —
-// and in this mirror, which bundles no providers — the set is empty, so any
+// Mirrors capdag::cartridge_discovery::verify_bundled_cartridge_hash and the
+// BUNDLED_CARTRIDGE_HASHES const codegen'd by build.rs. Under a plain build —
+// and in this mirror, which bundles no cartridges — the set is empty, so any
 // `installed_from: bundle` cartridge has no baked hash and is rejected.
-const BUNDLED_PROVIDER_HASHES = Object.freeze([]); // [name, version, hash] triples
+const BUNDLED_CARTRIDGE_HASHES = Object.freeze([]); // [name, version, hash] triples
 
 /**
- * Look up the baked expected directory hash for a bundled provider, or null if
+ * Look up the baked expected directory hash for a bundled cartridge, or null if
  * (name, version) was not recorded at build time.
  * @returns {string|null}
  */
-function bundledProviderExpectedHash(name, version) {
-  for (const [n, v, h] of BUNDLED_PROVIDER_HASHES) {
+function bundledCartridgeExpectedHash(name, version) {
+  for (const [n, v, h] of BUNDLED_CARTRIDGE_HASHES) {
     if (n === name && v === version) return h;
   }
   return null;
 }
 
 /**
- * Verify a bundled provider's on-disk content against the hash baked into this
+ * Verify a bundled cartridge's on-disk content against the hash baked into this
  * build. Returns null on success, or an error-reason string. Mirrors
- * verify_bundled_provider_hash. Non-macOS only: macOS bundled-provider
+ * verify_bundled_cartridge_hash. Non-macOS only: macOS bundled-cartridge
  * integrity is the OS code-signature, so the engine there neither bakes nor
  * checks these hashes.
  *
  * @returns {string|null} null on OK, else the failure reason.
  */
-function verifyBundledProviderHash(name, version, versionDir) {
-  const expected = bundledProviderExpectedHash(name, version);
+function verifyBundledCartridgeHash(name, version, versionDir) {
+  const expected = bundledCartridgeExpectedHash(name, version);
   if (expected === null) {
-    return `no baked hash for bundled provider ${name} ${version} — this build did not record it (MFR_BUNDLED_PROVIDER_HASHES)`;
+    return `no baked hash for bundled cartridge ${name} ${version} — this build did not record it (MFR_BUNDLED_CARTRIDGE_HASHES)`;
   }
   let actual;
   try {
     actual = hashCartridgeDirectory(versionDir);
   } catch (e) {
-    return `failed to hash bundled provider directory: ${e.message}`;
+    return `failed to hash bundled cartridge directory: ${e.message}`;
   }
   if (actual === expected) return null;
-  return `content hash mismatch — baked ${expected}, on-disk ${actual}; the shipped provider differs from what this build was compiled to ship`;
+  return `content hash mismatch — baked ${expected}, on-disk ${actual}; the shipped cartridge differs from what this build was compiled to ship`;
 }
 
 /**
@@ -6370,7 +6370,7 @@ async function scanChannelRoot(scanRoot, expectedSlug, identity, discovered) {
       continue;
     }
 
-    // Bundled-provider integrity. A cartridge marked installed_from=bundle is
+    // Bundled-cartridge integrity. A cartridge marked installed_from=bundle is
     // shipped INSIDE this build and has no upstream registry to verify against,
     // so it needs its own integrity proof. Platform-split: on macOS the OS
     // code-signature is the guard (baked-hash verification intentionally
@@ -6378,7 +6378,7 @@ async function scanChannelRoot(scanRoot, expectedSlug, identity, discovered) {
     // value, else BadInstallation.
     if (cj.installedFrom === CartridgeInstallSource.BUNDLE) {
       if (process.platform !== 'darwin') {
-        const reason = verifyBundledProviderHash(cj.name, cj.version, versionDir);
+        const reason = verifyBundledCartridgeHash(cj.name, cj.version, versionDir);
         if (reason !== null) {
           discovered.push(DiscoveredCartridge.incompatible({
             version_dir: versionDir,
@@ -6388,7 +6388,7 @@ async function scanChannelRoot(scanRoot, expectedSlug, identity, discovered) {
             version: cj.version,
             error: new CartridgeAttachmentError(
               CartridgeAttachmentErrorKind.BAD_INSTALLATION,
-              `bundled provider integrity check failed: ${reason}`,
+              `bundled cartridge integrity check failed: ${reason}`,
               detectedAt
             ),
           }));
@@ -8148,8 +8148,8 @@ module.exports = {
   CartridgeJsonError,
   CartridgeJson,
   hashCartridgeDirectory,
-  BUNDLED_PROVIDER_HASHES,
-  verifyBundledProviderHash,
+  BUNDLED_CARTRIDGE_HASHES,
+  verifyBundledCartridgeHash,
   DiscoveryIdentity,
   DiscoveredCartridge,
   probeCartridgeCapGroups,

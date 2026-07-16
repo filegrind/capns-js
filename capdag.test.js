@@ -715,7 +715,7 @@ function test050_matchingSemanticsDirectionMismatch() {
   assert(!cap.accepts(request), 'Incompatible direction types should not match');
 }
 
-// TEST890: Semantic direction matching - generic provider matches specific request
+// TEST890: Semantic direction matching - generic candidate matches specific request
 function test890_directionSemanticMatching() {
   // Generic wildcard cap accepts specific pdf request
   const genericCap = CapUrn.fromString(
@@ -1409,14 +1409,14 @@ function test6208_CapFabGetOutgoingConformsToMatching() {
 // the renderer colours/groups edges by provenance in browse mode.
 function test6224_CapFabDistinctRegistryNames() {
   const graph = new CapFab();
-  graph.addCap(makeGraphCap('media:ext=pdf', 'media:enc=utf-8', 'PDF to Text'), 'providers');
+  graph.addCap(makeGraphCap('media:ext=pdf', 'media:enc=utf-8', 'PDF to Text'), 'bundled-cartridges');
   graph.addCap(makeGraphCap('media:enc=utf-8', 'media:embedding-vector', 'Embed'), 'cartridges');
 
   const edges = graph.getEdges();
   assertEqual(edges.length, 2, 'Two caps must produce two edges');
 
   const names = new Set(edges.map(e => e.registryName));
-  assert(names.has('providers'), 'providers registry name must be preserved');
+  assert(names.has('bundled-cartridges'), 'bundled-cartridges registry name must be preserved');
   assert(names.has('cartridges'), 'cartridges registry name must be preserved');
 }
 
@@ -2687,11 +2687,11 @@ async function test1877_registryCartridgeUnderWrongSlugIsBadInstall() {
 }
 
 // TEST1878: a cartridge marked `installed_from: bundle` with no baked hash in
-// BUNDLED_PROVIDER_HASHES (empty in this mirror) is rejected as BadInstallation
+// BUNDLED_CARTRIDGE_HASHES (empty in this mirror) is rejected as BadInstallation
 // — the bundled-integrity gate fires before the probe. Non-macOS only: on macOS
 // the baked-hash path is intentionally absent (OS code-signature is the guard),
-// so a bundled provider is accepted there and would instead end at the probe.
-async function test1878_bundledProviderWithoutBakedHashIsRejected() {
+// so a bundled cartridge is accepted there and would instead end at the probe.
+async function test1878_bundledCartridgeWithoutBakedHashIsRejected() {
   if (process.platform === 'darwin') {
     // Mirrors the Rust #[cfg(not(target_os = "macos"))] gate: on macOS the
     // baked-hash path does not exist, so this scenario is not exercised.
@@ -2709,7 +2709,7 @@ async function test1878_bundledProviderWithoutBakedHashIsRejected() {
     discoveryInstallFixture(root, 'dev', 'nightly', 'cart', '1.0.0', json, 'cart');
     const out = await discoverCartridges(root, new DiscoveryIdentity({ channel: 'nightly', registryUrl: null, fabricManifestVersion: 1, cartridgeRegistryVersion: 1 }));
     discoveryExpectIncompatible(out, CartridgeAttachmentErrorKind.BAD_INSTALLATION);
-    assert(out[0].error.message.includes('bundled provider integrity'),
+    assert(out[0].error.message.includes('bundled cartridge integrity'),
       `message should name the bundled-integrity failure: ${out[0].error.message}`);
   } finally {
     discoveryRemoveRoot(root);
@@ -3195,11 +3195,11 @@ function test127_invalidEffectNoneFailsHard() {
 
 // TEST128: omitted effect means declared; unconstrained effect must be explicit
 function test128_effectDispatchRequiresExplicitWildcard() {
-  const noneProvider = CapUrn.fromString('cap:effect=none');
+  const noneCandidate = CapUrn.fromString('cap:effect=none');
   const declaredRequest = CapUrn.fromString('cap:raw');
   const anyRequest = CapUrn.fromString('cap:?effect');
-  assert(!noneProvider.isDispatchable(declaredRequest), 'effect=none should not silently satisfy declared request');
-  assert(noneProvider.isDispatchable(anyRequest), 'explicit ?effect should accept any provider effect');
+  assert(!noneCandidate.isDispatchable(declaredRequest), 'effect=none should not silently satisfy declared request');
+  assert(noneCandidate.isDispatchable(anyRequest), 'explicit ?effect should accept any candidate effect');
 }
 
 // ============================================================================
@@ -6886,7 +6886,7 @@ async function runTests() {
   await runTest('TEST1875: scan_all_reaches_both_dev_and_registry_slugs', test1875_scanAllReachesBothDevAndRegistrySlugs);
   await runTest('TEST1876: other_channel_subtree_is_skipped', test1876_otherChannelSubtreeIsSkipped);
   await runTest('TEST1877: registry_cartridge_under_wrong_slug_is_bad_install', test1877_registryCartridgeUnderWrongSlugIsBadInstall);
-  await runTest('TEST1878: bundled_provider_without_baked_hash_is_rejected', test1878_bundledProviderWithoutBakedHashIsRejected);
+  await runTest('TEST1878: bundled_cartridge_without_baked_hash_is_rejected', test1878_bundledCartridgeWithoutBakedHashIsRejected);
 
   // media_urn.rs: TEST1312-TEST1315, TEST1298-TEST1302 (MediaUrn predicates)
   console.log('\n--- media_urn.rs (predicates) ---');
