@@ -1,4 +1,4 @@
-# JS Test Catalog
+# CapDag-JS Test Catalog
 
 **Total Tests:** 356
 
@@ -12,7 +12,7 @@
 
 All numbered test numbers are unique.
 
-This catalog lists all tests in the JS codebase.
+This catalog lists all tests in the CapDag-JS codebase.
 
 | Test # | Function Name | Description | File |
 |--------|---------------|-------------|------|
@@ -455,7 +455,7 @@ These tests have a numbering disagreement between the function name and the auth
 
 ---
 
-*Generated from JS source tree*
+*Generated from CapDag-JS source tree*
 *Total tests: 356*
 *Total numbered tests: 356*
 *Total unnumbered tests: 0*
