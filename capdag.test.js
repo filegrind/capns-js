@@ -6363,6 +6363,139 @@ function test1848_capVersionNonZeroOnWire() {
 }
 
 // ===========================================================================
+// Shared parity tests 7100-7104: CapArg.streamUrn / CapArg.isMainInput.
+// Same substantive assertions in every capdag mirror (rust, go, js, objc, py).
+// ===========================================================================
+
+// TEST7100: streamUrn() returns the stdin source's URN when it differs from the declared slot media_urn — the stdin URN, not the slot URN, is what the runtime demuxes the arg's input stream by.
+function test7100_streamUrnReturnsStdinSourceUrnWhenItDiffersFromSlotUrn() {
+  const arg = new CapArg(
+    'media:enc=utf-8;file-path',
+    true,
+    [new ArgSource({ stdin: 'media:ext=pdf;pdf-stream' })]
+  );
+  assertEqual(arg.streamUrn(), 'media:ext=pdf;pdf-stream',
+    'streamUrn must return the stdin source URN');
+  assert(arg.streamUrn() !== arg.media_urn,
+    'stream URN must differ from the declared slot media_urn here');
+}
+
+// TEST7101: streamUrn() falls back to the declared slot media_urn when the arg declares no stdin source — a producer-fed arg may be delivered by its declared URN without ever appearing on stdin.
+function test7101_streamUrnFallsBackToDeclaredMediaUrnWithoutStdinSource() {
+  const arg = new CapArg(
+    'media:enc=utf-8;system-prompt',
+    true,
+    [new ArgSource({ cli_flag: '--system-prompt' })]
+  );
+  assertEqual(arg.streamUrn(), 'media:enc=utf-8;system-prompt',
+    'streamUrn must fall back to the declared media_urn');
+}
+
+// TEST7102: isMainInput() is true when the stdin URN is order-theoretically EQUIVALENT to the cap's in= spec even when the two strings list their tags in a different order — the comparison is the MediaUrn equivalence predicate, never a string comparison.
+function test7102_isMainInputTrueOnTagOrderInsensitiveEquivalenceToInSpec() {
+  const inSpec = MediaUrn.fromString('media:ext=pdf;pdf-stream');
+  const arg = new CapArg(
+    'media:enc=utf-8;file-path',
+    true,
+    [new ArgSource({ stdin: 'media:pdf-stream;ext=pdf' })] // same tags, different order
+  );
+  assert(arg.isMainInput(inSpec),
+    'tag-order-insensitive equivalent stdin URN must be the main input');
+  // The raw strings genuinely differ — proves the match is equivalence,
+  // not string equality.
+  assert(inSpec.toString() !== 'media:pdf-stream;ext=pdf',
+    'raw spec strings must differ for this test to be meaningful');
+}
+
+// TEST7103: isMainInput() is false for cli_flag-only and position-only args (no stdin source means never the main input, whatever the declared slot URN says), and false when the stdin URN is not equivalent to in=.
+function test7103_isMainInputFalseWithoutEquivalentStdinSource() {
+  const inSpec = MediaUrn.fromString('media:ext=pdf;pdf-stream');
+
+  const cliFlagOnly = new CapArg(
+    'media:ext=pdf;pdf-stream', // slot URN even matches in= — irrelevant
+    true,
+    [new ArgSource({ cli_flag: '--input' })]
+  );
+  assert(!cliFlagOnly.isMainInput(inSpec), 'cli_flag-only arg is never the main input');
+
+  const positionOnly = new CapArg(
+    'media:ext=pdf;pdf-stream',
+    true,
+    [new ArgSource({ position: 0 })]
+  );
+  assert(!positionOnly.isMainInput(inSpec), 'position-only arg is never the main input');
+
+  const nonEquivalentStdin = new CapArg(
+    'media:enc=utf-8;system-prompt',
+    false,
+    [new ArgSource({ stdin: 'media:enc=utf-8;system-prompt' })]
+  );
+  assert(!nonEquivalentStdin.isMainInput(inSpec),
+    'stdin URN not equivalent to in= must not be the main input');
+}
+
+// TEST7104: A realistic multi-arg cap (one stdin main input; one required, defaultless cli_flag arg; several defaulted cli_flag args): exactly one arg is the main input, and partitioning the remaining args by required-without-default vs has-default yields the expected sets.
+function test7104_multiArgCapExactlyOneMainInputAndPartitionOfRest() {
+  const inSpec = MediaUrn.fromString('media:ext=pdf;pdf-stream');
+
+  const args = [
+    new CapArg(
+      'media:enc=utf-8;file-path',
+      true,
+      // Main input may ALSO be delivered by cli-flag; stdin is the
+      // defining route.
+      [new ArgSource({ stdin: 'media:pdf-stream;ext=pdf' }), new ArgSource({ cli_flag: '--input' })]
+    ),
+    new CapArg(
+      'media:enc=utf-8;question',
+      true,
+      [new ArgSource({ cli_flag: '--question' })]
+    ),
+    new CapArg(
+      'media:max-tokens;numeric',
+      false,
+      [new ArgSource({ cli_flag: '--max-tokens' })],
+      { default_value: 1024 }
+    ),
+    new CapArg(
+      'media:numeric;temperature',
+      false,
+      [new ArgSource({ cli_flag: '--temperature' })],
+      { default_value: 0.7 }
+    ),
+    new CapArg(
+      'media:enc=utf-8;system-prompt',
+      false,
+      [new ArgSource({ cli_flag: '--system-prompt' })],
+      { default_value: 'You are a helpful assistant.' }
+    ),
+  ];
+
+  const mainInputs = args.filter(a => a.isMainInput(inSpec)).map(a => a.media_urn);
+  const rest = args.filter(a => !a.isMainInput(inSpec));
+  const requiredWithoutDefault = rest
+    .filter(a => a.required && a.default_value === null)
+    .map(a => a.media_urn);
+  const withDefault = rest
+    .filter(a => a.default_value !== null)
+    .map(a => a.media_urn);
+
+  assertEqual(JSON.stringify(mainInputs),
+    JSON.stringify(['media:enc=utf-8;file-path']),
+    'exactly one arg must be the main input');
+  assertEqual(JSON.stringify(requiredWithoutDefault),
+    JSON.stringify(['media:enc=utf-8;question']),
+    'required-without-default partition');
+  assertEqual(JSON.stringify(withDefault),
+    JSON.stringify([
+      'media:max-tokens;numeric',
+      'media:numeric;temperature',
+      'media:enc=utf-8;system-prompt',
+    ]),
+    'has-default partition');
+}
+
+// ===========================================================================
 // Fabric alias tests (shared numbers 1880-1882, 1887)
 //
 // Shared test numbers test the same behavior, with the same method, across
@@ -7140,6 +7273,13 @@ async function runTests() {
   // Cap.version round-trip tests
   runTest('TEST1847: cap_version_zero_omitted_on_wire',     test6737_capVersionZeroOmittedOnWire);
   runTest('TEST1848: cap_version_nonzero_on_wire',          test1848_capVersionNonZeroOnWire);
+
+  console.log('\n--- CapArg stream URN + main input (test7100–test7104) ---');
+  runTest('TEST7100: stream_urn_prefers_stdin_source_urn',   test7100_streamUrnReturnsStdinSourceUrnWhenItDiffersFromSlotUrn);
+  runTest('TEST7101: stream_urn_falls_back_to_media_urn',    test7101_streamUrnFallsBackToDeclaredMediaUrnWithoutStdinSource);
+  runTest('TEST7102: is_main_input_by_urn_equivalence',      test7102_isMainInputTrueOnTagOrderInsensitiveEquivalenceToInSpec);
+  runTest('TEST7103: is_main_input_false_without_stdin',     test7103_isMainInputFalseWithoutEquivalentStdinSource);
+  runTest('TEST7104: multi_arg_main_input_partition',        test7104_multiArgCapExactlyOneMainInputAndPartitionOfRest);
 
   runTest('TEST1880: alias_name_normalization_rules',       test1880_aliasNameNormalizationRules);
   runTest('TEST1881: token_urn_vs_alias_detection',         test1881_tokenUrnVsAliasDetection);

@@ -2482,6 +2482,46 @@ class CapArg {
   }
 
   /**
+   * The media URN the runtime demuxes this arg's input stream by: its
+   * stdin source URN if it declares one, otherwise its declared slot
+   * media URN. A cap need not declare any stdin source at all — a
+   * producer-fed arg may be delivered by its declared URN — so this
+   * never assumes a stdin source exists.
+   * Mirrors Rust: CapArg::stream_urn()
+   * @returns {string} The stream media URN
+   */
+  streamUrn() {
+    const stdinSource = this.sources.find(s => s.stdin !== null);
+    return stdinSource ? stdinSource.stdin : this.media_urn;
+  }
+
+  /**
+   * Whether this arg is the cap's MAIN input relative to `inSpec` (the cap
+   * URN's `in=` value): it declares a stdin source whose URN is `in=`. The
+   * main input is always the value piped in on stdin (like a Unix command's
+   * stdin), so the main arg always declares a stdin source carrying `in=`.
+   * Its DECLARED slot URN may differ from that stdin URN (e.g. a `file-path`
+   * slot whose piped content is a `pdf-stream`) — the stdin URN, not the
+   * slot URN, is `in=`. The main input may ALSO be delivered by
+   * position/cli-flag, but stdin is the defining route. Compared by
+   * tagged-URN equivalence, never as strings.
+   * Mirrors Rust: CapArg::is_main_input(&in_spec)
+   * @param {MediaUrn|string} inSpec - The cap URN's in= spec (parsed if given as string)
+   * @returns {boolean} True if this arg is the cap's main input
+   */
+  isMainInput(inSpec) {
+    const spec = inSpec instanceof MediaUrn ? inSpec : MediaUrn.fromString(inSpec);
+    return this.sources.some(s => {
+      if (s.stdin === null) return false;
+      try {
+        return MediaUrn.fromString(s.stdin).isEquivalent(spec);
+      } catch (_) {
+        return false;
+      }
+    });
+  }
+
+  /**
    * Check if this argument has a position source
    * @returns {boolean} True if has position source
    */
