@@ -744,6 +744,7 @@ function validateStrandStep(step, path) {
   if (!step || typeof step !== 'object') {
     throw new Error(`CapFabRenderer: ${path} is not an object`);
   }
+  assertString(step.token_id, `${path}.token_id`);
   assertString(step.from_spec, `${path}.from_spec`);
   assertString(step.to_spec, `${path}.to_spec`);
   if (!step.step_type || typeof step.step_type !== 'object') {
@@ -774,28 +775,32 @@ function validateStrandStep(step, path) {
     if (typeof body.output_is_sequence !== 'boolean') {
       throw new Error(`CapFabRenderer: ${path}.step_type.Cap.output_is_sequence must be a boolean`);
     }
-    // `inputs` (capdag CapInput list) carries the data-flow graph: the main
-    // input plus any convergence inputs. Optional on legacy payloads, but
-    // when present it must be well-formed — the fan-in edges are drawn from
-    // it, so a malformed entry is a hard error, not a silent skip.
-    if (body.inputs !== undefined) {
-      assertArray(body.inputs, `${path}.step_type.Cap.inputs`);
-      body.inputs.forEach((input, inputIdx) => {
-        const inputPath = `${path}.step_type.Cap.inputs[${inputIdx}]`;
-        assertObject(input, inputPath);
-        assertString(input.arg_urn, `${inputPath}.arg_urn`);
-        // serde: unit variant → the string "StrandInput"; struct variant →
-        // { Step: { token_id } }. Anything else is malformed.
-        if (input.source === 'StrandInput') return;
-        if (input.source && typeof input.source === 'object' && input.source.Step) {
-          assertString(input.source.Step.token_id, `${inputPath}.source.Step.token_id`);
-          return;
-        }
-        throw new Error(
-          `CapFabRenderer: ${inputPath}.source must be "StrandInput" or { Step: { token_id } }`
-        );
-      });
+    // `inputs` is the authoritative data-flow graph: the primary input plus
+    // every convergence input, with each producer named by stable token.
+    assertArray(body.inputs, `${path}.step_type.Cap.inputs`);
+    if (body.inputs.length === 0) {
+      throw new Error(`CapFabRenderer: ${path}.step_type.Cap.inputs must include the primary input`);
     }
+    const argUrns = new Set();
+    body.inputs.forEach((input, inputIdx) => {
+      const inputPath = `${path}.step_type.Cap.inputs[${inputIdx}]`;
+      assertObject(input, inputPath);
+      assertString(input.arg_urn, `${inputPath}.arg_urn`);
+      if (argUrns.has(input.arg_urn)) {
+        throw new Error(`CapFabRenderer: ${inputPath}.arg_urn duplicates '${input.arg_urn}'`);
+      }
+      argUrns.add(input.arg_urn);
+      // serde: unit variant → the string "StrandInput"; struct variant →
+      // { Step: { token_id } }. Anything else is malformed.
+      if (input.source === 'StrandInput') return;
+      if (input.source && typeof input.source === 'object' && input.source.Step) {
+        assertString(input.source.Step.token_id, `${inputPath}.source.Step.token_id`);
+        return;
+      }
+      throw new Error(
+        `CapFabRenderer: ${inputPath}.source must be "StrandInput" or { Step: { token_id } }`
+      );
+    });
   } else {
     assertString(body.media_def, `${path}.step_type.${variant}.media_def`);
   }
@@ -808,8 +813,26 @@ function validateStrandPayload(data) {
   assertString(data.source_media_urn, 'strand mode data.source_media_urn');
   assertString(data.target_media_urn, 'strand mode data.target_media_urn');
   assertArray(data.steps, 'strand mode data.steps');
+  const tokenIds = new Set();
   data.steps.forEach((step, idx) => {
     validateStrandStep(step, `strand mode data.steps[${idx}]`);
+    if (tokenIds.has(step.token_id)) {
+      throw new Error(`CapFabRenderer strand mode: duplicate step token_id '${step.token_id}'`);
+    }
+    tokenIds.add(step.token_id);
+  });
+  data.steps.forEach((step, idx) => {
+    if (!step.step_type.Cap) return;
+    step.step_type.Cap.inputs.forEach((input, inputIdx) => {
+      if (input.source === 'StrandInput') return;
+      const producerToken = input.source.Step.token_id;
+      if (!tokenIds.has(producerToken)) {
+        throw new Error(
+          `CapFabRenderer strand mode: data.steps[${idx}].step_type.Cap.inputs[${inputIdx}]` +
+          `.source.Step.token_id '${producerToken}' does not resolve to a strand step`
+        );
+      }
+    });
   });
   if (data.media_display_names !== undefined
       && (data.media_display_names === null || typeof data.media_display_names !== 'object')) {
@@ -832,15 +855,23 @@ function validateBodyOutcome(outcome, path) {
   }
   assertArray(outcome.cap_urns, `${path}.cap_urns`);
   outcome.cap_urns.forEach((u, i) => assertString(u, `${path}.cap_urns[${i}]`));
-  if (outcome.failed_cap !== undefined && outcome.failed_cap !== null
-      && (typeof outcome.failed_cap !== 'string' || outcome.failed_cap.length === 0)) {
-    throw new Error(`CapFabRenderer: ${path}.failed_cap must be a non-empty string when present`);
+  if (outcome.failed_token_id !== undefined && outcome.failed_token_id !== null
+      && (typeof outcome.failed_token_id !== 'string' || outcome.failed_token_id.length === 0)) {
+    throw new Error(`CapFabRenderer: ${path}.failed_token_id must be a non-empty string when present`);
   }
-  if (!outcome.success && outcome.failed_cap === undefined) {
-    // Failure without a failed_cap is allowed (e.g. infrastructure
-    // failure before any cap ran) but we still expect the field to be
-    // present — either null or a string. Rust's Option<String>
-    // serializes as null or the string, never missing.
+  if (!Object.prototype.hasOwnProperty.call(outcome, 'failed_token_id')) {
+    throw new Error(
+      `CapFabRenderer: ${path}.failed_token_id must be present as null or a stable step token`
+    );
+  }
+  if (!Object.prototype.hasOwnProperty.call(outcome, 'failed_arg_urn')) {
+    throw new Error(
+      `CapFabRenderer: ${path}.failed_arg_urn must be present as null or an attributed argument URN`
+    );
+  }
+  if (outcome.failed_arg_urn !== null
+      && (typeof outcome.failed_arg_urn !== 'string' || outcome.failed_arg_urn.length === 0)) {
+    throw new Error(`CapFabRenderer: ${path}.failed_arg_urn must be null or a non-empty string`);
   }
 }
 
@@ -869,6 +900,12 @@ function validateRunPayload(data) {
   assertArray(data.body_outcomes, 'run mode data.body_outcomes');
   data.body_outcomes.forEach((o, idx) => {
     validateBodyOutcome(o, `run mode data.body_outcomes[${idx}]`);
+    if (typeof o.failed_token_id === 'string'
+        && !data.resolved_strand.steps.some(step => step.token_id === o.failed_token_id)) {
+      throw new Error(
+        `CapFabRenderer run mode: body_outcomes[${idx}].failed_token_id '${o.failed_token_id}' does not resolve to a strand step`
+      );
+    }
   });
   if (typeof data.visible_success_count !== 'number' || data.visible_success_count < 0) {
     throw new Error('CapFabRenderer run mode: data.visible_success_count must be a non-negative number');
@@ -1383,7 +1420,7 @@ function buildStrandGraphData(data) {
       // ORDER is not — the realizer emits edges greedily in dependency
       // order, so `prevNodeId` (the previously-emitted step) need not be
       // one of this cap's inputs at all.
-      const capInputs = Array.isArray(body.inputs) ? body.inputs : [];
+      const capInputs = body.inputs;
       const producerNodeIds = [];
       for (const input of capInputs) {
         const src = input && input.source;
@@ -1392,16 +1429,22 @@ function buildStrandGraphData(data) {
           continue;
         }
         const producerToken = src && typeof src === 'object' && src.Step && src.Step.token_id;
-        if (typeof producerToken !== 'string' || producerToken.length === 0) continue;
+        if (typeof producerToken !== 'string' || producerToken.length === 0) {
+          throw new Error(`CapFabRenderer strand: cap step '${step.token_id}' has an invalid producer token`);
+        }
         const producerNodeId = tokenToNodeId.get(producerToken);
-        if (producerNodeId) producerNodeIds.push(producerNodeId);
+        if (!producerNodeId) {
+          throw new Error(
+            `CapFabRenderer strand: cap step '${step.token_id}' references unknown producer '${producerToken}'`
+          );
+        }
+        producerNodeIds.push(producerNodeId);
       }
 
       // Pick the source of the single labeled "backbone" edge (the one
-      // carrying the cap title + cardinality). Inside a ForEach body — or
-      // when the cap declares no inputs — keep the linear `prevNodeId`
-      // thread so the ForEach boundary handling and its (1→n) entry marker
-      // are preserved exactly. Otherwise anchor the backbone on a REAL
+      // carrying the cap title + cardinality). Inside a ForEach body, keep
+      // the linear `prevNodeId` thread so the boundary handling and its
+      // (1→n) entry marker are preserved exactly. Otherwise anchor it on a REAL
       // input: `prevNodeId` if it is genuinely one, else the first actual
       // producer — so a non-input step ordered just before this cap can
       // never become a spurious backbone edge.
@@ -1803,14 +1846,12 @@ function buildExternalInputRunGraphData(
   if (inputRuns.length <= 1 || allOutcomes.length === 0) return null;
 
   const capSteps = data.resolved_strand.steps
-    .filter(step => Object.keys(step.step_type)[0] === 'Cap')
-    .map(step => step.step_type.Cap);
+    .filter(step => Object.keys(step.step_type)[0] === 'Cap');
   if (capSteps.length === 0) {
     throw new Error('CapFabRenderer run mode: external multi-input runs require at least one Cap step in resolved_strand.');
   }
 
   const visibleOutcomes = visibleSuccess.concat(visibleFailure);
-  const CapUrn = requireHostDependency('CapUrn');
   const sourceCanonical = canonicalMediaUrn(data.resolved_strand.source_media_urn);
   const targetCanonical = canonicalMediaUrn(data.resolved_strand.target_media_urn);
   const anchorNodeId = 'external-input-anchor';
@@ -1874,12 +1915,10 @@ function buildExternalInputRunGraphData(
 
     let traceEnd = capSteps.length;
     if (!success) {
-      if (typeof outcome.failed_cap === 'string' && outcome.failed_cap.length > 0) {
-        const failedCap = CapUrn.fromString(outcome.failed_cap);
+      if (typeof outcome.failed_token_id === 'string' && outcome.failed_token_id.length > 0) {
         traceEnd = 0;
         for (let i = 0; i < capSteps.length; i++) {
-          const candidate = CapUrn.fromString(capSteps[i].cap_urn);
-          if (candidate.isEquivalent(failedCap)) {
+          if (capSteps[i].token_id === outcome.failed_token_id) {
             traceEnd = i + 1;
             break;
           }
@@ -1891,8 +1930,13 @@ function buildExternalInputRunGraphData(
 
     let prevNodeId = sourceNodeId;
     for (let i = 0; i < traceEnd; i++) {
-      const cap = capSteps[i];
-      const targetMedia = canonicalMediaUrn(i === capSteps.length - 1 ? data.resolved_strand.target_media_urn : data.resolved_strand.steps.filter(step => Object.keys(step.step_type)[0] === 'Cap')[i].to_spec);
+      const capStep = capSteps[i];
+      const cap = capStep.step_type.Cap;
+      const targetMedia = canonicalMediaUrn(
+        i === capSteps.length - 1
+          ? data.resolved_strand.target_media_urn
+          : capStep.to_spec
+      );
       const isLastExecutedStep = i === traceEnd - 1;
       const outputs = success ? runDef.outputs : [];
 
@@ -2288,19 +2332,13 @@ function buildRunGraphData(data) {
     const edgeClass = success ? 'body-success' : 'body-failure';
     const colorVar = success ? '--graph-body-edge-success' : '--graph-body-edge-failure';
 
-    // Trace end: failures stop at `failed_cap`. `CapUrn.isEquivalent`
-    // is used for the match — never string equality.
-    let traceEnd = bodyCapSteps.length;
-    if (!success && typeof outcome.failed_cap === 'string' && outcome.failed_cap.length > 0) {
-      const CapUrn = requireHostDependency('CapUrn');
-      const target = CapUrn.fromString(outcome.failed_cap);
-      for (let i = 0; i < bodyCapSteps.length; i++) {
-        const candidate = CapUrn.fromString(bodyCapSteps[i].step.step_type.Cap.cap_urn);
-        if (candidate.isEquivalent(target)) {
-          traceEnd = i + 1;
-          break;
-        }
-      }
+    // Trace end: failures stop at the exact stable step token.
+    let traceEnd = success ? bodyCapSteps.length : 0;
+    if (!success && typeof outcome.failed_token_id === 'string' && outcome.failed_token_id.length > 0) {
+      const failedIndex = bodyCapSteps.findIndex(
+        bodyStep => bodyStep.step.token_id === outcome.failed_token_id
+      );
+      if (failedIndex >= 0) traceEnd = failedIndex + 1;
     }
 
     const bodyKey = `body-${outcome.body_index}`;

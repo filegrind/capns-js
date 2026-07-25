@@ -89,6 +89,19 @@ function assertThrowsMediaUrn(fn, expectedErrorCode, message) {
   }
 }
 
+function assertThrowsMessage(fn, expectedMessage, message) {
+  try {
+    fn();
+  } catch (error) {
+    assert(
+      typeof error.message === 'string' && error.message.includes(expectedMessage),
+      `${message}: expected error containing ${JSON.stringify(expectedMessage)}, got ${JSON.stringify(error.message)}`
+    );
+    return;
+  }
+  throw new Error(`Assertion failed: ${message}: expected function to throw`);
+}
+
 function runTest(name, fn) {
   try {
     const result = fn();
@@ -4567,8 +4580,16 @@ function test6483_Renderer_buildBrowseGraphData_rejectsMissingMediaTitles() {
 
 // ---------------- strand builder ----------------
 
+let fixtureStepToken = 0;
+
+function nextFixtureStepToken() {
+  fixtureStepToken += 1;
+  return `fixture-step-${fixtureStepToken}`;
+}
+
 function makeCapStep(capUrn, title, fromSpec, toSpec, inSeq, outSeq) {
   return {
+    token_id: nextFixtureStepToken(),
     step_type: {
       Cap: {
         cap_urn: capUrn,
@@ -4576,6 +4597,7 @@ function makeCapStep(capUrn, title, fromSpec, toSpec, inSeq, outSeq) {
         specificity: 0,
         input_is_sequence: inSeq,
         output_is_sequence: outSeq,
+        inputs: [{ arg_urn: fromSpec, source: 'StrandInput' }],
       },
     },
     from_spec: fromSpec,
@@ -4585,6 +4607,7 @@ function makeCapStep(capUrn, title, fromSpec, toSpec, inSeq, outSeq) {
 
 function makeForEachStep(mediaDef) {
   return {
+    token_id: nextFixtureStepToken(),
     step_type: { ForEach: { media_def: mediaDef } },
     from_spec: mediaDef,
     to_spec: mediaDef,
@@ -4593,10 +4616,32 @@ function makeForEachStep(mediaDef) {
 
 function makeCollectStep(mediaDef) {
   return {
+    token_id: nextFixtureStepToken(),
     step_type: { Collect: { media_def: mediaDef } },
     from_spec: mediaDef,
     to_spec: mediaDef,
   };
+}
+
+// Build an intentionally linear fixture while still spelling the canonical
+// stable-token producer graph that production payloads carry. ForEach changes
+// cardinality but does not replace the current value producer; Collect does.
+function wireLinearStepInputs(steps) {
+  let producerToken = null;
+  for (const step of steps) {
+    if (step.step_type.Cap) {
+      step.step_type.Cap.inputs = [{
+        arg_urn: step.from_spec,
+        source: producerToken === null
+          ? 'StrandInput'
+          : { Step: { token_id: producerToken } },
+      }];
+      producerToken = step.token_id;
+    } else if (step.step_type.Collect) {
+      producerToken = step.token_id;
+    }
+  }
+  return steps;
 }
 
 // TEST6484: Renderer validate strand step rejects unknown variant
@@ -4606,6 +4651,7 @@ function test6484_Renderer_validateStrandStep_rejectsUnknownVariant() {
   let threw = false;
   try {
     rendererValidateStrandStep({
+      token_id: nextFixtureStepToken(),
       step_type: { WrongVariant: {} },
       from_spec: 'media:a',
       to_spec: 'media:a',
@@ -4624,6 +4670,7 @@ function test6486_Renderer_validateStrandStep_requiresBooleanIsSequence() {
   let threw = false;
   try {
     rendererValidateStrandStep({
+      token_id: nextFixtureStepToken(),
       step_type: { Cap: {
         cap_urn: 'cap:in="media:a";x;out="media:b"',
         title: 't',
@@ -4645,13 +4692,13 @@ function test6487_Renderer_classifyStrandCapSteps_capFlags() {
   // Strand: ForEach → cap1 → cap2 → cap3 → Collect. cap1 should have
   // prevForEach=true; cap3 should have nextCollect=true; cap2 should
   // have neither.
-  const steps = [
+  const steps = wireLinearStepInputs([
     makeForEachStep('media:ext=pdf;list'),
     makeCapStep('cap:in="media:ext=pdf";a;out="media:ext=png;image"', 'a', 'media:ext=pdf', 'media:ext=png;image', false, false),
     makeCapStep('cap:in="media:ext=png;image";b;out="media:ext=jpg"', 'b', 'media:ext=png;image', 'media:ext=jpg', false, false),
     makeCapStep('cap:in="media:ext=jpg";c;out="media:ext=txt"', 'c', 'media:ext=jpg', 'media:ext=txt', false, false),
     makeCollectStep('media:ext=txt'),
-  ];
+  ]);
   const { capStepIndices, capFlags } = rendererClassifyStrandCapSteps(steps);
   assertEqual(capStepIndices.length, 3, 'three cap steps');
   assert(capFlags.get(1).prevForEach, 'cap1 has prevForEach');
@@ -4667,7 +4714,7 @@ function test6488_Renderer_classifyStrandCapSteps_nestedForks() {
   // Nested strand: ForEach → cap1 → ForEach → cap2 → Collect → cap3 → Collect.
   // cap1 has prevForEach (outer), cap2 has prevForEach (inner) and
   // nextCollect (inner), cap3 has nextCollect (outer).
-  const steps = [
+  const steps = wireLinearStepInputs([
     makeForEachStep('media:a;list'),
     makeCapStep('cap:in="media:a";a;out="media:b"', 'a', 'media:a', 'media:b', false, false),
     makeForEachStep('media:b;list'),
@@ -4675,7 +4722,7 @@ function test6488_Renderer_classifyStrandCapSteps_nestedForks() {
     makeCollectStep('media:c'),
     makeCapStep('cap:in="media:c";c;out="media:d"', 'c', 'media:c', 'media:d', false, false),
     makeCollectStep('media:d'),
-  ];
+  ]);
   const { capFlags } = rendererClassifyStrandCapSteps(steps);
   assert(capFlags.get(1).prevForEach && !capFlags.get(1).nextCollect, 'cap1 outer entry');
   assert(capFlags.get(3).prevForEach && capFlags.get(3).nextCollect, 'cap2 inner both');
@@ -4702,9 +4749,9 @@ function test6489_Renderer_buildStrandGraphData_singleCapPlain() {
   const payload = withMediaDisplayNames({
     source_media_urn: 'media:a',
     target_media_urn: 'media:b',
-    steps: [
+    steps: wireLinearStepInputs([
       makeCapStep('cap:in="media:a";x;out="media:b"', 'x', 'media:a', 'media:b', false, false),
-    ],
+    ]),
   }, {
     'media:a': 'Source A',
     'media:b': 'Target B',
@@ -4728,9 +4775,9 @@ function test6491_Renderer_buildStrandGraphData_sequenceShowsCardinality() {
   const payload = withMediaDisplayNames({
     source_media_urn: 'media:a;list',
     target_media_urn: 'media:b',
-    steps: [
+    steps: wireLinearStepInputs([
       makeCapStep('cap:in="media:a;list";x;out="media:b"', 'x', 'media:a;list', 'media:b', true, false),
-    ],
+    ]),
   }, {
     'media:a;list': 'Source A List',
     'media:b': 'Target B',
@@ -4759,11 +4806,11 @@ function test6492_Renderer_buildStrandGraphData_foreachCollectSpan() {
   const payload = withMediaDisplayNames({
     source_media_urn: 'media:ext=pdf;list',
     target_media_urn: 'media:txt;list',
-    steps: [
+    steps: wireLinearStepInputs([
       makeForEachStep('media:ext=pdf;list'),
       makeCapStep('cap:in="media:ext=pdf";extract;out="media:ext=txt"', 'extract', 'media:ext=pdf', 'media:ext=txt', false, false),
       makeCollectStep('media:ext=txt'),
-    ],
+    ]),
   }, {
     'media:ext=pdf;list': 'PDF List',
     'media:ext=txt': 'Plain Text',
@@ -4802,10 +4849,10 @@ function test6493_Renderer_buildStrandGraphData_standaloneCollect() {
   const payload = withMediaDisplayNames({
     source_media_urn: 'media:a',
     target_media_urn: 'media:b;list',
-    steps: [
+    steps: wireLinearStepInputs([
       makeCapStep('cap:in="media:a";x;out="media:b"', 'x', 'media:a', 'media:b', false, false),
       makeCollectStep('media:b'),
-    ],
+    ]),
   }, {
     'media:a': 'Source A',
     'media:b': 'Target B',
@@ -4831,11 +4878,11 @@ function test6494_Renderer_buildStrandGraphData_unclosedForEachBody() {
   const payload = withMediaDisplayNames({
     source_media_urn: 'media:a',
     target_media_urn: 'media:c',
-    steps: [
+    steps: wireLinearStepInputs([
       makeCapStep('cap:in="media:a";a;out="media:b"', 'a', 'media:a', 'media:b', false, false),
       makeForEachStep('media:b'),
       makeCapStep('cap:in="media:b";b;out="media:c"', 'b', 'media:b', 'media:c', false, false),
-    ],
+    ]),
   }, {
     'media:a': 'Source A',
     'media:b': 'Intermediate B',
@@ -4869,11 +4916,11 @@ function test6495_Renderer_buildStrandGraphData_nestedForEachThrows() {
   const payload = withMediaDisplayNames({
     source_media_urn: 'media:a;list',
     target_media_urn: 'media:a',
-    steps: [
+    steps: wireLinearStepInputs([
       makeForEachStep('media:a;list'),
       makeForEachStep('media:a'),
       makeCapStep('cap:in="media:a";x;out="media:a"', 'x', 'media:a', 'media:a', false, false),
-    ],
+    ]),
   }, {
     'media:a;list': 'Source A List',
     'media:a': 'Source A',
@@ -4907,11 +4954,11 @@ function test6496_Renderer_collapseStrand_singleCapBodyKeepsCapOwnLabel() {
   const payload = withMediaDisplayNames({
     source_media_urn: 'media:ext=pdf;list',
     target_media_urn: 'media:txt;list',
-    steps: [
+    steps: wireLinearStepInputs([
       makeForEachStep('media:ext=pdf;list'),
       makeCapStep('cap:in="media:ext=pdf";extract;out="media:ext=txt"', 'extract', 'media:ext=pdf', 'media:ext=txt', false, false),
       makeCollectStep('media:ext=txt'),
-    ],
+    ]),
   }, {
     'media:ext=pdf;list': 'PDF List',
     'media:ext=txt': 'Plain Text',
@@ -4957,11 +5004,11 @@ function test6497_Renderer_collapseStrand_unclosedForEachBodyCollapses() {
   const payload = withMediaDisplayNames({
     source_media_urn: 'media:a',
     target_media_urn: 'media:c',
-    steps: [
+    steps: wireLinearStepInputs([
       makeCapStep('cap:in="media:a";a;out="media:b"', 'a', 'media:a', 'media:b', false, false),
       makeForEachStep('media:b'),
       makeCapStep('cap:in="media:b";b;out="media:c"', 'b', 'media:b', 'media:c', false, false),
-    ],
+    ]),
   }, {
     'media:a': 'Source A',
     'media:b': 'Intermediate B',
@@ -5015,10 +5062,10 @@ function test6498_Renderer_collapseStrand_standaloneCollectCollapses() {
   const payload = withMediaDisplayNames({
     source_media_urn: 'media:a',
     target_media_urn: 'media:b;list',
-    steps: [
+    steps: wireLinearStepInputs([
       makeCapStep('cap:in="media:a";x;out="media:b"', 'x', 'media:a', 'media:b', false, false),
       makeCollectStep('media:b'),
-    ],
+    ]),
   }, {
     'media:a': 'Source A',
     'media:b': 'Target B',
@@ -5064,11 +5111,11 @@ function test6499_Renderer_collapseStrand_sequenceProducingCapBeforeForeach() {
   const payload = withMediaDisplayNames({
     source_media_urn: 'media:ext=pdf',
     target_media_urn: 'media:decision',
-    steps: [
+    steps: wireLinearStepInputs([
       makeCapStep('cap:in="media:ext=pdf";disbind;out="media:page"', 'Disbind', 'media:ext=pdf', 'media:page', false, true),
       makeForEachStep('media:page'),
       makeCapStep('cap:in="media:page";decide;out="media:decision"', 'Make a Decision', 'media:page', 'media:decision', false, false),
-    ],
+    ]),
   }, {
     'media:ext=pdf': 'PDF',
     'media:page': 'Page',
@@ -5120,9 +5167,9 @@ function test6500_Renderer_collapseStrand_plainCapMergesTrailingOutput() {
   const payload = withMediaDisplayNames({
     source_media_urn: 'media:a',
     target_media_urn: 'media:b',
-    steps: [
+    steps: wireLinearStepInputs([
       makeCapStep('cap:in="media:a";x;out="media:b"', 'x', 'media:a', 'media:b', false, false),
-    ],
+    ]),
   }, {
     'media:a': 'Source A',
     'media:b': 'Target B',
@@ -5153,9 +5200,9 @@ function test6501_Renderer_collapseStrand_plainCapDistinctTargetNoMerge() {
   const payload = withMediaDisplayNames({
     source_media_urn: 'media:a',
     target_media_urn: 'media:b;list',
-    steps: [
+    steps: wireLinearStepInputs([
       makeCapStep('cap:in="media:a";x;out="media:b"', 'x', 'media:a', 'media:b', false, false),
-    ],
+    ]),
   }, {
     'media:a': 'Source A',
     'media:b': 'Target B',
@@ -5184,16 +5231,89 @@ function test6502_Renderer_validateStrandPayload_missingSourceMediaUrn() {
   assert(threw, 'missing source_media_urn must throw');
 }
 
+// TEST7120: Renderer requires the authoritative cap input graph
+function test7120_Renderer_validateStrandPayload_requiresAuthoritativeInputs() {
+  const step = makeCapStep(
+    'cap:in="media:a";x;out="media:b"',
+    'x', 'media:a', 'media:b', false, false
+  );
+  const payload = { source_media_urn: 'media:a', target_media_urn: 'media:b', steps: [step] };
+
+  const missing = JSON.parse(JSON.stringify(payload));
+  delete missing.steps[0].step_type.Cap.inputs;
+  assertThrowsMessage(
+    () => rendererValidateStrandPayload(missing),
+    'inputs must be an array',
+    'a cap cannot omit its data-flow graph'
+  );
+
+  const empty = JSON.parse(JSON.stringify(payload));
+  empty.steps[0].step_type.Cap.inputs = [];
+  assertThrowsMessage(
+    () => rendererValidateStrandPayload(empty),
+    'must include the primary input',
+    'a cap cannot omit its primary input'
+  );
+
+  const duplicate = JSON.parse(JSON.stringify(payload));
+  duplicate.steps[0].step_type.Cap.inputs.push(
+    { arg_urn: 'media:a', source: 'StrandInput' }
+  );
+  assertThrowsMessage(
+    () => rendererValidateStrandPayload(duplicate),
+    "duplicates 'media:a'",
+    'one cap cannot bind the same argument slot twice'
+  );
+
+  const unresolved = JSON.parse(JSON.stringify(payload));
+  unresolved.steps[0].step_type.Cap.inputs[0].source = { Step: { token_id: 'missing-step' } };
+  assertThrowsMessage(
+    () => rendererValidateStrandPayload(unresolved),
+    'does not resolve to a strand step',
+    'a cap input cannot name an unknown producer'
+  );
+}
+
 // ---------------- run builder ----------------
 
 function test6503_Renderer_validateBodyOutcome_rejectsNegativeIndex() {
   let threw = false;
   try {
-    rendererValidateBodyOutcome({ body_index: -1, success: true, cap_urns: [] }, 'test');
+    rendererValidateBodyOutcome({ body_index: -1, success: true, cap_urns: [], failed_token_id: null, failed_arg_urn: null }, 'test');
   } catch (e) {
     threw = true;
   }
   assert(threw, 'negative body_index must throw');
+}
+
+// TEST7121: Renderer body outcomes require an explicit stable failure coordinate
+function test7121_Renderer_validateBodyOutcome_requiresExplicitFailureCoordinate() {
+  rendererValidateBodyOutcome(
+    { body_index: 0, success: false, cap_urns: [], failed_token_id: null, failed_arg_urn: null },
+    'unattributed'
+  );
+  let threw = false;
+  try {
+    rendererValidateBodyOutcome({ body_index: 0, success: false, cap_urns: [] }, 'missing');
+  } catch (error) {
+    threw = true;
+    assert(error.message.includes('must be present as null or a stable step token'),
+      'missing coordinate error must state the required wire shape');
+  }
+  assert(threw, 'omitting failed_token_id must fail hard');
+
+  threw = false;
+  try {
+    rendererValidateBodyOutcome(
+      { body_index: 0, success: false, cap_urns: [], failed_token_id: null },
+      'missing-argument-coordinate'
+    );
+  } catch (error) {
+    threw = true;
+    assert(error.message.includes('must be present as null or an attributed argument URN'),
+      'missing argument coordinate error must state the required wire shape');
+  }
+  assert(threw, 'omitting failed_arg_urn must fail hard');
 }
 
 // TEST6504: Renderer build run graph data pages successes and failures
@@ -5201,7 +5321,7 @@ function test6504_Renderer_buildRunGraphData_pagesSuccessesAndFailures() {
   // 6 successes, 4 failures. visible=3+2, total=10. Body has 2
   // caps (a, b). Each body replica is a chain of:
   //   entry node + body_step_0 (cap a) + body_step_1 (cap b)
-  // = 3 nodes per body. Failed bodies truncate at failed_cap
+  // = 3 nodes per body. Failed bodies truncate at failed_token_id
   // (cap b, idx=1) so `traceEnd=2` — same 3-node chain.
   //
   // Total replica nodes: (3 success × 3) + (2 failure × 3) = 15.
@@ -5211,16 +5331,16 @@ function test6504_Renderer_buildRunGraphData_pagesSuccessesAndFailures() {
   const strand = {
     source_media_urn: 'media:ext=pdf;list',
     target_media_urn: 'media:ext=txt',
-    steps: [
+    steps: wireLinearStepInputs([
       makeForEachStep('media:ext=pdf;list'),
       makeCapStep('cap:in="media:ext=pdf";a;out="media:ext=png;image"', 'a', 'media:ext=pdf', 'media:ext=png;image', false, false),
       makeCapStep('cap:in="media:ext=png;image";b;out="media:ext=txt"', 'b', 'media:ext=png;image', 'media:ext=txt', false, false),
       makeCollectStep('media:ext=txt'),
-    ],
+    ]),
   };
   const outcomes = [];
   for (let i = 0; i < 6; i++) {
-    outcomes.push({ body_index: i, success: true, cap_urns: [], saved_paths: [], total_bytes: 0, duration_ms: 0 });
+    outcomes.push({ body_index: i, success: true, cap_urns: [], saved_paths: [], total_bytes: 0, duration_ms: 0, failed_token_id: null, failed_arg_urn: null });
   }
   for (let i = 6; i < 10; i++) {
     outcomes.push({
@@ -5230,7 +5350,8 @@ function test6504_Renderer_buildRunGraphData_pagesSuccessesAndFailures() {
       saved_paths: [],
       total_bytes: 0,
       duration_ms: 0,
-      failed_cap: 'cap:in="media:ext=png;image";b;out="media:ext=txt"',
+      failed_token_id: strand.steps[2].token_id,
+      failed_arg_urn: null,
       error: 'oom',
     });
   }
@@ -5267,22 +5388,21 @@ function test6504_Renderer_buildRunGraphData_pagesSuccessesAndFailures() {
   assertEqual(failureShowMore.data.hiddenCount, 2, 'failure hidden count = 2');
 }
 
-// TEST6505: Renderer build run graph data failure without failed cap renders full trace
-function test6505_Renderer_buildRunGraphData_failureWithoutFailedCapRendersFullTrace() {
-  // A failure without failed_cap (infrastructure failure) must
-  // still render the full body trace — the builder must not
-  // crash or produce zero replicas.
+// TEST6505: Renderer run graph keeps an unattributed body failure at its entry
+function test6505_Renderer_buildRunGraphData_unattributedFailureStopsAtEntry() {
+  // A failure without failed_token_id is machine-scoped. The body remains
+  // visible, but no cap is falsely presented as the failure location.
   //
   // Strand [ForEach, Cap, Collect] → body has 1 cap. Each body
   // replica emits 1 entry node + 1 body cap node = 2 nodes.
   const strand = {
     source_media_urn: 'media:ext=pdf;list',
     target_media_urn: 'media:ext=txt',
-    steps: [
+    steps: wireLinearStepInputs([
       makeForEachStep('media:ext=pdf;list'),
       makeCapStep('cap:in="media:ext=pdf";a;out="media:ext=txt"', 'a', 'media:ext=pdf', 'media:ext=txt', false, false),
       makeCollectStep('media:ext=txt'),
-    ],
+    ]),
   };
   const payload = {
     resolved_strand: strand,
@@ -5292,7 +5412,7 @@ function test6505_Renderer_buildRunGraphData_failureWithoutFailedCapRendersFullT
       'media:ext=txt': 'Text',
     },
     body_outcomes: [
-      { body_index: 0, success: false, cap_urns: [], saved_paths: [], total_bytes: 0, duration_ms: 0, error: 'unknown' },
+      { body_index: 0, success: false, cap_urns: [], saved_paths: [], total_bytes: 0, duration_ms: 0, failed_token_id: null, failed_arg_urn: null, error: 'unknown' },
     ],
     visible_success_count: 0,
     visible_failure_count: 5,
@@ -5303,19 +5423,15 @@ function test6505_Renderer_buildRunGraphData_failureWithoutFailedCapRendersFullT
   for (const n of built.replicaNodes) {
     if (n.classes === 'body-failure') failureNodes++;
   }
-  assertEqual(failureNodes, 2, 'entry + body cap = 2 failure replica nodes');
+  assertEqual(failureNodes, 1, 'only the body entry is shown for an unattributed failure');
 }
 
-// TEST6506: Renderer build run graph data uses cap urn is equivalent for failed cap
-function test6506_Renderer_buildRunGraphData_usesCapUrnIsEquivalentForFailedCap() {
-  // The renderer matches failed_cap against step cap URNs via
-  // CapUrn.isEquivalent, NOT string equality. Feed a payload where
-  // failed_cap and the step's cap_urn differ only in tag order — they
-  // should still match, proving URNs are not treated as strings.
+// TEST6506: Renderer run graph resolves a failure by exact stable step token
+function test6506_Renderer_buildRunGraphData_resolvesExactFailedStepToken() {
   const strand = {
     source_media_urn: 'media:a',
     target_media_urn: 'media:c',
-    steps: [
+    steps: wireLinearStepInputs([
       makeForEachStep('media:a;list'),
       // Canonical form places tags alphabetically: op after in/out.
       makeCapStep(
@@ -5327,11 +5443,8 @@ function test6506_Renderer_buildRunGraphData_usesCapUrnIsEquivalentForFailedCap(
         'y', 'media:b', 'media:c', false, false
       ),
       makeCollectStep('media:c'),
-    ],
+    ]),
   };
-  // The failed_cap URN is semantically the same as step 1 (cap y). If
-  // CapUrn.fromString canonicalizes (it should), any equivalent form
-  // will match. Feed a fully-specified form that is equivalent.
   const payload = {
     resolved_strand: strand,
     media_display_names: {
@@ -5348,7 +5461,8 @@ function test6506_Renderer_buildRunGraphData_usesCapUrnIsEquivalentForFailedCap(
         saved_paths: [],
         total_bytes: 0,
         duration_ms: 0,
-        failed_cap: 'cap:in=media:b;out=media:c;y',  // different tag order
+        failed_token_id: strand.steps[2].token_id,
+        failed_arg_urn: null,
         error: 'fail',
       },
     ],
@@ -5363,7 +5477,19 @@ function test6506_Renderer_buildRunGraphData_usesCapUrnIsEquivalentForFailedCap(
   }
   // 1 entry + 2 body step nodes (cap x and cap y, truncated
   // at cap y) = 3 failure replica nodes.
-  assertEqual(failureNodes, 3, 'trace truncates at cap y via isEquivalent, yielding entry + 2 cap nodes');
+  assertEqual(failureNodes, 3, 'trace truncates at cap y by stable token, yielding entry + 2 cap nodes');
+
+  const invalid = JSON.parse(JSON.stringify(payload));
+  invalid.body_outcomes[0].failed_token_id = 'missing-step-token';
+  let threw = false;
+  try {
+    rendererBuildRunGraphData(invalid);
+  } catch (error) {
+    threw = true;
+    assert(error.message.includes('does not resolve to a strand step'),
+      'unknown token failure must identify the unresolved coordinate');
+  }
+  assert(threw, 'unknown failed_token_id must fail hard');
 }
 
 // TEST6507: Renderer build run graph data backbone has no foreach node
@@ -5382,11 +5508,11 @@ function test6507_Renderer_buildRunGraphData_backboneHasNoForeachNode() {
   const strand = {
     source_media_urn: 'media:ext=pdf',
     target_media_urn: 'media:decision',
-    steps: [
+    steps: wireLinearStepInputs([
       makeCapStep('cap:in="media:ext=pdf";disbind;out="media:page"', 'Disbind', 'media:ext=pdf', 'media:page', false, true),
       makeForEachStep('media:page'),
       makeCapStep('cap:in="media:page";decide;out="media:decision"', 'Make a Decision', 'media:page', 'media:decision', false, false),
-    ],
+    ]),
   };
   const payload = {
     resolved_strand: strand,
@@ -5431,13 +5557,12 @@ function test6508_Renderer_buildRunGraphData_allFailedDropsTargetPlaceholder() {
   const strand = {
     source_media_urn: 'media:ext=pdf',
     target_media_urn: 'media:decision',
-    steps: [
+    steps: wireLinearStepInputs([
       makeCapStep('cap:in="media:ext=pdf";disbind;out="media:page"', 'Disbind', 'media:ext=pdf', 'media:page', false, true),
       makeForEachStep('media:page'),
       makeCapStep('cap:in="media:page";decide;out="media:decision"', 'Make a Decision', 'media:page', 'media:decision', false, false),
-    ],
+    ]),
   };
-  const failedCapUrn = 'cap:in="media:page";decide;out="media:decision"';
   const payload = {
     resolved_strand: strand,
     media_display_names: {
@@ -5446,8 +5571,8 @@ function test6508_Renderer_buildRunGraphData_allFailedDropsTargetPlaceholder() {
       'media:decision': 'Decision',
     },
     body_outcomes: [
-      { body_index: 0, success: false, cap_urns: [], saved_paths: [], total_bytes: 0, duration_ms: 0, failed_cap: failedCapUrn, error: 'boom' },
-      { body_index: 1, success: false, cap_urns: [], saved_paths: [], total_bytes: 0, duration_ms: 0, failed_cap: failedCapUrn, error: 'boom' },
+      { body_index: 0, success: false, cap_urns: [], saved_paths: [], total_bytes: 0, duration_ms: 0, failed_token_id: strand.steps[2].token_id, failed_arg_urn: null, error: 'boom' },
+      { body_index: 1, success: false, cap_urns: [], saved_paths: [], total_bytes: 0, duration_ms: 0, failed_token_id: strand.steps[2].token_id, failed_arg_urn: null, error: 'boom' },
     ],
     visible_success_count: 3,
     visible_failure_count: 3,
@@ -5502,11 +5627,11 @@ function test6509_Renderer_buildRunGraphData_unclosedForeachSuccessNoMerge() {
   const strand = {
     source_media_urn: 'media:ext=pdf',
     target_media_urn: 'media:decision',
-    steps: [
+    steps: wireLinearStepInputs([
       makeCapStep('cap:in="media:ext=pdf";disbind;out="media:page"', 'Disbind', 'media:ext=pdf', 'media:page', false, true),
       makeForEachStep('media:page'),
       makeCapStep('cap:in="media:page";decide;out="media:decision"', 'Make a Decision', 'media:page', 'media:decision', false, false),
-    ],
+    ]),
   };
   const payload = {
     resolved_strand: strand,
@@ -5516,7 +5641,7 @@ function test6509_Renderer_buildRunGraphData_unclosedForeachSuccessNoMerge() {
       'media:decision': 'Decision',
     },
     body_outcomes: [
-      { body_index: 0, success: true, cap_urns: [], saved_paths: [], total_bytes: 0, duration_ms: 0 },
+      { body_index: 0, success: true, cap_urns: [], saved_paths: [], total_bytes: 0, duration_ms: 0, failed_token_id: null, failed_arg_urn: null },
     ],
     visible_success_count: 3,
     visible_failure_count: 3,
@@ -5562,11 +5687,11 @@ function test6510_Renderer_buildRunGraphData_closedForeachSuccessMergesAtCollect
   const strand = {
     source_media_urn: 'media:ext=pdf;list',
     target_media_urn: 'media:txt;list',
-    steps: [
+    steps: wireLinearStepInputs([
       makeForEachStep('media:ext=pdf;list'),
       makeCapStep('cap:in="media:ext=pdf";extract;out="media:ext=txt"', 'extract', 'media:ext=pdf', 'media:ext=txt', false, false),
       makeCollectStep('media:ext=txt'),
-    ],
+    ]),
   };
   const payload = {
     resolved_strand: strand,
@@ -5577,7 +5702,7 @@ function test6510_Renderer_buildRunGraphData_closedForeachSuccessMergesAtCollect
       'media:txt;list': 'Text List',
     },
     body_outcomes: [
-      { body_index: 0, success: true, cap_urns: [], saved_paths: [], total_bytes: 0, duration_ms: 0 },
+      { body_index: 0, success: true, cap_urns: [], saved_paths: [], total_bytes: 0, duration_ms: 0, failed_token_id: null, failed_arg_urn: null },
     ],
     visible_success_count: 3,
     visible_failure_count: 3,
@@ -7210,12 +7335,14 @@ async function runTests() {
   runTest('RENDERER: collapseStrand_plainCapMergesOutput',    test6500_Renderer_collapseStrand_plainCapMergesTrailingOutput);
   runTest('RENDERER: collapseStrand_plainCapDistinctTarget',  test6501_Renderer_collapseStrand_plainCapDistinctTargetNoMerge);
   runTest('RENDERER: validateStrand_missingSourceMediaUrn',   test6502_Renderer_validateStrandPayload_missingSourceMediaUrn);
+  runTest('RENDERER: validateStrand_requiresCapInputs',       test7120_Renderer_validateStrandPayload_requiresAuthoritativeInputs);
 
   console.log('\n--- cap-fab-renderer run builder ---');
   runTest('RENDERER: validateBodyOutcome_negativeIndex',      test6503_Renderer_validateBodyOutcome_rejectsNegativeIndex);
+  runTest('RENDERER: validateBodyOutcome_failureCoordinate',  test7121_Renderer_validateBodyOutcome_requiresExplicitFailureCoordinate);
   runTest('RENDERER: buildRun_pagesSuccessesAndFailures',     test6504_Renderer_buildRunGraphData_pagesSuccessesAndFailures);
-  runTest('RENDERER: buildRun_failureWithoutFailedCap',       test6505_Renderer_buildRunGraphData_failureWithoutFailedCapRendersFullTrace);
-  runTest('RENDERER: buildRun_usesIsEquivalentForFailedCap',  test6506_Renderer_buildRunGraphData_usesCapUrnIsEquivalentForFailedCap);
+  runTest('RENDERER: buildRun_unattributedFailureAtEntry',    test6505_Renderer_buildRunGraphData_unattributedFailureStopsAtEntry);
+  runTest('RENDERER: buildRun_resolvesFailedStepToken',       test6506_Renderer_buildRunGraphData_resolvesExactFailedStepToken);
   runTest('RENDERER: buildRun_backboneHasNoForeachNode',      test6507_Renderer_buildRunGraphData_backboneHasNoForeachNode);
   runTest('RENDERER: buildRun_allFailedDropsPlaceholder',     test6508_Renderer_buildRunGraphData_allFailedDropsTargetPlaceholder);
   runTest('RENDERER: buildRun_unclosedForeachNoMerge',        test6509_Renderer_buildRunGraphData_unclosedForeachSuccessNoMerge);

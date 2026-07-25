@@ -5960,7 +5960,7 @@ function unixSecondsNow() {
 }
 
 // Default protocol limits / version, mirroring capdag::bifaci::frame.
-const BIFACI_PROTOCOL_VERSION = 3;
+const BIFACI_PROTOCOL_VERSION = 4;
 const BIFACI_DEFAULT_MAX_FRAME = 3670016;
 const BIFACI_DEFAULT_MAX_CHUNK = 262144;
 const BIFACI_DEFAULT_MAX_REORDER_BUFFER = 64;
@@ -6095,6 +6095,7 @@ function encodeHelloFrame() {
       ['max_reorder_buffer', BIFACI_DEFAULT_MAX_REORDER_BUFFER],
       ['initial_credit', BIFACI_DEFAULT_INITIAL_CREDIT],
       ['version', BIFACI_PROTOCOL_VERSION],
+      ['handler_capacity', 0],
     ],
   };
   const frame = {
@@ -6194,8 +6195,27 @@ function probeCartridgeCapGroups(entryPath) {
         finish(new Error(`cartridge ${entryPath} HELLO failed: expected HELLO, got frame_type ${frameType}`));
         return;
       }
+      const version = decoded.get(BIFACI_KEY_VERSION);
+      if (version !== BIFACI_PROTOCOL_VERSION) {
+        finish(new Error(`cartridge ${entryPath} HELLO failed: protocol version ${version} does not match required version ${BIFACI_PROTOCOL_VERSION}`));
+        return;
+      }
       const meta = decoded.get(BIFACI_KEY_META);
-      const manifestVal = meta instanceof Map ? meta.get('manifest') : undefined;
+      if (!(meta instanceof Map)) {
+        finish(new Error(`cartridge ${entryPath} HELLO failed: HELLO meta must be a map`));
+        return;
+      }
+      const metaVersion = meta.get('version');
+      if (metaVersion !== BIFACI_PROTOCOL_VERSION) {
+        finish(new Error(`cartridge ${entryPath} HELLO failed: meta.version ${metaVersion} does not match required version ${BIFACI_PROTOCOL_VERSION}`));
+        return;
+      }
+      const handlerCapacity = meta.get('handler_capacity');
+      if (!Number.isSafeInteger(handlerCapacity) || handlerCapacity < 0) {
+        finish(new Error(`cartridge ${entryPath} HELLO failed: missing required non-negative handler_capacity`));
+        return;
+      }
+      const manifestVal = meta.get('manifest');
       if (!manifestVal || manifestVal.__bytes === undefined) {
         finish(new Error(`cartridge ${entryPath} HELLO failed: Cartridge HELLO missing required manifest`));
         return;
