@@ -5279,7 +5279,7 @@ function test7120_Renderer_validateStrandPayload_requiresAuthoritativeInputs() {
 function test6503_Renderer_validateBodyOutcome_rejectsNegativeIndex() {
   let threw = false;
   try {
-    rendererValidateBodyOutcome({ body_index: -1, success: true, cap_urns: [], failed_token_id: null, failed_arg_urn: null }, 'test');
+    rendererValidateBodyOutcome({ body_index: -1, foreach_token_id: null, success: true, cap_urns: [], failed_token_id: null, failed_arg_urn: null }, 'test');
   } catch (e) {
     threw = true;
   }
@@ -5289,7 +5289,7 @@ function test6503_Renderer_validateBodyOutcome_rejectsNegativeIndex() {
 // TEST7121: Renderer body outcomes require an explicit stable failure coordinate
 function test7121_Renderer_validateBodyOutcome_requiresExplicitFailureCoordinate() {
   rendererValidateBodyOutcome(
-    { body_index: 0, success: false, cap_urns: [], failed_token_id: null, failed_arg_urn: null },
+    { body_index: 0, foreach_token_id: null, success: false, cap_urns: [], failed_token_id: null, failed_arg_urn: null },
     'unattributed'
   );
   let threw = false;
@@ -5297,15 +5297,28 @@ function test7121_Renderer_validateBodyOutcome_requiresExplicitFailureCoordinate
     rendererValidateBodyOutcome({ body_index: 0, success: false, cap_urns: [] }, 'missing');
   } catch (error) {
     threw = true;
+    assert(error.message.includes('foreach_token_id must be present as null or a stable ForEach step token'),
+      'missing execution-region coordinate error must state the required wire shape');
+  }
+  assert(threw, 'omitting foreach_token_id must fail hard');
+
+  threw = false;
+  try {
+    rendererValidateBodyOutcome(
+      { body_index: 0, foreach_token_id: null, success: false, cap_urns: [], failed_arg_urn: null },
+      'missing-failure-coordinate'
+    );
+  } catch (error) {
+    threw = true;
     assert(error.message.includes('must be present as null or a stable step token'),
-      'missing coordinate error must state the required wire shape');
+      'missing failure coordinate error must state the required wire shape');
   }
   assert(threw, 'omitting failed_token_id must fail hard');
 
   threw = false;
   try {
     rendererValidateBodyOutcome(
-      { body_index: 0, success: false, cap_urns: [], failed_token_id: null },
+      { body_index: 0, foreach_token_id: null, success: false, cap_urns: [], failed_token_id: null },
       'missing-argument-coordinate'
     );
   } catch (error) {
@@ -5314,6 +5327,71 @@ function test7121_Renderer_validateBodyOutcome_requiresExplicitFailureCoordinate
       'missing argument coordinate error must state the required wire shape');
   }
   assert(threw, 'omitting failed_arg_urn must fail hard');
+
+  assertThrowsMessage(
+    () => rendererValidateBodyOutcome(
+      { body_index: 1, foreach_token_id: null, success: true, cap_urns: [], failed_token_id: null, failed_arg_urn: null },
+      'nonzero-linear'
+    ),
+    'linear and must use body_index 0',
+    'a bare ordinal cannot address a second linear body'
+  );
+
+  assertThrowsMessage(
+    () => rendererValidateBodyOutcome(
+      { body_index: Number.MAX_SAFE_INTEGER + 1, foreach_token_id: 'tok-foreach', success: true, cap_urns: [], failed_token_id: null, failed_arg_urn: null },
+      'unsafe-coordinate'
+    ),
+    'non-negative safe integer',
+    'JSON transport must not round a body coordinate'
+  );
+}
+
+// TEST7122: Renderer body outcomes reject execution-region tokens for non-ForEach steps
+function test7122_Renderer_validateRunPayload_requiresForEachRegionCoordinate() {
+  const strand = {
+    source_media_urn: 'media:a',
+    target_media_urn: 'media:b',
+    steps: wireLinearStepInputs([
+      makeCapStep('cap:in="media:a";convert;out="media:b"', 'convert', 'media:a', 'media:b', false, false),
+    ]),
+  };
+  const payload = {
+    resolved_strand: strand,
+    body_outcomes: [{
+      body_index: 0,
+      foreach_token_id: strand.steps[0].token_id,
+      success: true,
+      cap_urns: [],
+      failed_token_id: null,
+      failed_arg_urn: null,
+    }],
+    visible_success_count: 1,
+    visible_failure_count: 0,
+    total_body_count: 1,
+  };
+  assertThrowsMessage(
+    () => rendererValidateRunPayload(payload),
+    'does not resolve to a ForEach strand step',
+    'a body outcome cannot use a cap token as its execution-region coordinate'
+  );
+
+  const duplicateCoordinate = {
+    ...payload,
+    body_outcomes: [0, 1].map(() => ({
+      body_index: 0,
+      foreach_token_id: null,
+      success: true,
+      cap_urns: [],
+      failed_token_id: null,
+      failed_arg_urn: null,
+    })),
+  };
+  assertThrowsMessage(
+    () => rendererValidateRunPayload(duplicateCoordinate),
+    "duplicate body coordinate 'linear:0'",
+    'one execution coordinate cannot acquire two outcomes'
+  );
 }
 
 // TEST6504: Renderer build run graph data pages successes and failures
@@ -5340,11 +5418,12 @@ function test6504_Renderer_buildRunGraphData_pagesSuccessesAndFailures() {
   };
   const outcomes = [];
   for (let i = 0; i < 6; i++) {
-    outcomes.push({ body_index: i, success: true, cap_urns: [], saved_paths: [], total_bytes: 0, duration_ms: 0, failed_token_id: null, failed_arg_urn: null });
+    outcomes.push({ body_index: i, foreach_token_id: strand.steps[0].token_id, success: true, cap_urns: [], saved_paths: [], total_bytes: 0, duration_ms: 0, failed_token_id: null, failed_arg_urn: null });
   }
   for (let i = 6; i < 10; i++) {
     outcomes.push({
       body_index: i,
+      foreach_token_id: strand.steps[0].token_id,
       success: false,
       cap_urns: [],
       saved_paths: [],
@@ -5412,7 +5491,7 @@ function test6505_Renderer_buildRunGraphData_unattributedFailureStopsAtEntry() {
       'media:ext=txt': 'Text',
     },
     body_outcomes: [
-      { body_index: 0, success: false, cap_urns: [], saved_paths: [], total_bytes: 0, duration_ms: 0, failed_token_id: null, failed_arg_urn: null, error: 'unknown' },
+      { body_index: 0, foreach_token_id: strand.steps[0].token_id, success: false, cap_urns: [], saved_paths: [], total_bytes: 0, duration_ms: 0, failed_token_id: null, failed_arg_urn: null, error: 'unknown' },
     ],
     visible_success_count: 0,
     visible_failure_count: 5,
@@ -5456,6 +5535,7 @@ function test6506_Renderer_buildRunGraphData_resolvesExactFailedStepToken() {
     body_outcomes: [
       {
         body_index: 0,
+        foreach_token_id: strand.steps[0].token_id,
         success: false,
         cap_urns: [],
         saved_paths: [],
@@ -5571,8 +5651,8 @@ function test6508_Renderer_buildRunGraphData_allFailedDropsTargetPlaceholder() {
       'media:decision': 'Decision',
     },
     body_outcomes: [
-      { body_index: 0, success: false, cap_urns: [], saved_paths: [], total_bytes: 0, duration_ms: 0, failed_token_id: strand.steps[2].token_id, failed_arg_urn: null, error: 'boom' },
-      { body_index: 1, success: false, cap_urns: [], saved_paths: [], total_bytes: 0, duration_ms: 0, failed_token_id: strand.steps[2].token_id, failed_arg_urn: null, error: 'boom' },
+      { body_index: 0, foreach_token_id: strand.steps[1].token_id, success: false, cap_urns: [], saved_paths: [], total_bytes: 0, duration_ms: 0, failed_token_id: strand.steps[2].token_id, failed_arg_urn: null, error: 'boom' },
+      { body_index: 1, foreach_token_id: strand.steps[1].token_id, success: false, cap_urns: [], saved_paths: [], total_bytes: 0, duration_ms: 0, failed_token_id: strand.steps[2].token_id, failed_arg_urn: null, error: 'boom' },
     ],
     visible_success_count: 3,
     visible_failure_count: 3,
@@ -5641,7 +5721,7 @@ function test6509_Renderer_buildRunGraphData_unclosedForeachSuccessNoMerge() {
       'media:decision': 'Decision',
     },
     body_outcomes: [
-      { body_index: 0, success: true, cap_urns: [], saved_paths: [], total_bytes: 0, duration_ms: 0, failed_token_id: null, failed_arg_urn: null },
+      { body_index: 0, foreach_token_id: strand.steps[1].token_id, success: true, cap_urns: [], saved_paths: [], total_bytes: 0, duration_ms: 0, failed_token_id: null, failed_arg_urn: null },
     ],
     visible_success_count: 3,
     visible_failure_count: 3,
@@ -5702,7 +5782,7 @@ function test6510_Renderer_buildRunGraphData_closedForeachSuccessMergesAtCollect
       'media:txt;list': 'Text List',
     },
     body_outcomes: [
-      { body_index: 0, success: true, cap_urns: [], saved_paths: [], total_bytes: 0, duration_ms: 0, failed_token_id: null, failed_arg_urn: null },
+      { body_index: 0, foreach_token_id: strand.steps[0].token_id, success: true, cap_urns: [], saved_paths: [], total_bytes: 0, duration_ms: 0, failed_token_id: null, failed_arg_urn: null },
     ],
     visible_success_count: 3,
     visible_failure_count: 3,
