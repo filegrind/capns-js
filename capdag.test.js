@@ -4309,7 +4309,7 @@ function test6467_Machine_capRegistryEntry_construction() {
     command: 'extract',
     cap_description: 'Extracts text from PDF',
     args: [{ media_urn: 'media:ext=pdf', required: true }],
-    output: { media_urn: 'media:enc=utf-8;ext=txt', output_description: 'Extracted text' },
+    output: { media_urn: 'media:enc=utf-8;ext=txt', output_description: 'Digitized text' },
     media_defs: [],
     urn_tags: { op: 'extract' },
     in_spec: 'media:ext=pdf',

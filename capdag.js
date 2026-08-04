@@ -1338,7 +1338,7 @@ const MEDIA_EMBEDDING_VECTOR = 'media:embedding-vector;enc=utf-8;record';
 // and `file-type=txt` (binds the URN to the `.txt` extension).
 const MEDIA_IMAGE_DESCRIPTION = 'media:enc=utf-8;ext=txt;image-description;plain-text';
 // Media URN for finalised plain text — the canonical input/output of cap:save-as-txt.
-// Producers of user-facing prose (LLM text-generation, OCR's extracted text,
+// Producers of user-facing prose (LLM text-generation, OCR's digitized text,
 // summarisation) declare this URN as their `out` so the planner restricts the .txt
 // persistence path to those caps. See fabric/media/plain-text.toml.
 const MEDIA_PLAIN_TEXT = 'media:enc=utf-8;ext=txt;plain-text';
