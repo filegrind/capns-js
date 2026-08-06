@@ -15,6 +15,7 @@
     "capdag.test.js",
     "machine.pegjs",
     "machine-parser.js",
+    "planner.js",
     "RULES.md",
     "README.md"
   ],

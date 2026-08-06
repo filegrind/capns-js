@@ -15,6 +15,7 @@
     "capdag.test.js",
     "machine.pegjs",
     "machine-parser.js",
+    "planner.js",
     "RULES.md",
     "README.md"
   ],
@@ -40,5 +41,5 @@
     "pretest": "npm run build:parser",
     "test": "node capdag.test.js"
   },
-  "version": "1.240.679"
+  "version": "1.241.684"
 }
