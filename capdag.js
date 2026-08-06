@@ -1606,6 +1606,17 @@ class MediaUrn {
   isFilePath() { return this._hasMarkerTag('file-path'); }
 
   /**
+   * True if this URN carries the `live` marker tag — a live-feed
+   * REFERENCE (13.2 §Reference Media): the arg value is a selector record
+   * the runtime resolves into an unbounded content stream via a registered
+   * provider, the same transport-resolution family as `media:file-path`.
+   * This is the canonical membership predicate for that family; callers
+   * must not test the `live` tag themselves.
+   * @returns {boolean}
+   */
+  isLiveFeed() { return this._hasMarkerTag('live'); }
+
+  /**
    * Check if this represents a collection type.
    * Returns true if the "collection" marker tag is present.
    * @returns {boolean}

@@ -2797,6 +2797,16 @@ function test551_isFilePath() {
   assert(!MediaUrn.fromString(MEDIA_IDENTITY).isFilePath(), 'MEDIA_IDENTITY should not be file-path');
 }
 
+// TEST553: is_live_feed returns true for every URN carrying the `live` marker tag (the reference-media family the runtime resolves via providers), false for everything else — including content URNs a feed delivers.
+function test553_isLiveFeed() {
+  assert(MediaUrn.fromString('media:live').isLiveFeed(), 'media:live should be live-feed');
+  assert(MediaUrn.fromString('media:live;synthetic').isLiveFeed(), 'media:live;synthetic should be live-feed');
+  assert(MediaUrn.fromString('media:audio;live;microphone').isLiveFeed(), 'microphone URN should be live-feed');
+  assert(!MediaUrn.fromString(MEDIA_STRING).isLiveFeed(), 'MEDIA_STRING should not be live-feed');
+  assert(!MediaUrn.fromString(MEDIA_FILE_PATH).isLiveFeed(), 'MEDIA_FILE_PATH should not be live-feed');
+  assert(!MediaUrn.fromString('media:audio;pcm').isLiveFeed(), 'feed CONTENT urns should not be live-feed');
+}
+
 // Mirror-specific coverage: isCollection returns true when collection marker tag is present
 // Mirror-specific coverage: N/A for JS (MEDIA_COLLECTION constants removed - no longer exists)
 function test6272_isCollection() {
@@ -7308,6 +7318,7 @@ async function runTests() {
   runTest('TEST1315: is_numeric', test549_isNumeric);
   runTest('TEST1298: is_bool', test550_isBool);
   runTest('TEST1299: is_file_path', test551_isFilePath);
+  runTest('TEST553: is_live_feed', test553_isLiveFeed);
   runTest('TEST1302: predicate_constant_consistency', test558_predicateConstantConsistency);
 
   // cap_urn.rs: TEST1303-TEST1307 (CapUrn tier tests)
