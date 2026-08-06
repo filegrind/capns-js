@@ -949,6 +949,50 @@ class CapUrn {
     return runtimeOut;
   }
 
+  /**
+   * THE effect-audit predicate: does an actually-emitted runtime output
+   * satisfy this cap's declared effect contract for the given runtime
+   * input? Every check of "did the cap emit what its effect promised"
+   * must go through this — never a hand-rolled combination of
+   * inferRuntimeOutputMedia with equality or conformance checks, so the
+   * contract has exactly one definition.
+   *
+   * The condition is deliberately asymmetric per effect:
+   * - effect=none / effect=patch compute an EXACT runtime output type,
+   *   so the emission must be tag-equivalent to the inference. A more
+   *   specific emission would still be a lie: the effect promises the
+   *   type is fully determined by the input.
+   * - effect=declared promises only the declared out=, so an emission
+   *   that is MORE specific than the declaration is legal and desirable;
+   *   the emission must conform to the declared output. A more generic
+   *   emission breaks downstream plan refinement and fails.
+   *
+   * Throws (rather than returning false) when the inference itself is
+   * impossible: the runtime input does not conform to the declared
+   * input, the effect is the unconstrained request form (?effect), or
+   * the URN state is internally inconsistent — those are upstream
+   * contract breaks, not emission mismatches.
+   *
+   * @param {MediaUrn} runtimeInput
+   * @param {MediaUrn} runtimeOutput
+   * @returns {boolean}
+   */
+  isConformantRuntimeOutput(runtimeInput, runtimeOutput) {
+    const inferred = this.inferRuntimeOutputMedia(runtimeInput);
+    switch (this.effectValue) {
+      case CapEffect.NONE:
+      case CapEffect.PATCH:
+        return runtimeOutput.isEquivalent(inferred);
+      case CapEffect.DECLARED:
+        return runtimeOutput.conformsTo(inferred);
+      default:
+        throw new CapUrnError(
+          ErrorCodes.INVALID_EFFECT_APPLICATION,
+          'Cannot audit an emission against an unconstrained effect request'
+        );
+    }
+  }
+
   _validateAdmissible() {
     const inMedia = this.inMediaUrn();
     const outMedia = this.outMediaUrn();

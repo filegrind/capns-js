@@ -3206,6 +3206,80 @@ function test127_invalidEffectNoneFailsHard() {
   );
 }
 
+// TEST8121: isConformantRuntimeOutput — effect=declared accepts a more
+// specific emission, rejects a more generic one
+function test8121_effectConformanceDeclaredAsymmetry() {
+  const cap = CapUrn.fromString('cap:extract;in="media:ext=pdf";out="media:record"');
+  const input = MediaUrn.fromString('media:ext=pdf');
+
+  assert(
+    cap.isConformantRuntimeOutput(input, MediaUrn.fromString('media:record')),
+    'emitting exactly the declared out is conformant'
+  );
+  assert(
+    cap.isConformantRuntimeOutput(input, MediaUrn.fromString('media:fmt=json;record')),
+    'a more specific emission than the declared out is conformant'
+  );
+  assert(
+    !cap.isConformantRuntimeOutput(input, MediaUrn.fromString('media:')),
+    'a more generic emission than the declared out is a violation'
+  );
+  assert(
+    !cap.isConformantRuntimeOutput(input, MediaUrn.fromString('media:ext=png;image')),
+    'an unrelated emission is a violation'
+  );
+}
+
+// TEST8122: isConformantRuntimeOutput — effect=none requires the emission
+// to be tag-equivalent to the runtime input; MORE specific is still a lie
+function test8122_effectConformanceNoneRequiresEquivalence() {
+  const cap = CapUrn.fromString('cap:decimate-sequence;effect=none');
+  const input = MediaUrn.fromString('media:ext=png;image');
+
+  assert(
+    cap.isConformantRuntimeOutput(input, input),
+    'emitting exactly the runtime input type is conformant'
+  );
+  assert(
+    !cap.isConformantRuntimeOutput(input, MediaUrn.fromString('media:ext=png;image;width=64')),
+    'effect=none promises the output type IS the input type; more specific is a lie'
+  );
+  assert(
+    !cap.isConformantRuntimeOutput(input, MediaUrn.fromString('media:image')),
+    'a more generic emission is a violation'
+  );
+
+  const strict = CapUrn.fromString('cap:effect=none;in="media:image";out="media:image"');
+  const nonImage = MediaUrn.fromString('media:ext=pdf');
+  assertThrows(
+    () => strict.isConformantRuntimeOutput(nonImage, nonImage),
+    ErrorCodes.INVALID_EFFECT_APPLICATION,
+    'a nonconforming runtime input is an upstream contract break, surfaced as an error'
+  );
+}
+
+// TEST8123: isConformantRuntimeOutput — effect=patch requires exactly the
+// delta-patched input type
+function test8123_effectConformancePatchRequiresPatchedInput() {
+  const cap = CapUrn.fromString(
+    'cap:convert;effect=patch;in="media:ext=jpeg;image";out="media:ext=png;image"'
+  );
+  const input = MediaUrn.fromString('media:ext=jpeg;image;width=64');
+
+  assert(
+    cap.isConformantRuntimeOutput(input, MediaUrn.fromString('media:ext=png;image;width=64')),
+    'the delta-patched input type (preserved tags intact) is conformant'
+  );
+  assert(
+    !cap.isConformantRuntimeOutput(input, MediaUrn.fromString('media:ext=png;image')),
+    'dropping the preserved width tag violates the patch promise'
+  );
+  assert(
+    !cap.isConformantRuntimeOutput(input, input),
+    'emitting the unpatched input type is a violation'
+  );
+}
+
 // TEST128: omitted effect means declared; unconstrained effect must be explicit
 function test128_effectDispatchRequiresExplicitWildcard() {
   const noneCandidate = CapUrn.fromString('cap:effect=none');
@@ -7270,6 +7344,9 @@ async function runTests() {
   runTest('TEST655: effect_declared_uses_declared_output', test126_effectDeclaredUsesDeclaredOutput);
   runTest('TEST656: invalid_effect_none_fails_hard', test127_invalidEffectNoneFailsHard);
   runTest('TEST657: effect_dispatch_requires_explicit_wildcard', test128_effectDispatchRequiresExplicitWildcard);
+  runTest('TEST8121: effect_conformance_declared_asymmetry', test8121_effectConformanceDeclaredAsymmetry);
+  runTest('TEST8122: effect_conformance_none_requires_equivalence', test8122_effectConformanceNoneRequiresEquivalence);
+  runTest('TEST8123: effect_conformance_patch_requires_patched_input', test8123_effectConformancePatchRequiresPatchedInput);
 
   // machine module: parser tests (mirrors parser.rs)
   console.log('\n--- machine/parser.rs ---');
