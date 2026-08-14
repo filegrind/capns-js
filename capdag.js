@@ -5603,9 +5603,12 @@ function slugForSync(registryUrl) {
 }
 
 /**
- * How a cartridge was installed. Pure metadata — never consulted for any host
- * or engine routing decision. Mirrors Rust CartridgeInstallSource; the
- * on-disk JSON uses snake_case values.
+ * How a cartridge was installed. Exactly ONE value is semantic: BUNDLE
+ * selects the bundled-cartridge integrity path at discovery. Every other
+ * value is provenance telemetry, and the vocabulary GROWS as installers do —
+ * so an unrecognized spelling is preserved verbatim on the record and
+ * round-trips, never failing the cartridge.json parse. Mirrors Rust
+ * CartridgeInstallSource; the on-disk JSON uses snake_case values.
  */
 const CartridgeInstallSource = Object.freeze({
   REGISTRY: 'registry',
@@ -5744,10 +5747,12 @@ class CartridgeJson {
     }
     let installedFrom = null;
     if (obj.installed_from !== undefined && obj.installed_from !== null) {
-      const valid = Object.values(CartridgeInstallSource);
-      if (!valid.includes(obj.installed_from)) {
-        throw new CartridgeJsonError(CartridgeJsonErrorKind.INVALID_JSON, `cartridge.json unknown installed_from: ${obj.installed_from}`);
+      if (typeof obj.installed_from !== 'string') {
+        throw new CartridgeJsonError(CartridgeJsonErrorKind.INVALID_JSON, 'cartridge.json installed_from must be a string');
       }
+      // An unknown spelling is preserved VERBATIM: the provenance vocabulary
+      // grows as installers do, and a telemetry hint must never fail the
+      // parse and take the cartridge down with it. Only BUNDLE is semantic.
       installedFrom = obj.installed_from;
     }
     return new CartridgeJson({

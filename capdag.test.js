@@ -6965,6 +6965,40 @@ function assertThrowsPlanState(fn, message) {
 
 // TEST1450: a defaults-only request is AUTO with every knob at its default,
 // and the proto JSON carries the documented wire shape.
+// TEST1514: the provenance vocabulary grows with installers. A workspace
+// build install parses to its named value; a spelling this build does not
+// know parses, is preserved VERBATIM, round-trips, and is not BUNDLE (the
+// one semantic value) — an unknown telemetry hint can never fail the
+// cartridge.json parse and take the cartridge down with it.
+function test1514_installSourceVocabularyTolerance() {
+  const base = {
+    name: 'candlecartridge',
+    version: '1.227.800',
+    channel: 'nightly',
+    registry_url: 'https://cartridges-staging.machinefabric.com/v1/manifest',
+    entry: 'candlecartridge',
+    installed_at: '2026-08-14T22:26:59Z',
+    fabric_manifest_version: 4,
+  };
+  // A drifted installer's spelling is tolerated but NOT blessed: the
+  // protocol's vocabulary is registry/dev/bundle/app_installer, and a
+  // writer's mistake never becomes a named value.
+  const built = CartridgeJson.fromObject({ ...base, installed_from: 'build' });
+  assert(built.installedFrom === 'build',
+    `build is preserved verbatim like any unknown, got ${built.installedFrom}`);
+  assert(!Object.values(CartridgeInstallSource).includes('build'),
+    'build is not part of the protocol vocabulary');
+
+  const unknown = CartridgeJson.fromObject({ ...base, installed_from: 'quantum_courier' });
+  assert(unknown.installedFrom === 'quantum_courier',
+    `unknown spellings are preserved verbatim, got ${unknown.installedFrom}`);
+  assert(unknown.installedFrom !== CartridgeInstallSource.BUNDLE,
+    'an unknown spelling is never the semantic bundle value');
+  const rewritten = unknown.toObject ? unknown.toObject() : JSON.parse(JSON.stringify(unknown));
+  assert((rewritten.installed_from || rewritten.installedFrom) === 'quantum_courier',
+    'unknown spellings round-trip');
+}
+
 function test1450_planRequestDefaults() {
   const request = new plannerNS.PlanRequest({
     sources: [{ mediaUrn: 'media:ext=pdf', isSequence: false }],
@@ -7589,6 +7623,7 @@ async function runTests() {
 
   // planner.js: unified plan-space vocabulary
   console.log('--- planner.js ---');
+  runTest('TEST1514: install_source_vocabulary_tolerance', test1514_installSourceVocabularyTolerance);
   runTest('TEST1450: plan_request_defaults', test1450_planRequestDefaults);
   runTest('TEST1451: plan_request_knob_validation', test1451_planRequestKnobValidation);
   runTest('TEST1452: knob_proto_round_trip', test1452_knobProtoRoundTrip);
