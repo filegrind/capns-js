@@ -6155,7 +6155,6 @@ function encodeHelloFrame() {
       ['max_reorder_buffer', BIFACI_DEFAULT_MAX_REORDER_BUFFER],
       ['initial_credit', BIFACI_DEFAULT_INITIAL_CREDIT],
       ['version', BIFACI_PROTOCOL_VERSION],
-      ['handler_capacity', 0],
     ],
   };
   const frame = {
@@ -6270,9 +6269,21 @@ function probeCartridgeCapGroups(entryPath) {
         finish(new Error(`cartridge ${entryPath} HELLO failed: meta.version ${metaVersion} does not match required version ${BIFACI_PROTOCOL_VERSION}`));
         return;
       }
-      const handlerCapacity = meta.get('handler_capacity');
-      if (!Number.isSafeInteger(handlerCapacity) || handlerCapacity < 0) {
-        finish(new Error(`cartridge ${entryPath} HELLO failed: missing required non-negative handler_capacity`));
+      // The concurrency-pool state map is MANDATORY on a cartridge HELLO
+      // (bifaci pools, protocol v4): JSON bytes under meta key "pools". A
+      // missing or malformed map is a protocol violation, never a default.
+      const poolsVal = meta.get('pools');
+      if (!poolsVal || poolsVal.__bytes === undefined) {
+        finish(new Error(`cartridge ${entryPath} HELLO failed: missing required concurrency-pool state map`));
+        return;
+      }
+      try {
+        const poolStates = JSON.parse(Buffer.from(poolsVal.__bytes).toString('utf8'));
+        if (poolStates === null || typeof poolStates !== 'object' || Array.isArray(poolStates)) {
+          throw new Error('pool-state map must be a JSON object');
+        }
+      } catch (e) {
+        finish(new Error(`cartridge ${entryPath} HELLO failed: malformed pool-state map: ${e.message}`));
         return;
       }
       const manifestVal = meta.get('manifest');
