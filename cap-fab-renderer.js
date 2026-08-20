@@ -2234,8 +2234,7 @@ function buildRunGraphData(data) {
     };
   }
 
-  // Expanding. The plan mirrors the working
-  // `machfab-mac/.scrap/working_graph/.../RunGraphViewer.html`:
+  // Expanding. The plan uses the renderer's established fan-out layout:
   //
   //   pre-foreach backbone ... → [anchor]
   //                                 │

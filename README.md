@@ -1,131 +1,64 @@
-# Cap URN - JavaScript Implementation
+# CapDAG for JavaScript
 
-JavaScript implementation of Cap URN (Capability Uniform Resource Names), built on [Tagged URN](https://github.com/machinefabric/tagged-urn-js).
+This public package is CapDAG's JavaScript planning and notation mirror. Use it
+in browsers or Node.js for Tagged, Media, and Cap URNs, capability definitions,
+dispatch, Machine Notation, planning, and graph rendering.
 
-## Features
+JavaScript intentionally does not implement the cartridge runtime, host, relay,
+or Bifaci process surface. That boundary is part of the package design, not an
+unreported parity gap. Rust remains the behavioral reference for shared
+features.
 
-- **Required Direction Specifiers** - `in`/`out` tags for input/output media types
-- **Media URN Validation** - Validates direction spec values are valid Media URNs
-- **Special Pattern Values** - `*` (must-have-any), `?` (unspecified), `!` (must-not-have)
-- **Graded Specificity** - Exact values score higher than wildcards
-- **Cross-Language Compatible** - Identical behavior to Rust, Go, and Objective-C implementations
-- **Production Ready** - No fallbacks, fails hard on invalid input
-
-## Installation
+## Install the package
 
 ```bash
 npm install capdag
 ```
 
-## Quick Start
+Node.js 14 or newer is required by the package manifest.
+
+## Parse and build Cap URNs
 
 ```javascript
-const { CapUrn, CapUrnBuilder, CapMatcher } = require('capdag');
+const { CapUrn, CapUrnBuilder } = require("capdag");
 
-// Create from string (with required direction specifiers)
-const cap = CapUrn.fromString('cap:in="media:binary";extract;out="media:object"');
-console.log(cap.toString());
-
-// Use builder pattern
+const parsed = CapUrn.fromString(
+  'cap:disbind;in="media:ext=pdf";out="media:enc=utf-8;page"'
+);
 const built = new CapUrnBuilder()
-  .inSpec('media:void')
-  .outSpec('media:object')
-  .tag('op', 'generate')
-  .tag('target', 'thumbnail')
+  .inSpec("media:ext=pdf")
+  .outSpec("media:enc=utf-8;page")
+  .marker("disbind")
   .build();
 
-// Matching
-const request = CapUrn.fromString('cap:in="media:binary";extract;out="media:object"');
-console.log(cap.accepts(request)); // true
-
-// Find best match by specificity
-const caps = [
-  CapUrn.fromString('cap:in=*;extract;out=*'),
-  CapUrn.fromString('cap:in="media:binary";extract;out="media:object"'),
-  CapUrn.fromString('cap:ext=pdf;in="media:binary";extract;out="media:object"')
-];
-const best = CapMatcher.findBestMatch(caps, request);
-console.log(best.toString()); // Most specific match
+console.log(parsed.toString() === built.toString());
 ```
 
-## API Reference
+Treat URNs as opaque parsed values. Use the package's predicates for
+equivalence, conformance, dispatch, and ranking instead of string surgery.
 
-### CapUrn Class
+## Find the relevant API
 
-#### Static Methods
-- `CapUrn.fromString(s)` - Parse Cap URN from string
-  - Throws `CapUrnError` on invalid format or missing direction specifiers
+- `capdag.js` provides URNs, definitions, dispatch, and matching.
+- `machine-parser.js` is generated from `machine.pegjs`.
+- `planner.js` provides planning and Machine Notation structures.
+- `cap-fab-renderer.js` and the browser build support graph presentation.
+- [`RULES.md`](RULES.md) records package-specific construction rules.
 
-#### Instance Methods
-- `toString()` - Get canonical string representation
-- `getTag(key)` - Get tag value (case-insensitive)
-- `getInSpec()` - Get input media type
-- `getOutSpec()` - Get output media type
-- `hasTag(key, value)` - Check if tag exists with value
-- `withTag(key, value)` - Add/update tag (returns new instance)
-- `withoutTag(key)` - Remove tag (returns new instance)
-- `accepts(request)` - Check if this cap (as pattern) accepts a request
-- `specificity()` - Get specificity score for matching
-- `isMoreSpecificThan(other)` - Compare specificity
-- `equals(other)` - Check equality
+The normative semantics and terminology live in the
+[CapDAG specification](https://github.com/machinefabric/capdag/blob/main/docs/01-overview.md). Source comments and
+exports are the JavaScript API reference.
 
-### CapUrnBuilder Class
-
-Fluent builder for constructing Cap URNs:
-
-```javascript
-const cap = new CapUrnBuilder()
-  .inSpec('media:binary')
-  .outSpec('media:object')
-  .tag('op', 'extract')
-  .tag('target', 'metadata')
-  .build();
-```
-
-### CapMatcher Class
-
-Utility for matching sets of caps:
-
-- `CapMatcher.findBestMatch(caps, request)` - Find most specific match
-- `CapMatcher.findAllMatches(caps, request)` - Find all matches (sorted by specificity)
-
-### Error Handling
-
-```javascript
-const { CapUrnError, ErrorCodes } = require('capdag');
-
-try {
-  const cap = CapUrn.fromString('cap:extract;in=media:;out=media:'); // Missing in/out
-} catch (error) {
-  if (error instanceof CapUrnError) {
-    console.log(`Error code: ${error.code}`); // MISSING_IN_SPEC
-  }
-}
-```
-
-Cap-specific error codes:
-- `ErrorCodes.MISSING_IN_SPEC` - Missing required `in` tag
-- `ErrorCodes.MISSING_OUT_SPEC` - Missing required `out` tag
-- `ErrorCodes.INVALID_MEDIA_URN` - Invalid Media URN in direction spec
-
-For base Tagged URN error codes, see [Tagged URN documentation](https://github.com/machinefabric/tagged-urn-js).
-
-## Documentation
-
-- [RULES.md](./RULES.md) - Cap-specific rules
-- [Tagged URN RULES.md](https://github.com/machinefabric/tagged-urn-js/blob/main/RULES.md) - Base format rules (case, quoting, wildcards, etc.)
-
-## Testing
+## Build and verify changes
 
 ```bash
+npm run build:parser
 npm test
 ```
 
-## Cross-Language Compatibility
+`npm test` runs the parser build first. Shared behavior changes require the
+applicable reference test with the same substantive number and assertions.
 
-This JavaScript implementation produces identical results to:
-- [Rust reference implementation](https://github.com/machinefabric/capdag)
-- [Go implementation](https://github.com/machinefabric/capdag-go)
-- [Objective-C implementation](https://github.com/machinefabric/capdag-objc)
+## License
 
-All implementations pass the same test cases and follow identical rules.
+MIT
