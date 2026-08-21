@@ -3018,6 +3018,35 @@ function test1296_rule11VoidInputCliFlagOnly() {
   validateCapArgs(cap);
 }
 
+// TEST1953: RULE14 — `streaming: true` is accepted on the main input (the
+// stdin arg equivalent to `in=`), survives the JSON round-trip, and is refused
+// on any other argument: a side option has no wire stream, so it has nothing
+// to consume incrementally, and the rule keeps the executor's hop rule
+// one-dimensional.
+function test1953_rule14StreamingOnlyOnMainInput() {
+  const urn = CapUrn.fromString('cap:in="media:string";test;out="media:string"');
+  const ok = new Cap(urn, 'Test', ['test-cmd']);
+  const main = new CapArg('media:string', true, [ArgSource.fromJSON({ stdin: 'media:string' })], { streaming: true });
+  ok.args = [main];
+  validateCapArgs(ok);
+  assert(CapArg.fromJSON(main.toJSON()).streaming === true, 'streaming survives the JSON round-trip');
+  assert(!('streaming' in new CapArg('media:string', true, []).toJSON()), 'streaming is omitted when false, like is_sequence');
+
+  const bad = new Cap(CapUrn.fromString('cap:in="media:string";test;out="media:string"'), 'Test', ['test-cmd']);
+  bad.args = [
+    new CapArg('media:string', true, [ArgSource.fromJSON({ stdin: 'media:string' })]),
+    new CapArg('media:integer;numeric', false, [ArgSource.fromJSON({ cli_flag: '--count' })], { streaming: true }),
+  ];
+  try {
+    validateCapArgs(bad);
+    assert(false, 'Should have thrown RULE14 for a streaming side option');
+  } catch (e) {
+    assert(e instanceof ValidationError, 'Should be ValidationError');
+    assert(e.message.includes('RULE14'), 'Should mention RULE14: ' + e.message);
+    assert(e.message.includes('media:integer;numeric'), 'Should name the offending arg: ' + e.message);
+  }
+}
+
 // TEST1297: RULE11 - non-void-input cap with stdin source passes
 function test1297_rule11NonVoidInputWithStdin() {
   const urn = CapUrn.fromString('cap:in="media:string";test;out="media:string"');
@@ -7367,6 +7396,7 @@ async function runTests() {
   runTest('TEST1295: rule11_non_void_input_without_stdin_rejected', test1295_rule11NonVoidInputWithoutStdinRejected);
   runTest('TEST1296: rule11_void_input_cli_flag_only', test1296_rule11VoidInputCliFlagOnly);
   runTest('TEST1297: rule11_non_void_input_with_stdin', test1297_rule11NonVoidInputWithStdin);
+  runTest('TEST1953: rule14_streaming_only_on_main_input', test1953_rule14StreamingOnlyOnMainInput);
 
   // cap_urn.rs: TEST639-TEST653 (Cap URN wildcard tests)
   console.log('\n--- cap_urn.rs (wildcard tests) ---');

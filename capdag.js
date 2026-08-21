@@ -2470,6 +2470,11 @@ class CapArg {
     this.media_urn = mediaUrn;
     this.required = required;
     this.is_sequence = options.is_sequence || false;
+    // Consumed WITHOUT a length promise (a feed): the cap processes items as
+    // they arrive and may be wired live to an unbounded producer. Orthogonal
+    // to is_sequence (cardinality), not part of the URN. Only the main input
+    // may stream (RULE14).
+    this.streaming = options.streaming || false;
     this.sources = sources;  // Array of ArgSource
     this.arg_description = options.arg_description !== undefined ? options.arg_description : null;
     this.default_value = options.default_value !== undefined ? options.default_value : null;
@@ -2489,6 +2494,7 @@ class CapArg {
       sources,
       {
         is_sequence: json.is_sequence,
+        streaming: json.streaming,
         arg_description: json.arg_description,
         default_value: json.default_value,
         metadata: json.metadata
@@ -2507,6 +2513,7 @@ class CapArg {
       sources: this.sources.map(s => s.toJSON())
     };
     if (this.is_sequence) result.is_sequence = true;
+    if (this.streaming) result.streaming = true;
     if (this.arg_description !== null && this.arg_description !== undefined) {
       result.arg_description = this.arg_description;
     }
@@ -3331,6 +3338,19 @@ function validateCapArgs(cap) {
     throw new ValidationError('InvalidCapSchema', capUrn, {
       issue: `RULE11: Cap has non-void in= spec but no argument declares a stdin source`
     });
+  }
+
+  // RULE14: Only the main input may stream. `streaming: true` declares that
+  // an argument is consumed without a length promise — a feed. Side
+  // arguments (options, model specs, prompts alongside the main input) are
+  // values the runtime demuxes whole; a feed there has no meaning and would
+  // let an unbounded stream reach a collector that must refuse it (L16).
+  for (const arg of args) {
+    if (arg.streaming && !arg.isMainInput(inMediaUrn)) {
+      throw new ValidationError('InvalidCapSchema', capUrn, {
+        issue: `RULE14: Argument '${arg.media_urn}' declares streaming=true but is not the main input (no stdin source equivalent to in='${cap.urn.getInSpec()}') — only the main input may be consumed without a length promise`
+      });
+    }
   }
 
   // RULE5: No two args may have same position
