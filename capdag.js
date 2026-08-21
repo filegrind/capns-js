@@ -2455,6 +2455,21 @@ class ArgSource {
   }
 }
 
+/** The definition's argument keys — what every capdag mirror's CapArg carries. */
+const CAP_ARG_KEYS = Object.freeze(['media_urn', 'required', 'sources', 'arg_description', 'default_value', 'metadata', 'is_sequence', 'streaming']);
+/** The definition's output keys — what every capdag mirror's CapOutput carries. */
+const CAP_OUTPUT_KEYS = Object.freeze(['media_urn', 'output_description', 'metadata', 'is_sequence', 'streaming']);
+
+function refuseUnknownDefinitionKeys(json, known, what) {
+  const unknown = Object.keys(json).filter(key => !known.includes(key)).sort();
+  if (unknown.length > 0) {
+    throw new Error(
+      `${what} carries field(s) this capdag does not know: ${unknown.join(', ')} — ` +
+      `the definition comes from a fabric newer than this capdag; the contract is ${known.join(', ')}`
+    );
+  }
+}
+
 /**
  * Cap argument definition - media_urn is the unique identifier
  */
@@ -2487,6 +2502,12 @@ class CapArg {
    * @returns {CapArg} The CapArg instance
    */
   static fromJSON(json) {
+    // A key this definition does not know is a fabric NEWER than this
+    // capdag — a contract this build cannot honour. Dropping it would let a
+    // cartridge advertise a contract the fabric never made (this is how a
+    // `streaming` argument once went out as bounded); it is refused, named.
+    // Mirrors Rust `deny_unknown_fields`.
+    refuseUnknownDefinitionKeys(json, CAP_ARG_KEYS, 'cap argument');
     const sources = (json.sources || []).map(s => ArgSource.fromJSON(s));
     return new CapArg(
       json.media_urn,
@@ -2940,6 +2961,9 @@ class Cap {
       cap.args = json.args.map(a => CapArg.fromJSON(a));
     } else {
       cap.args = [];
+    }
+    if (json.output !== undefined && json.output !== null) {
+      refuseUnknownDefinitionKeys(json.output, CAP_OUTPUT_KEYS, 'cap output');
     }
     cap.output = json.output;
     cap.registered_by = json.registered_by ? RegisteredBy.fromJSON(json.registered_by) : null;

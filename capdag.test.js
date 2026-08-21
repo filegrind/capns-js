@@ -3047,6 +3047,25 @@ function test1953_rule14StreamingOnlyOnMainInput() {
   }
 }
 
+// TEST1964: a definition field this capdag does not know is a NEWER fabric,
+// not noise — parsing refuses it, naming the key, for arguments and outputs
+// alike. The field being dropped is how a cartridge built on an older capdag
+// once advertised a `streaming` input as bounded.
+function test1964_unknownDefinitionFieldIsRefused() {
+  let threw = null;
+  try {
+    CapArg.fromJSON({ media_urn: 'media:string', required: true, sources: [{ stdin: 'media:string' }], chunking: 'adaptive' });
+  } catch (e) { threw = e; }
+  assert(threw !== null && threw.message.includes('chunking'), 'an unknown arg field must be refused by name: ' + (threw && threw.message));
+  assert(CapArg.fromJSON({ media_urn: 'media:string', required: true, sources: [{ stdin: 'media:string' }], streaming: true }).streaming === true);
+
+  const capJson = new Cap(CapUrn.fromString('cap:in="media:string";test;out="media:string"'), 'Test', ['test-cmd']).toJSON();
+  capJson.output = { media_urn: 'media:string', output_description: 'x', windowed: true };
+  threw = null;
+  try { Cap.fromJSON(capJson); } catch (e) { threw = e; }
+  assert(threw !== null && threw.message.includes('windowed'), 'an unknown output field must be refused by name: ' + (threw && threw.message));
+}
+
 // TEST1297: RULE11 - non-void-input cap with stdin source passes
 function test1297_rule11NonVoidInputWithStdin() {
   const urn = CapUrn.fromString('cap:in="media:string";test;out="media:string"');
@@ -7397,6 +7416,7 @@ async function runTests() {
   runTest('TEST1296: rule11_void_input_cli_flag_only', test1296_rule11VoidInputCliFlagOnly);
   runTest('TEST1297: rule11_non_void_input_with_stdin', test1297_rule11NonVoidInputWithStdin);
   runTest('TEST1953: rule14_streaming_only_on_main_input', test1953_rule14StreamingOnlyOnMainInput);
+  runTest('TEST1964: unknown_definition_field_is_refused', test1964_unknownDefinitionFieldIsRefused);
 
   // cap_urn.rs: TEST639-TEST653 (Cap URN wildcard tests)
   console.log('\n--- cap_urn.rs (wildcard tests) ---');
