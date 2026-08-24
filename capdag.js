@@ -5551,7 +5551,7 @@ class InstalledCartridgeRecord {
    * @param {Array<Object>} [opts.capGroups=[]] - Cartridge's manifest cap_groups; each element is `{name, caps, adapter_urns}`.
    * @param {CartridgeAttachmentError|null} [opts.attachmentError=null]
    * @param {CartridgeRuntimeStats|null} [opts.runtimeStats=null]
-   * @param {string} [opts.lifecycle='discovered'] - One of `discovered` | `inspecting` | `verifying` | `operational`. Mutually exclusive with attachmentError; see `machfab-mac/docs/cartridge state machine.md`.
+   * @param {string} [opts.lifecycle='discovered'] - One of `discovered` | `inspecting` | `verifying` | `operational`. Mutually exclusive with attachmentError; see `macfloom/docs/cartridge state machine.md`.
    */
   constructor({ registryUrl = null, channel, id, version, sha256, capGroups = [], attachmentError = null, runtimeStats = null, lifecycle = 'discovered' }) {
     this.registry_url = registryUrl;

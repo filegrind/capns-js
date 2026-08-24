@@ -4,7 +4,7 @@
 // (`machfab/proto/cap.proto` PlanMachines/DiscoverConvergentTargets): the knob
 // enums, the request shape with the same validation the engine applies, and
 // parsers for the proto-JSON response shapes (ts-proto `snakeToCamel=false`,
-// so wire field names are snake_case). This is what lets fabricloom-uikit represent
+// so wire field names are snake_case). This is what lets floom-uikit represent
 // and manipulate the FULL planner state — knobs, ranked candidates, apexes —
 // both standalone (fixtures) and fed over gRPC by the desktop clients.
 //

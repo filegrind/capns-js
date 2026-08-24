@@ -6,7 +6,7 @@
 //
 // The browser build exists because capdag-js source files are CJS:
 // they use `require()` and `module.exports`, which a plain <script tag>
-// cannot load. For browser consumers (capdag-dot-com, machfab-mac
+// cannot load. For browser consumers (capdag-dot-com, macfloom
 // WKWebViews) we strip those CJS hooks and wrap the result in an IIFE
 // that assigns to window.*.
 //
