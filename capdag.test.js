@@ -5827,7 +5827,7 @@ function test6508_Renderer_buildRunGraphData_allFailedDropsTargetPlaceholder() {
 // TEST6509: Renderer build run graph data unclosed foreach success no merge
 function test6509_Renderer_buildRunGraphData_unclosedForeachSuccessNoMerge() {
   // Strand without a Collect: [Disbind, ForEach, make_decision].
-  // Under the machfab realize_strand semantics there's no Collect,
+  // Under the floom-engine realize_strand semantics there's no Collect,
   // so each body produces its OWN terminal output. Successful
   // replicas do NOT merge into a shared target — each body has
   // its own separate decision.

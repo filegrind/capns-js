@@ -1,7 +1,7 @@
 // Unified configurable planner — the plan-space vocabulary for JS clients.
 //
 // Mirrors core Rust `capdag/src/planner/plan_space.rs` and the proto surface
-// (`machfab/proto/cap.proto` PlanMachines/DiscoverConvergentTargets): the knob
+// (`floom-engine/proto/cap.proto` PlanMachines/DiscoverConvergentTargets): the knob
 // enums, the request shape with the same validation the engine applies, and
 // parsers for the proto-JSON response shapes (ts-proto `snakeToCamel=false`,
 // so wire field names are snake_case). This is what lets floom-uikit represent

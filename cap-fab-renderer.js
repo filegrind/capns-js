@@ -2447,7 +2447,7 @@ function buildRunGraphData(data) {
 
     // Successful bodies merge into the collect target ONLY when a
     // Collect closes the foreach body. Without a Collect (the
-    // common "unclosed foreach" case in machfab realize_strand),
+    // common "unclosed foreach" case in floom-engine realize_strand),
     // replicas terminate at their last body step — each body has
     // its own separate output, no shared merge.
     if (success && hasCollect && collectTargetId) {
