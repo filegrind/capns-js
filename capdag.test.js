@@ -1705,7 +1705,7 @@ function test6236_JS_mediaUrnsForExtension() {
   assert(thrownError instanceof MediaDefError, 'Should throw MediaDefError for unknown ext');
 }
 
-// TEST0070: J s get extension mappings
+// TEST6240: J s get extension mappings
 function test6240_JS_getExtensionMappings() {
   const mediaDefs = [
     { urn: 'media:ext=pdf', media_type: 'application/pdf', extensions: ['pdf'] },
@@ -1716,7 +1716,7 @@ function test6240_JS_getExtensionMappings() {
   assertEqual(mappings.length, 3, 'Should have 3 mappings');
 }
 
-// TEST0073: J s resolve media urn from specs
+// TEST6242: J s resolve media urn from specs
 function test6242_JS_resolveMediaUrnFromSpecs() {
   const mediaDefs = [
     { urn: MEDIA_STRING, media_type: 'text/plain', title: 'String', profile_uri: 'https://capdag.com/schema/str' },
@@ -3357,12 +3357,12 @@ function test6275_Machine_emptyInput() {
   assertThrowsWithCode(() => parseMachine(''), MachineSyntaxErrorCodes.EMPTY);
 }
 
-// TEST0088: Machine whitespace only
+// TEST6277: Machine whitespace only
 function test6277_Machine_whitespaceOnly() {
   assertThrowsWithCode(() => parseMachine('   \n  \t  '), MachineSyntaxErrorCodes.EMPTY);
 }
 
-// TEST0089: Machine header only no wirings
+// TEST6279: Machine header only no wirings
 function test6279_Machine_headerOnlyNoWirings() {
   assertThrowsWithCode(
     () => Machine.fromString('[extract cap:in="media:ext=pdf";extract;out="media:enc=utf-8;ext=txt"]'),
@@ -3370,7 +3370,7 @@ function test6279_Machine_headerOnlyNoWirings() {
   );
 }
 
-// TEST0090: Machine duplicate alias
+// TEST6280: Machine duplicate alias
 function test6280_Machine_duplicateAlias() {
   assertThrowsWithCode(
     () => Machine.fromString(
@@ -3382,7 +3382,7 @@ function test6280_Machine_duplicateAlias() {
   );
 }
 
-// TEST0094: Machine simple linear chain
+// TEST6286: Machine simple linear chain
 function test6286_Machine_simpleLinearChain() {
   const g = Machine.fromString(
     '[extract cap:in="media:ext=pdf";extract;out="media:enc=utf-8;ext=txt"]' +
@@ -3398,7 +3398,7 @@ function test6286_Machine_simpleLinearChain() {
   assertEqual(edge.isLoop, false);
 }
 
-// TEST0095: Machine two step chain
+// TEST6288: Machine two step chain
 function test6288_Machine_twoStepChain() {
   const g = Machine.fromString(
     '[extract cap:in="media:ext=pdf";extract;out="media:enc=utf-8;ext=txt"]' +
@@ -3413,7 +3413,7 @@ function test6288_Machine_twoStepChain() {
     'Second edge target should be media:embedding-vector;enc=utf-8;record');
 }
 
-// TEST0096: Machine fan out
+// TEST6290: Machine fan out
 function test6290_Machine_fanOut() {
   const g = Machine.fromString(
     '[meta cap:in="media:ext=pdf";extract-metadata;out="media:enc=utf-8;file-metadata;record"]' +
@@ -3431,7 +3431,7 @@ function test6290_Machine_fanOut() {
   }
 }
 
-// TEST0097: Machine fan in secondary assigned by prior wiring
+// TEST6292: Machine fan in secondary assigned by prior wiring
 function test6292_Machine_fanInSecondaryAssignedByPriorWiring() {
   const g = Machine.fromString(
     '[thumb cap:in="media:ext=pdf";generate-thumbnail;out="media:ext=png;image;thumbnail"]' +
@@ -3445,7 +3445,7 @@ function test6292_Machine_fanInSecondaryAssignedByPriorWiring() {
   assertEqual(g.edges()[2].sources.length, 2);
 }
 
-// TEST0098: Machine fan in secondary unassigned gets wildcard
+// TEST6294: Machine fan in secondary unassigned gets wildcard
 function test6294_Machine_fanInSecondaryUnassignedGetsWildcard() {
   const g = Machine.fromString(
     '[describe cap:in="media:ext=png;image";describe-image;out="media:enc=utf-8;image-description"]\n' +
@@ -7011,8 +7011,6 @@ function assertThrowsPlanState(fn, message) {
   throw new Error(`Expected PlanStateError but function succeeded: ${message}`);
 }
 
-// TEST1450: a defaults-only request is AUTO with every knob at its default,
-// and the proto JSON carries the documented wire shape.
 // TEST1514: the provenance vocabulary grows with installers. A workspace
 // build install parses to its named value; a spelling this build does not
 // know parses, is preserved VERBATIM, round-trips, and is not BUNDLE (the
@@ -7047,6 +7045,8 @@ function test1514_installSourceVocabularyTolerance() {
     'unknown spellings round-trip');
 }
 
+// TEST1450: a defaults-only request is AUTO with every knob at its default,
+// and the proto JSON carries the documented wire shape.
 function test1450_planRequestDefaults() {
   const request = new plannerNS.PlanRequest({
     sources: [{ mediaUrn: 'media:ext=pdf', isSequence: false }],
