@@ -14,6 +14,12 @@ const {
   CartridgeJson, CartridgeJsonError, CartridgeJsonErrorKind, hashCartridgeDirectory,
   DiscoveryIdentity, DiscoveredCartridge, discoverCartridges,
   CartridgeAttachmentErrorKind, CartridgeChannel,
+  RegistryVerdict, RegistryVerdictState, ChainFailureReason,
+  REGISTRY_VERDICT_STATES, CHAIN_FAILURE_REASONS,
+  registryVerdictStateForChainFailure, registryVerdictPermitsAttachment,
+  registryVerdictIsTrustFailure, registryVerdictIsTransient,
+  RegistryRemedy, registryVerdictRemedy,
+  MANIFEST_SIG_FORMAT, RELEASE_KEY_CERT_FORMAT,
   CapFabEdge, CapFabStats, CapFab,
   StdinSource, StdinSourceKind,
   validateNoMediaDefRedefinitionSync,
@@ -71,6 +77,27 @@ function assertThrows(fn, expectedErrorCode, message) {
       return; // Expected error
     }
     throw new Error(`Expected CapUrnError with code ${expectedErrorCode} but got: [code=${error.code}] ${error.message}`);
+  }
+}
+
+/**
+ * A refusal: the call must throw, and its message must match. Distinct from
+ * `assertThrows`, which is specific to `CapUrnError` codes — asserting only
+ * "it threw" would pass on a typo in the very message the refusal exists to
+ * state.
+ */
+function assertRefuses(fn, pattern, message) {
+  let thrown = null;
+  try {
+    fn();
+  } catch (error) {
+    thrown = error;
+  }
+  if (thrown === null) {
+    throw new Error(`Expected a refusal but the call succeeded: ${message || pattern}`);
+  }
+  if (!pattern.test(thrown.message)) {
+    throw new Error(`Expected a refusal matching ${pattern} but got: ${thrown.message}`);
   }
 }
 
@@ -2693,7 +2720,7 @@ async function test1877_registryCartridgeUnderWrongSlugIsBadInstall() {
     const json = discoveryRegistryCartridgeJson(url, 'nightly', 1);
     discoveryInstallFixture(root, wrongSlug, 'nightly', 'cart', '1.0.0', json, 'cart');
     const out = await discoverCartridges(root, new DiscoveryIdentity({ channel: 'nightly', registryUrl: null, fabricManifestVersion: 1, cartridgeRegistryVersion: 1 }));
-    discoveryExpectIncompatible(out, CartridgeAttachmentErrorKind.BAD_INSTALLATION);
+    discoveryExpectIncompatible(out, CartridgeAttachmentErrorKind.MISPLACED);
   } finally {
     discoveryRemoveRoot(root);
   }
@@ -2721,7 +2748,7 @@ async function test1878_bundledCartridgeWithoutBakedHashIsRejected() {
     });
     discoveryInstallFixture(root, 'dev', 'nightly', 'cart', '1.0.0', json, 'cart');
     const out = await discoverCartridges(root, new DiscoveryIdentity({ channel: 'nightly', registryUrl: null, fabricManifestVersion: 1, cartridgeRegistryVersion: 1 }));
-    discoveryExpectIncompatible(out, CartridgeAttachmentErrorKind.BAD_INSTALLATION);
+    discoveryExpectIncompatible(out, CartridgeAttachmentErrorKind.MISPLACED);
     assert(out[0].error.message.includes('bundled cartridge integrity'),
       `message should name the bundled-integrity failure: ${out[0].error.message}`);
   } finally {
@@ -7439,6 +7466,15 @@ async function runTests() {
   runTest('TEST655: effect_declared_uses_declared_output', test126_effectDeclaredUsesDeclaredOutput);
   runTest('TEST656: invalid_effect_none_fails_hard', test127_invalidEffectNoneFailsHard);
   runTest('TEST657: effect_dispatch_requires_explicit_wildcard', test128_effectDispatchRequiresExplicitWildcard);
+  runTest('TEST8150: registry_verdict_states_closed', test8150_registryVerdictStatesAreTheClosedWireVocabulary);
+  runTest('TEST8151: chain_failure_classification', test8151_unreadableFormatIsUnverifiableAndRejectedKeyIsUntrusted);
+  runTest('TEST8152: only_verified_permits_attachment', test8152_onlyVerifiedPermitsAttachment);
+  runTest('TEST8153: trust_failures_never_transient', test8153_trustFailuresAreNeverTransient);
+  runTest('TEST8154: contradictory_verdicts_refused', test8154_contradictoryVerdictsAreRefused);
+  runTest('TEST8159: remedy_follows_from_state', test8159_theRemedyFollowsFromTheState);
+  runTest('TEST8155: registry_verdict_wire_round_trip', test8155_registryVerdictWireRoundTrip);
+  runTest('TEST8157: signature_formats_from_library', test8157_signatureFormatDiscriminatorsComeFromTheLibrary);
+  runTest('TEST8158: attachment_kinds_separate_situations', test8158_attachmentKindsSeparateTheirSituations);
   runTest('TEST8121: effect_conformance_declared_asymmetry', test8121_effectConformanceDeclaredAsymmetry);
   runTest('TEST8122: effect_conformance_none_requires_equivalence', test8122_effectConformanceNoneRequiresEquivalence);
   runTest('TEST8123: effect_conformance_patch_requires_patched_input', test8123_effectConformancePatchRequiresPatchedInput);
@@ -7688,6 +7724,229 @@ async function runTests() {
     console.log('OK All tests passed!');
   }
 }
+
+
+// ============================================================================
+// Registry verdicts — the vocabulary a consumer concludes about a REGISTRY
+// ============================================================================
+
+/** TEST8150: the wire vocabulary is closed and matches the Rust mirror. */
+function test8150_registryVerdictStatesAreTheClosedWireVocabulary() {
+  const expected = [
+    'verified', 'pending', 'offline', 'unreachable',
+    'http_error', 'malformed', 'unsigned', 'untrusted', 'unverifiable',
+  ];
+  assertEqual(REGISTRY_VERDICT_STATES.length, expected.length, 'state count matches the Rust mirror');
+  for (const state of expected) {
+    assert(REGISTRY_VERDICT_STATES.includes(state), `wire vocabulary carries '${state}'`);
+  }
+  const reasons = [
+    'malformed_envelope', 'unsupported_envelope_format', 'malformed_certificate',
+    'unsupported_certificate_format', 'empty_certificate_list', 'insufficient_root_signatures',
+    'expired_certificate', 'not_yet_valid_certificate', 'environment_mismatch',
+    'key_id_mismatch', 'no_authorizing_certificate', 'manifest_signature_invalid',
+  ];
+  assertEqual(CHAIN_FAILURE_REASONS.length, reasons.length, 'reason count matches the Rust mirror');
+  for (const reason of reasons) {
+    assert(CHAIN_FAILURE_REASONS.includes(reason), `wire vocabulary carries '${reason}'`);
+  }
+  assertRefuses(() => registryVerdictPermitsAttachment('network_error'), /unknown registry verdict state/);
+}
+
+/** TEST8151: a format this build cannot read is OUR limitation — never the
+ *  registry being untrustworthy, and never a network problem. */
+function test8151_unreadableFormatIsUnverifiableAndRejectedKeyIsUntrusted() {
+  for (const unevaluable of [
+    ChainFailureReason.MALFORMED_ENVELOPE,
+    ChainFailureReason.UNSUPPORTED_ENVELOPE_FORMAT,
+    ChainFailureReason.MALFORMED_CERTIFICATE,
+    ChainFailureReason.UNSUPPORTED_CERTIFICATE_FORMAT,
+    ChainFailureReason.EMPTY_CERTIFICATE_LIST,
+  ]) {
+    assertEqual(
+      registryVerdictStateForChainFailure(unevaluable),
+      RegistryVerdictState.UNVERIFIABLE,
+      `${unevaluable} could not be judged at all`,
+    );
+  }
+  for (const judged of [
+    ChainFailureReason.INSUFFICIENT_ROOT_SIGNATURES,
+    ChainFailureReason.EXPIRED_CERTIFICATE,
+    ChainFailureReason.NOT_YET_VALID_CERTIFICATE,
+    ChainFailureReason.ENVIRONMENT_MISMATCH,
+    ChainFailureReason.KEY_ID_MISMATCH,
+    ChainFailureReason.NO_AUTHORIZING_CERTIFICATE,
+    ChainFailureReason.MANIFEST_SIGNATURE_INVALID,
+  ]) {
+    assertEqual(
+      registryVerdictStateForChainFailure(judged),
+      RegistryVerdictState.UNTRUSTED,
+      `${judged} is a judgement that WAS reached`,
+    );
+  }
+  assertRefuses(() => registryVerdictStateForChainFailure('bad_signature'), /unknown chain failure reason/);
+}
+
+/** TEST8152: only a verified registry lets a cartridge attach — `pending`
+ *  included, which must never read as permission. */
+function test8152_onlyVerifiedPermitsAttachment() {
+  for (const state of REGISTRY_VERDICT_STATES) {
+    assertEqual(
+      registryVerdictPermitsAttachment(state),
+      state === RegistryVerdictState.VERIFIED,
+      `permits_attachment('${state}')`,
+    );
+  }
+}
+
+/** TEST8153: a refusal never resolves itself, so nothing may present it as
+ *  worth retrying. */
+function test8153_trustFailuresAreNeverTransient() {
+  for (const state of REGISTRY_VERDICT_STATES) {
+    assert(
+      !(registryVerdictIsTrustFailure(state) && registryVerdictIsTransient(state)),
+      `'${state}' cannot be both a refusal and something a retry could fix`,
+    );
+  }
+  assert(registryVerdictIsTrustFailure(RegistryVerdictState.UNVERIFIABLE));
+  assert(registryVerdictIsTrustFailure(RegistryVerdictState.UNTRUSTED));
+  assert(registryVerdictIsTrustFailure(RegistryVerdictState.UNSIGNED));
+  assert(registryVerdictIsTransient(RegistryVerdictState.UNREACHABLE));
+  assert(registryVerdictIsTransient(RegistryVerdictState.PENDING));
+  // Policy is not transient: it holds until an operator changes it.
+  assert(!registryVerdictIsTransient(RegistryVerdictState.OFFLINE));
+  assert(!registryVerdictIsTrustFailure(RegistryVerdictState.OFFLINE));
+}
+
+/** TEST8159: the remedy follows from the state, and "check the network" is
+ *  reachable from exactly one state. That sentence used to be appended to every
+ *  held-cartridge message whatever the cause, which is how a signature format a
+ *  build could not read sent operators to their router. */
+function test8159_theRemedyFollowsFromTheState() {
+  const network = REGISTRY_VERDICT_STATES.filter(
+    (state) => registryVerdictRemedy(state) === RegistryRemedy.CHECK_NETWORK,
+  );
+  assertEqual(network.length, 1, 'exactly one state is a network problem');
+  assertEqual(network[0], RegistryVerdictState.UNREACHABLE);
+  for (const state of REGISTRY_VERDICT_STATES) {
+    if (!registryVerdictIsTrustFailure(state)) continue;
+    const remedy = registryVerdictRemedy(state);
+    assert(
+      remedy === RegistryRemedy.DO_NOT_PROCEED || remedy === RegistryRemedy.UPDATE_CLIENT,
+      `'${state}' is a refusal; its remedy must not be a retry (got '${remedy}')`,
+    );
+  }
+  // The one that was misclassified: our limitation, so update the client —
+  // never distrust the registry, never touch the network.
+  assertEqual(registryVerdictRemedy(RegistryVerdictState.UNVERIFIABLE), RegistryRemedy.UPDATE_CLIENT);
+  assertEqual(registryVerdictRemedy(RegistryVerdictState.UNTRUSTED), RegistryRemedy.DO_NOT_PROCEED);
+  assertEqual(registryVerdictRemedy(RegistryVerdictState.VERIFIED), RegistryRemedy.NONE);
+  assertEqual(registryVerdictRemedy(RegistryVerdictState.PENDING), RegistryRemedy.WAIT);
+  // Policy is the operator's setting, not their router.
+  assertEqual(registryVerdictRemedy(RegistryVerdictState.OFFLINE), RegistryRemedy.CHANGE_NETWORK_POLICY);
+  assertRefuses(() => registryVerdictRemedy('flaky'), /unknown registry verdict state/);
+}
+
+/** TEST8154: illegal states are unrepresentable — every contradiction is
+ *  refused at construction. */
+function test8154_contradictoryVerdictsAreRefused() {
+  const URL = 'https://cartridges.example/v1/manifest';
+  const now = 1700000000;
+  assertRefuses(
+    () => RegistryVerdict.stated(URL, RegistryVerdictState.UNREACHABLE, '', now),
+    /must carry the detail/,
+  );
+  assertRefuses(
+    () => RegistryVerdict.stated(URL, RegistryVerdictState.VERIFIED, 'all good', now),
+    /states no failure/,
+  );
+  assertRefuses(
+    () => RegistryVerdict.stated(URL, RegistryVerdictState.HTTP_ERROR, '500', now),
+    /must carry the status/,
+  );
+  assertRefuses(
+    () => RegistryVerdict.stated(URL, RegistryVerdictState.UNTRUSTED, 'nope', now),
+    /must carry the chain failure reason/,
+  );
+  assertRefuses(
+    () => RegistryVerdict.stated('', RegistryVerdictState.UNREACHABLE, 'timeout', now),
+    /must name the registry/,
+  );
+  // A reason that contradicts the state it is filed under.
+  assertRefuses(
+    () => new RegistryVerdict(URL, RegistryVerdictState.UNTRUSTED, 'x', null,
+      ChainFailureReason.UNSUPPORTED_ENVELOPE_FORMAT, now),
+    /chain failure reason/,
+  );
+  // A status on a state that never answered.
+  assertRefuses(
+    () => new RegistryVerdict(URL, RegistryVerdictState.UNREACHABLE, 'timeout', 404, null, now),
+    /only an 'http_error' verdict carries an HTTP status/,
+  );
+}
+
+/** TEST8155: the wire form round-trips with its invariants intact. */
+function test8155_registryVerdictWireRoundTrip() {
+  const URL = 'https://cartridges.example/v1/manifest';
+  const now = 1700000000;
+  const verdict = RegistryVerdict.chainFailed(
+    URL,
+    ChainFailureReason.UNSUPPORTED_ENVELOPE_FORMAT,
+    "envelope format 'other/1' is not implemented by this build",
+    now,
+  );
+  assertEqual(verdict.state, RegistryVerdictState.UNVERIFIABLE);
+  const decoded = RegistryVerdict.fromJSON(JSON.parse(JSON.stringify(verdict.toJSON())));
+  assertEqual(decoded.state, verdict.state);
+  assertEqual(decoded.chain_failure, verdict.chain_failure);
+  assertEqual(decoded.detail, verdict.detail);
+  assertEqual(decoded.registry_url, verdict.registry_url);
+  assertEqual(decoded.permitsAttachment(), false);
+
+  const http = RegistryVerdict.httpError(URL, 404, 'registry answered HTTP 404', now);
+  assertEqual(http.http_status, 404);
+  assertEqual(RegistryVerdict.fromJSON(http.toJSON()).http_status, 404);
+
+  assertRefuses(
+    () => RegistryVerdict.fromJSON({
+      registry_url: URL, state: 'http_error', detail: 'answered badly',
+      http_status: null, chain_failure: null, checked_at_unix_seconds: now,
+    }),
+    /must carry the status/,
+  );
+  assertRefuses(
+    () => RegistryVerdict.fromJSON({
+      registry_url: URL, state: 'flaky', detail: 'hm',
+      http_status: null, chain_failure: null, checked_at_unix_seconds: now,
+    }),
+    /unknown registry verdict state/,
+  );
+}
+
+/** TEST8157: the format discriminators are the library's, so no consumer can
+ *  hold a divergent copy. A product rename that edits a client's private
+ *  constant makes that client verify nothing while every other implementation
+ *  keeps working — which is precisely what happened. */
+function test8157_signatureFormatDiscriminatorsComeFromTheLibrary() {
+  assertEqual(MANIFEST_SIG_FORMAT, 'machinefabric-manifest-sig/1');
+  assertEqual(RELEASE_KEY_CERT_FORMAT, 'machinefabric-release-key-cert/1');
+}
+
+/** TEST8158: the attachment vocabulary names the situations apart. */
+function test8158_attachmentKindsSeparateTheirSituations() {
+  assertEqual(CartridgeAttachmentErrorKind.MISPLACED, 'misplaced');
+  assertEqual(CartridgeAttachmentErrorKind.NOT_LISTED, 'not_listed');
+  assertEqual(CartridgeAttachmentErrorKind.REGISTRY_UNVERIFIED, 'registry_unverified');
+  assert(
+    CartridgeAttachmentErrorKind.BAD_INSTALLATION === undefined,
+    'bad_installation meant two things with different remedies and is gone',
+  );
+  assert(
+    CartridgeAttachmentErrorKind.REGISTRY_UNREACHABLE === undefined,
+    'registry_unreachable claimed a cause it could not know and is gone',
+  );
+}
+
 
 // Run the tests
 if (require.main === module) {

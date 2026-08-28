@@ -5416,6 +5416,306 @@ const CartridgeLifecycle = Object.freeze({
   OPERATIONAL: 'operational',
 });
 
+/**
+ * Format discriminator for release-key certificates.
+ * Mirrors Rust `RELEASE_KEY_CERT_FORMAT` (bifaci/release_cert.rs).
+ *
+ * THE WIRE FORMAT IS NOT A PRODUCT NAME. Every verifier — this library, the
+ * desktop clients' in-process verifiers, the publisher — must compare against
+ * THIS constant. A client that keeps its own copy can be renamed away from the
+ * protocol by a search-and-replace, verify nothing, and report the registry as
+ * unreachable; that is exactly what happened, and it is why these live here.
+ */
+const RELEASE_KEY_CERT_FORMAT = 'machinefabric-release-key-cert/1';
+
+/** Format discriminator for manifest signature envelopes.
+ *  Mirrors Rust `MANIFEST_SIG_FORMAT`. */
+const MANIFEST_SIG_FORMAT = 'machinefabric-manifest-sig/1';
+
+/**
+ * What a consumer concluded about a cartridge registry.
+ * Mirrors Rust `RegistryVerdictState` (bifaci/registry_verdict.rs).
+ *
+ * A REGISTRY IS NOT A CARTRIDGE: this is one fact per registry URL, shared by
+ * every cartridge that claims provenance from it. The vocabulary separates the
+ * two things a consumer can conclude — that it could not get an answer
+ * (OFFLINE, UNREACHABLE, HTTP_ERROR, MALFORMED) and that it got one and refused
+ * it (UNSIGNED, UNTRUSTED, UNVERIFIABLE) — because those have opposite
+ * remedies.
+ */
+const RegistryVerdictState = Object.freeze({
+  // Fetched, chain-verified and parsed. The only state that lets a cartridge
+  // from this registry attach.
+  VERIFIED: 'verified',
+  // No verdict yet — the first check has not run. NOT a failure.
+  PENDING: 'pending',
+  // The consumer's own network policy forbade the request. The remedy is a
+  // setting, not the network.
+  OFFLINE: 'offline',
+  // DNS, refused, timeout, TLS. The only state where "check your connection"
+  // is sound advice.
+  UNREACHABLE: 'unreachable',
+  // The registry answered with an HTTP error; the status travels with it.
+  HTTP_ERROR: 'http_error',
+  // The registry answered with a body this build cannot read as a manifest.
+  MALFORMED: 'malformed',
+  // No signature sidecar where one is required.
+  UNSIGNED: 'unsigned',
+  // The chain was evaluated and REJECTED — the registry's problem.
+  UNTRUSTED: 'untrusted',
+  // The chain could NOT be evaluated: a format this build does not implement.
+  // Our problem, remedied by updating the client — never by distrusting the
+  // registry, and never by checking the network.
+  UNVERIFIABLE: 'unverifiable',
+});
+
+/**
+ * WHAT TO DO ABOUT A REGISTRY IN A GIVEN STATE. Mirrors Rust `RegistryRemedy`.
+ *
+ * The remedy follows from the state and nothing else. It used to be a sentence
+ * glued onto the failure message at the point the record was built — "Check the
+ * network connection and try again." — appended whatever the cause, so a
+ * signature a build could not read sent operators to their router. A remedy
+ * asserted as fact regardless of what failed is worse than none.
+ *
+ * This is the ACTION, not its wording: a CLI prints a line, a desktop client
+ * offers a control. Both derive them from here.
+ */
+const RegistryRemedy = Object.freeze({
+  // Nothing to do — the registry verified.
+  NONE: 'none',
+  // A check is in flight and will answer on its own.
+  WAIT: 'wait',
+  // The machine cannot reach the registry. Check the connection.
+  CHECK_NETWORK: 'check_network',
+  // This build was told not to go out. Change the network policy.
+  CHANGE_NETWORK_POLICY: 'change_network_policy',
+  // The registry answered badly; it is the registry's side to fix.
+  RETRY_LATER: 'retry_later',
+  // This build cannot read the registry's signature format. Update the client —
+  // the registry is not at fault and the network is not involved.
+  UPDATE_CLIENT: 'update_client',
+  // The registry's answer was rejected. Do not proceed.
+  DO_NOT_PROCEED: 'do_not_proceed',
+});
+
+const _REGISTRY_REMEDY_BY_STATE = Object.freeze({
+  verified: RegistryRemedy.NONE,
+  pending: RegistryRemedy.WAIT,
+  offline: RegistryRemedy.CHANGE_NETWORK_POLICY,
+  unreachable: RegistryRemedy.CHECK_NETWORK,
+  http_error: RegistryRemedy.RETRY_LATER,
+  malformed: RegistryRemedy.RETRY_LATER,
+  unsigned: RegistryRemedy.DO_NOT_PROCEED,
+  untrusted: RegistryRemedy.DO_NOT_PROCEED,
+  unverifiable: RegistryRemedy.UPDATE_CLIENT,
+});
+
+/** The one thing to do about a registry in this state. */
+function registryVerdictRemedy(state) {
+  const remedy = _REGISTRY_REMEDY_BY_STATE[state];
+  if (remedy === undefined) {
+    throw new Error(`unknown registry verdict state '${state}'`);
+  }
+  return remedy;
+}
+
+/** Why a signature chain failed. Mirrors Rust `ChainFailureReason`. */
+const ChainFailureReason = Object.freeze({
+  MALFORMED_ENVELOPE: 'malformed_envelope',
+  UNSUPPORTED_ENVELOPE_FORMAT: 'unsupported_envelope_format',
+  MALFORMED_CERTIFICATE: 'malformed_certificate',
+  UNSUPPORTED_CERTIFICATE_FORMAT: 'unsupported_certificate_format',
+  EMPTY_CERTIFICATE_LIST: 'empty_certificate_list',
+  INSUFFICIENT_ROOT_SIGNATURES: 'insufficient_root_signatures',
+  EXPIRED_CERTIFICATE: 'expired_certificate',
+  NOT_YET_VALID_CERTIFICATE: 'not_yet_valid_certificate',
+  ENVIRONMENT_MISMATCH: 'environment_mismatch',
+  KEY_ID_MISMATCH: 'key_id_mismatch',
+  NO_AUTHORIZING_CERTIFICATE: 'no_authorizing_certificate',
+  MANIFEST_SIGNATURE_INVALID: 'manifest_signature_invalid',
+});
+
+const REGISTRY_VERDICT_STATES = Object.freeze(Object.values(RegistryVerdictState));
+const CHAIN_FAILURE_REASONS = Object.freeze(Object.values(ChainFailureReason));
+
+/** The reasons that mean the chain could not be EVALUATED, as opposed to being
+ *  evaluated and rejected. */
+const UNEVALUABLE_CHAIN_FAILURES = Object.freeze([
+  ChainFailureReason.MALFORMED_ENVELOPE,
+  ChainFailureReason.UNSUPPORTED_ENVELOPE_FORMAT,
+  ChainFailureReason.MALFORMED_CERTIFICATE,
+  ChainFailureReason.UNSUPPORTED_CERTIFICATE_FORMAT,
+  ChainFailureReason.EMPTY_CERTIFICATE_LIST,
+]);
+
+/**
+ * The verdict a chain failure produces.
+ *
+ * Could the chain be evaluated at all? A format this build does not implement
+ * means no judgement was reached (UNVERIFIABLE — update the client). Anything
+ * else means the chain WAS judged and found wanting (UNTRUSTED — do not
+ * proceed). Leaving this decision to each consumer is how one client reported
+ * an unreadable signature format as a network outage.
+ */
+function registryVerdictStateForChainFailure(reason) {
+  if (!CHAIN_FAILURE_REASONS.includes(reason)) {
+    throw new Error(`unknown chain failure reason '${reason}'`);
+  }
+  return UNEVALUABLE_CHAIN_FAILURES.includes(reason)
+    ? RegistryVerdictState.UNVERIFIABLE
+    : RegistryVerdictState.UNTRUSTED;
+}
+
+/** Whether a cartridge from a registry in this state may attach. */
+function registryVerdictPermitsAttachment(state) {
+  if (!REGISTRY_VERDICT_STATES.includes(state)) {
+    throw new Error(`unknown registry verdict state '${state}'`);
+  }
+  return state === RegistryVerdictState.VERIFIED;
+}
+
+/** Whether the state is a refusal of an answer we DID get. Never changes on retry. */
+function registryVerdictIsTrustFailure(state) {
+  if (!REGISTRY_VERDICT_STATES.includes(state)) {
+    throw new Error(`unknown registry verdict state '${state}'`);
+  }
+  return state === RegistryVerdictState.UNSIGNED
+    || state === RegistryVerdictState.UNTRUSTED
+    || state === RegistryVerdictState.UNVERIFIABLE;
+}
+
+/** Whether an unattended retry could plausibly reach a different verdict. */
+function registryVerdictIsTransient(state) {
+  if (!REGISTRY_VERDICT_STATES.includes(state)) {
+    throw new Error(`unknown registry verdict state '${state}'`);
+  }
+  return state === RegistryVerdictState.PENDING
+    || state === RegistryVerdictState.UNREACHABLE
+    || state === RegistryVerdictState.HTTP_ERROR
+    || state === RegistryVerdictState.MALFORMED;
+}
+
+/**
+ * What a consumer concluded about one registry, and why.
+ * Mirrors Rust `RegistryVerdict`.
+ *
+ * Illegal combinations are unrepresentable: the constructors take exactly what
+ * their state requires and `validate()` refuses every contradiction, so a
+ * verdict that says "http_error" without a status, or "verified" with a failure
+ * detail, is refused at the boundary instead of rendered as a contradiction.
+ */
+class RegistryVerdict {
+  constructor(registryUrl, state, detail, httpStatus, chainFailure, checkedAtUnixSeconds) {
+    this.registry_url = registryUrl;
+    this.state = state;
+    this.detail = detail;
+    this.http_status = httpStatus === undefined ? null : httpStatus;
+    this.chain_failure = chainFailure === undefined ? null : chainFailure;
+    this.checked_at_unix_seconds = checkedAtUnixSeconds;
+    this.validate();
+  }
+
+  static verified(registryUrl, checkedAtUnixSeconds) {
+    return new RegistryVerdict(registryUrl, RegistryVerdictState.VERIFIED, '', null, null, checkedAtUnixSeconds);
+  }
+
+  /** No verdict yet. Carries no time, because nothing has been checked. */
+  static pending(registryUrl) {
+    return new RegistryVerdict(registryUrl, RegistryVerdictState.PENDING, '', null, null, 0);
+  }
+
+  /** A state carrying only a detail line: OFFLINE, UNREACHABLE, MALFORMED, UNSIGNED. */
+  static stated(registryUrl, state, detail, checkedAtUnixSeconds) {
+    return new RegistryVerdict(registryUrl, state, detail, null, null, checkedAtUnixSeconds);
+  }
+
+  static httpError(registryUrl, status, detail, checkedAtUnixSeconds) {
+    return new RegistryVerdict(registryUrl, RegistryVerdictState.HTTP_ERROR, detail, status, null, checkedAtUnixSeconds);
+  }
+
+  /** A signature chain that failed. The state FOLLOWS from the reason, so a
+   *  caller cannot file an unreadable format as a rejected key. */
+  static chainFailed(registryUrl, reason, detail, checkedAtUnixSeconds) {
+    return new RegistryVerdict(
+      registryUrl,
+      registryVerdictStateForChainFailure(reason),
+      detail,
+      null,
+      reason,
+      checkedAtUnixSeconds,
+    );
+  }
+
+  validate() {
+    if (typeof this.registry_url !== 'string' || this.registry_url.length === 0) {
+      throw new Error('a registry verdict must name the registry it is about');
+    }
+    if (!REGISTRY_VERDICT_STATES.includes(this.state)) {
+      throw new Error(`unknown registry verdict state '${this.state}'`);
+    }
+    if (typeof this.detail !== 'string') {
+      throw new Error('a registry verdict detail must be a string');
+    }
+    const statesNoFailure = this.state === RegistryVerdictState.VERIFIED
+      || this.state === RegistryVerdictState.PENDING;
+    if (statesNoFailure && this.detail.length > 0) {
+      throw new Error(`a '${this.state}' verdict states no failure, so it carries no detail (got ${JSON.stringify(this.detail)})`);
+    }
+    if (!statesNoFailure && this.detail.length === 0) {
+      throw new Error(`a '${this.state}' verdict must carry the detail that explains it`);
+    }
+    if (this.state === RegistryVerdictState.HTTP_ERROR) {
+      if (!Number.isInteger(this.http_status)) {
+        throw new Error("an 'http_error' verdict must carry the status the registry answered with");
+      }
+    } else if (this.http_status !== null) {
+      throw new Error(`only an 'http_error' verdict carries an HTTP status (got one on '${this.state}')`);
+    }
+    const chainStates = this.state === RegistryVerdictState.UNTRUSTED
+      || this.state === RegistryVerdictState.UNVERIFIABLE;
+    if (chainStates) {
+      if (this.chain_failure === null) {
+        throw new Error(`a '${this.state}' verdict must carry the chain failure reason that produced it`);
+      }
+      if (registryVerdictStateForChainFailure(this.chain_failure) !== this.state) {
+        throw new Error(`only a trust failure carries a chain failure reason (got one on '${this.state}')`);
+      }
+    } else if (this.chain_failure !== null) {
+      throw new Error(`only a trust failure carries a chain failure reason (got one on '${this.state}')`);
+    }
+    if (!Number.isFinite(this.checked_at_unix_seconds)) {
+      throw new Error('a registry verdict must say when it was reached');
+    }
+  }
+
+  permitsAttachment() {
+    return registryVerdictPermitsAttachment(this.state);
+  }
+
+  toJSON() {
+    return {
+      registry_url: this.registry_url,
+      state: this.state,
+      detail: this.detail,
+      http_status: this.http_status,
+      chain_failure: this.chain_failure,
+      checked_at_unix_seconds: this.checked_at_unix_seconds,
+    };
+  }
+
+  static fromJSON(d) {
+    return new RegistryVerdict(
+      d.registry_url,
+      d.state,
+      d.detail,
+      d.http_status === undefined ? null : d.http_status,
+      d.chain_failure === undefined ? null : d.chain_failure,
+      d.checked_at_unix_seconds,
+    );
+  }
+}
+
 const CartridgeAttachmentErrorKind = Object.freeze({
   INCOMPATIBLE: 'incompatible',
   MANIFEST_INVALID: 'manifest_invalid',
@@ -5428,12 +5728,20 @@ const CartridgeAttachmentErrorKind = Object.freeze({
   // channel folder doesn't match the manifest's channel, or a bundled-cartridge
   // integrity proof failed. Structurally well-formed but cannot be trusted
   // because its placement on disk does not match what it claims to be.
-  BAD_INSTALLATION: 'bad_installation',
+  // Recovery is "reinstall".
+  MISPLACED: 'misplaced',
+  // The cartridge's registry verified, and does not list this
+  // (channel, id, version): the artefact says it came from somewhere that has
+  // never heard of it. Recovery is "wait for the publish, or rebuild as dev".
+  NOT_LISTED: 'not_listed',
   // Operator explicitly disabled this cartridge through the host UI.
   DISABLED: 'disabled',
-  // The cartridge declares a non-null registry_url but the host could not
-  // reach that registry to verify the cartridge is listed.
-  REGISTRY_UNREACHABLE: 'registry_unreachable',
+  // The cartridge declares a non-null registry_url and that registry's verdict
+  // is not `verified`, so its provenance claim is unconfirmed. WHY belongs to
+  // the registry, not the cartridge — consumers join on registry_url and read
+  // the RegistryVerdict, which is one fact per registry rather than one per
+  // cartridge that claims it.
+  REGISTRY_UNVERIFIED: 'registry_unverified',
   // The cartridge was built against a different fabric registry manifest
   // version than this host is pinned to.
   FABRIC_MANIFEST_VERSION_MISMATCH: 'fabric_manifest_version_mismatch',
@@ -5708,7 +6016,7 @@ function validateRegistryUrlScheme(url, devMode) {
 /**
  * Error kinds for CartridgeJson reading/validation. Mirrors the variants of
  * Rust CartridgeJsonError. `RegistrySlugMismatch` is the three-place
- * consistency failure that discovery maps to BAD_INSTALLATION.
+ * consistency failure that discovery maps to MISPLACED.
  */
 const CartridgeJsonErrorKind = Object.freeze({
   NOT_FOUND: 'not_found',
@@ -5722,7 +6030,7 @@ const CartridgeJsonErrorKind = Object.freeze({
 
 /**
  * Error thrown by CartridgeJson.readFromDir. Carries a structured `kind` so
- * discovery can map a slug mismatch to BAD_INSTALLATION and everything else
+ * discovery can map a slug mismatch to MISPLACED and everything else
  * to MANIFEST_INVALID. Mirrors Rust CartridgeJsonError.
  */
 class CartridgeJsonError extends Error {
@@ -6460,7 +6768,7 @@ async function scanChannelRoot(scanRoot, expectedSlug, identity, discovered) {
       cj = CartridgeJson.readFromDir(versionDir, expectedSlug);
     } catch (e) {
       const kind = (e instanceof CartridgeJsonError && e.kind === CartridgeJsonErrorKind.REGISTRY_SLUG_MISMATCH)
-        ? CartridgeAttachmentErrorKind.BAD_INSTALLATION
+        ? CartridgeAttachmentErrorKind.MISPLACED
         : CartridgeAttachmentErrorKind.MANIFEST_INVALID;
       discovered.push(DiscoveredCartridge.incompatible({
         version_dir: versionDir,
@@ -6485,7 +6793,7 @@ async function scanChannelRoot(scanRoot, expectedSlug, identity, discovered) {
         registry_url: cj.registryUrl,
         version: cj.version,
         error: new CartridgeAttachmentError(
-          CartridgeAttachmentErrorKind.BAD_INSTALLATION,
+          CartridgeAttachmentErrorKind.MISPLACED,
           `Channel mismatch: cartridge declares '${cj.channel}' but host is pinned to '${identity.channel}'. Release and nightly artefacts must not mix.`,
           detectedAt
         ),
@@ -6562,7 +6870,7 @@ async function scanChannelRoot(scanRoot, expectedSlug, identity, discovered) {
             registry_url: cj.registryUrl,
             version: cj.version,
             error: new CartridgeAttachmentError(
-              CartridgeAttachmentErrorKind.BAD_INSTALLATION,
+              CartridgeAttachmentErrorKind.MISPLACED,
               `bundled cartridge integrity check failed: ${reason}`,
               detectedAt
             ),
@@ -8108,6 +8416,21 @@ const planner = require('./planner.js');
 
 // Export for CommonJS
 module.exports = {
+  // Registry trust vocabulary — one verdict per registry, shared by every
+  // cartridge that claims provenance from it.
+  RegistryVerdict,
+  RegistryVerdictState,
+  ChainFailureReason,
+  REGISTRY_VERDICT_STATES,
+  CHAIN_FAILURE_REASONS,
+  registryVerdictStateForChainFailure,
+  registryVerdictPermitsAttachment,
+  registryVerdictIsTrustFailure,
+  registryVerdictIsTransient,
+  RegistryRemedy,
+  registryVerdictRemedy,
+  MANIFEST_SIG_FORMAT,
+  RELEASE_KEY_CERT_FORMAT,
   // Planner plan-space vocabulary
   PlanStateError: planner.PlanStateError,
   ConvergencePresence: planner.ConvergencePresence,
