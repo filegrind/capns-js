@@ -7472,6 +7472,7 @@ async function runTests() {
   runTest('TEST8153: trust_failures_never_transient', test8153_trustFailuresAreNeverTransient);
   runTest('TEST8154: contradictory_verdicts_refused', test8154_contradictoryVerdictsAreRefused);
   runTest('TEST8159: remedy_follows_from_state', test8159_theRemedyFollowsFromTheState);
+  runTest('TEST8162: a_verdict_says_the_same_thing_at_a_different_time', test8162_aVerdictSaysTheSameThingAtADifferentTime);
   runTest('TEST8155: registry_verdict_wire_round_trip', test8155_registryVerdictWireRoundTrip);
   runTest('TEST8157: signature_formats_from_library', test8157_signatureFormatDiscriminatorsComeFromTheLibrary);
   runTest('TEST8158: attachment_kinds_separate_situations', test8158_attachmentKindsSeparateTheirSituations);
@@ -7822,6 +7823,41 @@ function test8153_trustFailuresAreNeverTransient() {
   // Policy is not transient: it holds until an operator changes it.
   assert(!registryVerdictIsTransient(RegistryVerdictState.OFFLINE));
   assert(!registryVerdictIsTrustFailure(RegistryVerdictState.OFFLINE));
+}
+
+/** TEST8162: WHEN IS A VERDICT NEWS? Both desktop clients re-verify their
+ *  registries after every discovery round and re-run discovery when the
+ *  verdicts "changed". Change had to mean "the registry said something
+ *  different", and comparing whole verdicts cannot mean that: they carry the
+ *  moment of the check, so the same answer taken a second later is a different
+ *  value. That is the loop that left an engine discovering cartridges forever. */
+function test8162_aVerdictSaysTheSameThingAtADifferentTime() {
+  const earlier = RegistryVerdict.verified('https://r.example', 1756000000);
+  const later = RegistryVerdict.verified('https://r.example', 1756000931);
+  assert(
+    JSON.stringify(earlier.toJSON()) !== JSON.stringify(later.toJSON()),
+    'they are not the same value — one is a later check',
+  );
+  assert(earlier.statesTheSameAs(later), 'but they say the same thing about the registry');
+
+  for (const differing of [
+    RegistryVerdict.stated('https://r.example', RegistryVerdictState.UNREACHABLE, 'connection timed out', 1756000000),
+    RegistryVerdict.httpError('https://r.example', 503, 'the registry answered HTTP 503', 1756000000),
+    RegistryVerdict.chainFailed('https://r.example', ChainFailureReason.MANIFEST_SIGNATURE_INVALID, 'signature does not verify', 1756000000),
+    RegistryVerdict.verified('https://other.example/manifest', 1756000000),
+  ]) {
+    assert(!earlier.statesTheSameAs(differing), `${differing.state} is a different statement about the registry`);
+  }
+
+  // 404 and 503 are different situations with different remedies.
+  assert(
+    !RegistryVerdict.httpError('https://r.example', 404, 'the registry answered HTTP 404', 1756000000)
+      .statesTheSameAs(RegistryVerdict.httpError('https://r.example', 503, 'the registry answered HTTP 503', 1756000000)),
+    '404 and 503 are different situations with different remedies',
+  );
+
+  assertRefuses(() => earlier.statesTheSameAs({ state: 'verified' }),
+    /compares two registry verdicts/, 'a bare object is not a verdict');
 }
 
 /** TEST8159: the remedy follows from the state, and "check the network" is

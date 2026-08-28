@@ -5707,6 +5707,27 @@ class RegistryVerdict {
     return registryVerdictPermitsAttachment(this.state);
   }
 
+  /**
+   * WHETHER TWO VERDICTS SAY THE SAME THING ABOUT THE REGISTRY.
+   *
+   * Not a deep-equality check. A verdict carries `checked_at_unix_seconds`,
+   * which is provenance about the CHECK and not about the registry — so a
+   * consumer asking "did this change?" by comparing whole verdicts is told yes
+   * on every re-check, forever. Both desktop clients asked exactly that to
+   * decide whether to re-run cartridge discovery, and the answer drove a loop
+   * that left the engine discovering cartridges and never reaching ready.
+   */
+  statesTheSameAs(other) {
+    if (!(other instanceof RegistryVerdict)) {
+      throw new Error('statesTheSameAs compares two registry verdicts');
+    }
+    return this.registry_url === other.registry_url
+      && this.state === other.state
+      && this.detail === other.detail
+      && this.http_status === other.http_status
+      && this.chain_failure === other.chain_failure;
+  }
+
   toJSON() {
     return {
       registry_url: this.registry_url,
