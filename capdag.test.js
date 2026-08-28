@@ -7734,7 +7734,7 @@ async function runTests() {
 function test8150_registryVerdictStatesAreTheClosedWireVocabulary() {
   const expected = [
     'verified', 'pending', 'offline', 'unreachable',
-    'http_error', 'malformed', 'unsigned', 'untrusted', 'unverifiable',
+    'http_error', 'malformed', 'unsigned', 'untrusted', 'unverifiable', 'unenforced',
   ];
   assertEqual(REGISTRY_VERDICT_STATES.length, expected.length, 'state count matches the Rust mirror');
   for (const state of expected) {
@@ -7793,10 +7793,16 @@ function test8152_onlyVerifiedPermitsAttachment() {
   for (const state of REGISTRY_VERDICT_STATES) {
     assertEqual(
       registryVerdictPermitsAttachment(state),
-      state === RegistryVerdictState.VERIFIED,
+      state === RegistryVerdictState.VERIFIED || state === RegistryVerdictState.UNENFORCED,
       `permits_attachment('${state}')`,
     );
   }
+  // A DEV BUILD HAS TO WORK, and it says which of the two it is: "we checked
+  // and it passed" and "we did not check" are different facts.
+  assert(registryVerdictPermitsAttachment(RegistryVerdictState.UNENFORCED));
+  assert(!registryVerdictIsTrustFailure(RegistryVerdictState.UNENFORCED));
+  assert(!registryVerdictIsTransient(RegistryVerdictState.UNENFORCED));
+  assertEqual(registryVerdictRemedy(RegistryVerdictState.UNENFORCED), RegistryRemedy.NONE);
 }
 
 /** TEST8153: a refusal never resolves itself, so nothing may present it as

@@ -5467,6 +5467,12 @@ const RegistryVerdictState = Object.freeze({
   // Our problem, remedied by updating the client — never by distrusting the
   // registry, and never by checking the network.
   UNVERIFIABLE: 'unverifiable',
+  // This build bakes no trust anchors, so there is no regime to verify against
+  // and the manifest was accepted without proof. A development build, and only
+  // ever that. It permits attachment — a dev build has to work — and is a
+  // SEPARATE state rather than being reported as VERIFIED, because "we checked
+  // and it passed" and "we did not check" are different facts.
+  UNENFORCED: 'unenforced',
 });
 
 /**
@@ -5509,6 +5515,7 @@ const _REGISTRY_REMEDY_BY_STATE = Object.freeze({
   unsigned: RegistryRemedy.DO_NOT_PROCEED,
   untrusted: RegistryRemedy.DO_NOT_PROCEED,
   unverifiable: RegistryRemedy.UPDATE_CLIENT,
+  unenforced: RegistryRemedy.NONE,
 });
 
 /** The one thing to do about a registry in this state. */
@@ -5572,7 +5579,7 @@ function registryVerdictPermitsAttachment(state) {
   if (!REGISTRY_VERDICT_STATES.includes(state)) {
     throw new Error(`unknown registry verdict state '${state}'`);
   }
-  return state === RegistryVerdictState.VERIFIED;
+  return state === RegistryVerdictState.VERIFIED || state === RegistryVerdictState.UNENFORCED;
 }
 
 /** Whether the state is a refusal of an answer we DID get. Never changes on retry. */
@@ -5620,6 +5627,12 @@ class RegistryVerdict {
     return new RegistryVerdict(registryUrl, RegistryVerdictState.VERIFIED, '', null, null, checkedAtUnixSeconds);
   }
 
+  /** This build bakes no trust anchors: the manifest was accepted without
+   *  proof, and says so rather than claiming it verified. */
+  static unenforced(registryUrl, checkedAtUnixSeconds) {
+    return new RegistryVerdict(registryUrl, RegistryVerdictState.UNENFORCED, '', null, null, checkedAtUnixSeconds);
+  }
+
   /** No verdict yet. Carries no time, because nothing has been checked. */
   static pending(registryUrl) {
     return new RegistryVerdict(registryUrl, RegistryVerdictState.PENDING, '', null, null, 0);
@@ -5658,7 +5671,8 @@ class RegistryVerdict {
       throw new Error('a registry verdict detail must be a string');
     }
     const statesNoFailure = this.state === RegistryVerdictState.VERIFIED
-      || this.state === RegistryVerdictState.PENDING;
+      || this.state === RegistryVerdictState.PENDING
+      || this.state === RegistryVerdictState.UNENFORCED;
     if (statesNoFailure && this.detail.length > 0) {
       throw new Error(`a '${this.state}' verdict states no failure, so it carries no detail (got ${JSON.stringify(this.detail)})`);
     }
